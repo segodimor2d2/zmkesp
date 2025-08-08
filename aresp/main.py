@@ -24,7 +24,11 @@ pot4.atten(ADC.ATTN_11DB)
 #pot5.atten(ADC.ATTN_11DB)
 '''
 
-pots = [TouchPad(Pin(pin)) for pin in (13, 12, 14, 27, 4)]
+pot1 = TouchPad(Pin(13)) #0
+pot2 = TouchPad(Pin(12)) #1
+pot3 = TouchPad(Pin(14)) #2
+pot4 = TouchPad(Pin(27)) #3
+pot5 = TouchPad(Pin(4)) #4
 
 print()
 print('*********************************')

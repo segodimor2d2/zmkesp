@@ -2,12 +2,33 @@ import time
 import math
 import mpu6050
 from machine import Pin, SoftI2C, ADC, TouchPad
+from hid_services import Keyboard
+import network
+import espnow
 
 print()
 print('*********************************')
 
-def send_charPs(abckey):
-    print(abckey)
+def send_charPs(abckey, kb):
+    if abckey == '': char = hidcodes['KEY_NONE']
+    elif abckey in hidcodes: char = hidcodes[abckey]
+    else: char = hidcodes['KEY_NONE']
+
+    if abckey == 'KEY_LSHIFT': kb.set_modifiers(left_shift=1)
+    elif abckey == 'KEY_RSHIFT': kb.set_modifiers(right_shift=1)
+    elif abckey == 'KEY_LCTRL': kb.set_modifiers(left_control=1)
+    elif abckey == 'KEY_RCTRL': kb.set_modifiers(right_control=1)
+    elif abckey == 'KEY_LALT': kb.set_modifiers(left_alt=1)
+    elif abckey == 'KEY_RALT': kb.set_modifiers(right_alt=1)
+
+    kb.set_keys(char)
+    kb.notify_hid_report()
+    time.sleep_ms(2)
+
+    kb.set_keys()
+    kb.set_modifiers()
+    kb.notify_hid_report()
+    time.sleep_ms(2)
 
 def vibrar(n_pulsos, step=None):
     for _ in range(n_pulsos):
@@ -16,7 +37,7 @@ def vibrar(n_pulsos, step=None):
             time.sleep_ms(200)
         else:
             #time.sleep_ms(70)
-            time.sleep_ms(101)
+            time.sleep_ms(100)
         #time.sleep_ms(200)
         pino_vibracao.off()
         time.sleep_ms(70)
@@ -81,7 +102,7 @@ def startlimpot(arrlim,vals):
         arrlim[i] = vals
     return arrlim
 
-def run(tsleep,tclear,samples):
+def run(tsleep,tclear,samples,e):
 
     bufferPot = [[],[],[],[],[]]
     for i in range(40):
@@ -299,13 +320,14 @@ def run(tsleep,tclear,samples):
                 print(stepY,stepX,'\t',abclevel[i],cycle)
                 #print(stepY,stepX,'\t',abclevel[i],threshPot[i],pval[i],cycle)
 
-                send_charPs(abclevel[i])
+                send_charPs(abclevel[i], kb)
                 triggerPot[i] = True
                 holdclick = True
                 wait2Zero = False
                 cycle = 0
 
             elif triggerPot[i] and pval[i] >= threshPot[i]:
+                #send_charRl(kb)
                 triggerPot[i] = False
                 holdclick = False
                 wait2Zero = True
@@ -314,6 +336,21 @@ def run(tsleep,tclear,samples):
             #   print(triggerPot[i])
         
         #--------------------------------------------
+        try:
+            host, msg = e.irecv(0)
+            if msg:
+                msg = msg.decode('utf-8')
+                abcL, stt = msg.split(';')
+                print(abcL, stt)
+                if stt == '1':
+                    send_charPs(abcL, kb)
+                #if stt == '0':
+                #    send_charRl(kb)
+                    #send_charPs(abcL, kb)
+        except OSError as err:
+            print(err)
+        #--------------------------------------------
+
 
         if wait2Zero: cycle += 1
         if cycle == 20:
@@ -326,48 +363,77 @@ def run(tsleep,tclear,samples):
         num+=1
         time.sleep_ms(tsleep)
 
+def advertising(kb):
+    print('\n.......................start_advertising')
+    kb.start_advertising()
+    while True:
+        if kb.get_state() == 3:
+            print('tf2kb connected!')
+            kb.stop_advertising()
+            break
+        time.sleep_ms(1000)
+        print('...')
 
 #---------------------------------------------------------------
+# print('\n.......................')
+kb = Keyboard("tf2kb")
+kb.set_state_change_callback(None)
+kb.start()
 
+advertising(kb)
+kb.get_state()
 
-from hidcodes import hidcodes, abc 
-
-i2c = SoftI2C(scl=Pin(22), sda=Pin(21))
-mpuSensor = mpu6050.accel(i2c)
-
-pino_vibracao = Pin(33, Pin.OUT)
-
-vibrar(4)
-
-
-'''
-pot1 = ADC(Pin(34))
-pot2 = ADC(Pin(35))
-pot3 = ADC(Pin(32))
-pot4 = ADC(Pin(33))
-#pot5 = ADC(Pin(39))
-
-pot1.atten(ADC.ATTN_11DB)
-pot2.atten(ADC.ATTN_11DB)
-pot3.atten(ADC.ATTN_11DB)
-pot4.atten(ADC.ATTN_11DB)
-#pot5.atten(ADC.ATTN_11DB)
-'''
-
-pot1 = TouchPad(Pin(13)) #0
-pot2 = TouchPad(Pin(12)) #1
-pot3 = TouchPad(Pin(14)) #2
-pot4 = TouchPad(Pin(27)) #3
-pot5 = TouchPad(Pin(4)) #4
+#1 si kb.get_state() DEVICE_IDLE = desconectado
+#2 si kb.get_state() DEVICE_ADVERTISING = disponibilidade
+#3 si kb.get_state() DEVICE_CONNECTED = conectaado
 
 #---------------------------------------------------------------
-TSLEEP=50
-TCLEAR=10000
-#TCLEAR=10000
-SAMPLES = 5 
+print('\n.......................')
+if kb.get_state() == 3:
 
-run(TSLEEP,TCLEAR,SAMPLES)
+    from hidcodes import hidcodes, abc 
 
+    i2c = SoftI2C(scl=Pin(22), sda=Pin(21))
+    mpuSensor = mpu6050.accel(i2c)
+
+    pino_vibracao = Pin(33, Pin.OUT)
+
+    vibrar(4)
+
+
+    '''
+    pot1 = ADC(Pin(34))
+    pot2 = ADC(Pin(35))
+    pot3 = ADC(Pin(32))
+    pot4 = ADC(Pin(33))
+    #pot5 = ADC(Pin(39))
+
+    pot1.atten(ADC.ATTN_11DB)
+    pot2.atten(ADC.ATTN_11DB)
+    pot3.atten(ADC.ATTN_11DB)
+    pot4.atten(ADC.ATTN_11DB)
+    #pot5.atten(ADC.ATTN_11DB)
+    '''
+
+    pot1 = TouchPad(Pin(13)) #0
+    pot2 = TouchPad(Pin(12)) #1
+    pot3 = TouchPad(Pin(14)) #2
+    pot4 = TouchPad(Pin(27)) #3
+    pot5 = TouchPad(Pin(4)) #4
+
+    # ESPNOW - A WLAN interface must be active to send()/recv()
+    sta = network.WLAN(network.STA_IF)
+    sta.active(True)
+    #sta.disconnect()   # Because ESP8266 auto-connects to last Access Point
+    e = espnow.ESPNow()
+    e.active(True)
+    #---------------------------------------------------------------
+    TSLEEP=50
+    TCLEAR=10000
+    #TCLEAR=10000
+    SAMPLES = 5 
+
+    run(TSLEEP,TCLEAR,SAMPLES,e)
 
 
 

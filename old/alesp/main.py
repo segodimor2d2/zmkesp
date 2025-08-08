@@ -2,12 +2,17 @@ import time
 import math
 import mpu6050
 from machine import Pin, SoftI2C, ADC, TouchPad
+#from hid_services import Keyboard
+import network
+import espnow
 
 print()
 print('*********************************')
 
-def send_charPs(abckey):
-    print(abckey)
+def send_charPs(abckey, stt, peer):
+    msg = '%s;%s' % (abckey,stt)
+    #e.send(peer, msg, True)
+    e.send(peer, msg)
 
 def vibrar(n_pulsos, step=None):
     for _ in range(n_pulsos):
@@ -16,7 +21,7 @@ def vibrar(n_pulsos, step=None):
             time.sleep_ms(200)
         else:
             #time.sleep_ms(70)
-            time.sleep_ms(101)
+            time.sleep_ms(100)        
         #time.sleep_ms(200)
         pino_vibracao.off()
         time.sleep_ms(70)
@@ -81,7 +86,7 @@ def startlimpot(arrlim,vals):
         arrlim[i] = vals
     return arrlim
 
-def run(tsleep,tclear,samples):
+def run(tsleep,tclear,samples,e,peer):
 
     bufferPot = [[],[],[],[],[]]
     for i in range(40):
@@ -148,11 +153,13 @@ def run(tsleep,tclear,samples):
     gy1, gy2 = 0, 1 # normal
     #gy1, gy2 = 1, 0 # invertido
 
-    abcR = abc[1]
+    abcR = abc[0]
     abclevel = abcR[0]
 
     vibrar(2)
     while True:
+
+        #host, msg = e.recv()
 
         gyro, accl = media(buffer)
         #print(gyro[0],gyro[1],gyro[2])
@@ -206,8 +213,8 @@ def run(tsleep,tclear,samples):
 
         #--------------------------------------------
         if not evntTriggeredYP and not holdclick and gyro[gy2] > threshP:
-            if gy2 == 0: stepY += 1
-            if gy2 == 1: stepY -= 1
+            if gy2 == 0: stepY -= 1
+            if gy2 == 1: stepY += 1
             vibrar(1,stepY)
             evntTriggeredYP = True
             wait2Zero = False
@@ -218,8 +225,8 @@ def run(tsleep,tclear,samples):
             wait2Zero = True
 
         if not evntTriggeredYN and not holdclick and gyro[gy2] < threshN:
-            if gy2 == 0: stepY -= 1
-            if gy2 == 1: stepY += 1
+            if gy2 == 0: stepY += 1
+            if gy2 == 1: stepY -= 1
             vibrar(1,stepY)
             evntTriggeredYN = True
             wait2Zero = False
@@ -232,16 +239,16 @@ def run(tsleep,tclear,samples):
         if evntTriggeredYP: stepWaitYP += 1
         else: stepWaitYP = 0
         if stepWaitYP >= 5:
-            if gy1 == 0: stepY -= 1
-            if gy1 == 1: stepY += 1
+            if gy1 == 0: stepY += 1
+            if gy1 == 1: stepY -= 1
             stepWaitYP = 0
             vibrar(1,stepY)
 
         if evntTriggeredYN: stepWaitYN += 1
         else: stepWaitYN = 0
         if stepWaitYN >= 5:
-            if gy1 == 0: stepY += 1
-            if gy1 == 1: stepY -= 1
+            if gy1 == 0: stepY -= 1
+            if gy1 == 1: stepY += 1
             stepWaitYN = 0
             vibrar(1,stepY)
         #--------------------------------------------
@@ -299,13 +306,16 @@ def run(tsleep,tclear,samples):
                 print(stepY,stepX,'\t',abclevel[i],cycle)
                 #print(stepY,stepX,'\t',abclevel[i],threshPot[i],pval[i],cycle)
 
-                send_charPs(abclevel[i])
+                #send_charPs(abclevel[i], kb)
+                send_charPs(abclevel[i], 1, peer)
                 triggerPot[i] = True
                 holdclick = True
                 wait2Zero = False
                 cycle = 0
 
             elif triggerPot[i] and pval[i] >= threshPot[i]:
+                #send_charRl(kb)
+                send_charPs(abclevel[i], 0, peer)
                 triggerPot[i] = False
                 holdclick = False
                 wait2Zero = True
@@ -314,6 +324,9 @@ def run(tsleep,tclear,samples):
             #   print(triggerPot[i])
         
         #--------------------------------------------
+        #if msg:
+        #    print(msg)
+
 
         if wait2Zero: cycle += 1
         if cycle == 20:
@@ -326,16 +339,41 @@ def run(tsleep,tclear,samples):
         num+=1
         time.sleep_ms(tsleep)
 
+'''
+def advertising(kb):
+    print('\n.......................start_advertising')
+    kb.start_advertising()
+    while True:
+        if kb.get_state() == 3:
+            print('tf2kb connected!')
+            kb.stop_advertising()
+            break
+        time.sleep_ms(1000)
+        print('...')
+'''
 
 #---------------------------------------------------------------
+print('\n.......................')
+#kb = Keyboard("tf2kb")
+#kb.set_state_change_callback(None)
+#kb.start()
 
+#advertising(kb)
+#kb.get_state()
+#1 si kb.get_state() DEVICE_IDLE = desconectado
+#2 si kb.get_state() DEVICE_ADVERTISING = disponibilidade
+#3 si kb.get_state() DEVICE_CONNECTED = conectaado
+
+#---------------------------------------------------------------
+print('\n.......................')
+#if kb.get_state() == 3:
 
 from hidcodes import hidcodes, abc 
 
 i2c = SoftI2C(scl=Pin(22), sda=Pin(21))
 mpuSensor = mpu6050.accel(i2c)
 
-pino_vibracao = Pin(33, Pin.OUT)
+pino_vibracao = Pin(32, Pin.OUT)
 
 vibrar(4)
 
@@ -354,11 +392,20 @@ pot4.atten(ADC.ATTN_11DB)
 #pot5.atten(ADC.ATTN_11DB)
 '''
 
-pot1 = TouchPad(Pin(13)) #0
-pot2 = TouchPad(Pin(12)) #1
-pot3 = TouchPad(Pin(14)) #2
-pot4 = TouchPad(Pin(27)) #3
-pot5 = TouchPad(Pin(4)) #4
+pot5 = TouchPad(Pin(33)) #
+pot4 = TouchPad(Pin(13)) #
+pot3 = TouchPad(Pin(15)) #
+pot2 = TouchPad(Pin(04)) #
+pot1 = TouchPad(Pin(27)) #
+
+# ESPNOW - A WLAN interface must be active to send()/recv()
+sta = network.WLAN(network.STA_IF)
+sta.active(True)
+#sta.disconnect()   # Because ESP8266 auto-connects to last Access Point
+e = espnow.ESPNow()
+e.active(True)
+peer = b'\xbb\xbb\xbb\xbb\xbb\xbb' # MAC address of peer's wifi interface
+e.add_peer(peer) # Must add_peer() before send()
 
 #---------------------------------------------------------------
 TSLEEP=50
@@ -366,10 +413,7 @@ TCLEAR=10000
 #TCLEAR=10000
 SAMPLES = 5 
 
-run(TSLEEP,TCLEAR,SAMPLES)
-
-
-
+run(TSLEEP,TCLEAR,SAMPLES,e,peer)
 
 
 

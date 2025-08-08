@@ -1,6 +1,5 @@
 import machine
 
-
 class accel():
     def __init__(self, i2c, addr=0x68):
         self.iic = i2c

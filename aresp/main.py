@@ -2,6 +2,8 @@ import time
 import math
 from hw import init_i2c, init_mpu, init_vibrator, init_pots
 from actions import vibrar, send_charPs
+from pots import add_pot_samples, calc_calibrate
+from gyro import append_gyro, average_and_slide
 
 i2c = init_i2c()
 mpuSensor = init_mpu(i2c)
@@ -11,28 +13,6 @@ pot1, pot2, pot3, pot4, pot5 = pot_list
 
 print()
 print('*********************************')
-
-def calclim(lim,val):
-    lst = (lim[0],lim[1],val)
-    lim[0] = max(lst)
-    lim[1] = min(lst)
-    lim[2] = val
-    return lim 
-
-def getPots(bufferPot,pval):
-    bufferPot[0].append(pval[0])
-    bufferPot[1].append(pval[1])
-    bufferPot[2].append(pval[2])
-    bufferPot[3].append(pval[3])
-    bufferPot[4].append(pval[4])
-    return bufferPot
-
-def calcCalibrate(bufferPot):
-    maxCalc = [] 
-    for potList in bufferPot:
-        maxCalc.append(max(potList))
-    return maxCalc
-
 
 def getGyro(buffer):
     mpuData = mpuSensor.get_values()
@@ -72,42 +52,32 @@ def startlimpot(arrlim,vals):
         arrlim[i] = vals
     return arrlim
 
-def start(tsleep, tclear, samples,
-          i2c=None, mpu=None, pots=None, vib=None):
+def start(tsleep, tclear, samples, i2c=None, mpu=None, pots=None, vib=None):
     # inicializa hardware se não passado
-    if i2c is None:
-        i2c = init_i2c()
-    if mpu is None:
-        mpu = init_mpu(i2c)
-    if vib is None:
-        vib = init_vibrator()
-    if pots is None:
-        pots = init_pots()
+    if i2c is None: i2c = init_i2c()
+    if mpu is None: mpu = init_mpu(i2c)
+    if vib is None: vib = init_vibrator()
+    if pots is None: pots = init_pots()
 
-    bufferPot = [[],[],[],[],[]]
-    for i in range(40):
-        pval = [pot.read() for pot in [pot1, pot2, pot3, pot4, pot5]]
-        print(pval[0],pval[1],pval[2],pval[3],pval[4])
-        getPots(bufferPot,pval)
+    # --- calibracao de pots (40 amostras)
+    bufferPot = [[] for _ in pots]
+    for _ in range(40):
+        pval = [pot.read() for pot in pots]
+        print("pot sample:", pval)
+        add_pot_samples(bufferPot, pval)
         time.sleep_ms(70)
+    maxCalibratePots = calc_calibrate(bufferPot)
+    print("maxCalibratePots:", maxCalibratePots)
 
-    maxCalibratePots = calcCalibrate(bufferPot)
-    print(maxCalibratePots)
+    # --- prepara buffer do gyro
+    buffer = [[] for _ in range(6)]
+    for _ in range(samples-1):
+        append_gyro(buffer, mpu)
+        time.sleep_ms(70)
+    gyro, accl = average_and_slide(buffer, mpu)
 
     num = 0
-
-    buffer = [[],[],[],[],[],[]]
-
-    for i in range(samples-1):
-        getGyro(buffer)
-        time.sleep_ms(70)
-
-    gyro, accl = media(buffer)
-
-    limgyro = [[],[],[]]
-
     holdclick = False
-
     limpot = [[],[],[],[]]
     triggerPot = [False] * 5
     threshPot = [-120] * 5

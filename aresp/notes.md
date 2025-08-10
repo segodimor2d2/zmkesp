@@ -25,10 +25,13 @@ mpremote repl
 mpremote fs ls
 mpremote connect /dev/ttyUSB0 cp main.py :main.py
 mpremote connect /dev/ttyUSB0 cp hw.py :hw.py
+mpremote connect /dev/ttyUSB0 cp actions.py :actions.py
+mpremote connect /dev/ttyUSB0 cp pots.py :pots.py
+mpremote connect /dev/ttyUSB0 cp gyro.py :gyro.py
+mpremote connect /dev/ttyUSB0 cp mpu6050.py :mpu6050.py
+
 mpremote connect /dev/ttyUSB0 cp utils.py :utils.py
 mpremote connect /dev/ttyUSB0 cp sensors.py :sensors.py
-mpremote connect /dev/ttyUSB0 cp actions.py :actions.py
-mpremote connect /dev/ttyUSB0 cp mpu6050.py :mpu6050.py
 
 
 ---
@@ -160,7 +163,8 @@ def vibrar(pino_vibracao, n_pulsos, step=None):
             except: pass
         time.sleep_ms(70)
 ```
-
+pots.py
+gyro.py
 # `pots.py`
 
 ```python
@@ -226,17 +230,12 @@ from utils import vibrar, send_charPs
 from pots import add_pot_samples, calc_calibrate
 from gyro import append_gyro, average_and_slide
 
-def start(tsleep, tclear, samples,
-          i2c=None, mpu=None, pots=None, vib=None):
+def start(tsleep, tclear, samples, i2c=None, mpu=None, pots=None, vib=None):
     # inicializa hardware se não passado
-    if i2c is None:
-        i2c = init_i2c()
-    if mpu is None:
-        mpu = init_mpu(i2c)
-    if vib is None:
-        vib = init_vibrator()
-    if pots is None:
-        pots = init_pots()
+    if i2c is None: i2c = init_i2c()
+    if mpu is None: mpu = init_mpu(i2c)
+    if vib is None: vib = init_vibrator()
+    if pots is None: pots = init_pots()
 
     # --- calibracao de pots (40 amostras)
     bufferPot = [[] for _ in pots]

@@ -1,25 +1,18 @@
 import time
 import math
-import mpu6050
-from machine import Pin, SoftI2C, ADC, TouchPad
+from hw import init_i2c, init_mpu, init_vibrator, init_pots
 
-i2c = SoftI2C(scl=Pin(22), sda=Pin(21))
-mpuSensor = mpu6050.MPU6050(i2c)
-
-pino_vibracao = Pin(33, Pin.OUT)
-
-
-pot1 = TouchPad(Pin(13)) #0
-pot2 = TouchPad(Pin(12)) #1
-pot3 = TouchPad(Pin(14)) #2
-pot4 = TouchPad(Pin(27)) #3
-pot5 = TouchPad(Pin(4)) #4
+i2c = init_i2c()
+mpuSensor = init_mpu(i2c)
+pino_vibracao = init_vibrator()
+pot_list = init_pots()
+pot1, pot2, pot3, pot4, pot5 = pot_list
 
 print()
 print('*********************************')
 
-def send_charPs(abckey):
-    print(abckey)
+def send_charPs(abclevel,i,state):
+    print(abclevel,i,state)
 
 def vibrar(n_pulsos, step=None):
     for _ in range(n_pulsos):
@@ -267,16 +260,17 @@ def start(tsleep,tclear,samples):
 
                 # >>> evento
                 #print(i)
-                print(stepY,stepX,'\t',abclevel,cycle)
-                #print(stepY,stepX,'\t',abclevel,threshPot[i],pval[i],cycle)
+                # print(stepY,stepX,'\t',abclevel,cycle)
+                # print(stepY,stepX,'\t',abclevel,i,threshPot[i],pval[i],cycle)
 
-                send_charPs(abclevel)
+                send_charPs(abclevel,i,1)
                 triggerPot[i] = True
                 holdclick = True
                 wait2Zero = False
                 cycle = 0
 
             elif triggerPot[i] and pval[i] >= threshPot[i]:
+                send_charPs(abclevel,i,0)
                 triggerPot[i] = False
                 holdclick = False
                 wait2Zero = True
@@ -301,7 +295,6 @@ def start(tsleep,tclear,samples):
 #---------------------------------------------------------------
 
 def run():
-    """Inicia o sistema com vibração de sinalização."""
     vibrar(4)
     TSLEEP = 50
     TCLEAR = 10000

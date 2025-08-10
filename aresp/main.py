@@ -14,34 +14,6 @@ pot1, pot2, pot3, pot4, pot5 = pot_list
 print()
 print('*********************************')
 
-def getGyro(buffer):
-    mpuData = mpuSensor.get_values()
-    buffer[0].append(mpuData['GyX'])
-    buffer[1].append(mpuData['GyY'])
-    buffer[2].append(mpuData['GyZ'])
-    buffer[3].append(mpuData['AcX'])
-    buffer[4].append(mpuData['AcY'])
-    buffer[5].append(mpuData['AcZ'])
-    return buffer
-
-def media(buffer):
-    getGyro(buffer)
-    xgyro = sum(buffer[0])/len(buffer[0])
-    ygyro = sum(buffer[1])/len(buffer[1])
-    zgyro = sum(buffer[2])/len(buffer[2])
-    xaccl = sum(buffer[3])/len(buffer[3])
-    yaccl = sum(buffer[4])/len(buffer[4])
-    zaccl = sum(buffer[5])/len(buffer[5])
-    gyro = [xgyro,ygyro,zgyro]
-    accl = [xaccl,yaccl,zaccl]
-    buffer[0].pop(0)
-    buffer[1].pop(0)
-    buffer[2].pop(0)
-    buffer[3].pop(0)
-    buffer[4].pop(0)
-    buffer[5].pop(0)
-    return gyro,accl
-
 def startlim(arrlim,vals):
     for i in range(len(arrlim)):
         arrlim[i] = [vals[i]] * 3
@@ -122,7 +94,7 @@ def start(tsleep, tclear, samples, i2c=None, mpu=None, pots=None, vib=None):
     vibrar(vib, 2)
     while True:
 
-        gyro, accl = media(buffer)
+        gyro, accl = average_and_slide(buffer, mpu)
 
         #--------------------------------------------
         if not evntTriggeredXP and not holdclick and gyro[gy1] > threshXP:

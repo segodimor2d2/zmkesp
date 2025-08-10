@@ -1,6 +1,7 @@
 import time
 import math
 from hw import init_i2c, init_mpu, init_vibrator, init_pots
+from actions import vibrar, send_charPs
 
 i2c = init_i2c()
 mpuSensor = init_mpu(i2c)
@@ -10,21 +11,6 @@ pot1, pot2, pot3, pot4, pot5 = pot_list
 
 print()
 print('*********************************')
-
-def send_charPs(abclevel,i,state):
-    print(abclevel,i,state)
-
-def vibrar(n_pulsos, step=None):
-    for _ in range(n_pulsos):
-        pino_vibracao.on()
-        if step == 0:
-            time.sleep_ms(200)
-        else:
-            #time.sleep_ms(70)
-            time.sleep_ms(101)
-        #time.sleep_ms(200)
-        pino_vibracao.off()
-        time.sleep_ms(70)
 
 def calclim(lim,val):
     lst = (lim[0],lim[1],val)
@@ -86,7 +72,17 @@ def startlimpot(arrlim,vals):
         arrlim[i] = vals
     return arrlim
 
-def start(tsleep,tclear,samples):
+def start(tsleep, tclear, samples,
+          i2c=None, mpu=None, pots=None, vib=None):
+    # inicializa hardware se não passado
+    if i2c is None:
+        i2c = init_i2c()
+    if mpu is None:
+        mpu = init_mpu(i2c)
+    if vib is None:
+        vib = init_vibrator()
+    if pots is None:
+        pots = init_pots()
 
     bufferPot = [[],[],[],[],[]]
     for i in range(40):
@@ -153,7 +149,7 @@ def start(tsleep,tclear,samples):
     gy1, gy2 = 0, 1 # normal
     #gy1, gy2 = 1, 0 # invertido
 
-    vibrar(2)
+    vibrar(vib, 2)
     while True:
 
         gyro, accl = media(buffer)
@@ -162,7 +158,7 @@ def start(tsleep,tclear,samples):
         if not evntTriggeredXP and not holdclick and gyro[gy1] > threshXP:
             if gy1 == 0: stepX += 1
             if gy1 == 1: stepX -= 1
-            vibrar(1,stepX)
+            vibrar(vib, 1, stepX)
             evntTriggeredXP = True
             wait2Zero = False
             cycle = 0
@@ -175,7 +171,7 @@ def start(tsleep,tclear,samples):
         if not evntTriggeredXN and not holdclick and gyro[gy1] < threshXN:
             if gy1 == 0: stepX -= 1
             if gy1 == 1: stepX += 1
-            vibrar(1,stepX)
+            vibrar(vib, 1, stepX)
             evntTriggeredXN = True
             wait2Zero = False
             cycle = 0
@@ -190,7 +186,7 @@ def start(tsleep,tclear,samples):
             if gy1 == 0: stepX += 1
             if gy1 == 1: stepX -= 1
             stepWaitXP = 0
-            vibrar(1,stepX)
+            vibrar(vib, 1, stepX)
 
         if evntTriggeredXN: stepWaitXN += 1
         else: stepWaitXN = 0
@@ -198,14 +194,14 @@ def start(tsleep,tclear,samples):
             if gy1 == 0: stepX -= 1
             if gy1 == 1: stepX += 1
             stepWaitXN = 0
-            vibrar(1,stepX)
+            vibrar(vib, 1, stepX)
 
 
         #--------------------------------------------
         if not evntTriggeredYP and not holdclick and gyro[gy2] > threshP:
             if gy2 == 0: stepY += 1
             if gy2 == 1: stepY -= 1
-            vibrar(1,stepY)
+            vibrar(vib, 1, stepY)
             evntTriggeredYP = True
             wait2Zero = False
             cycle = 0
@@ -217,7 +213,7 @@ def start(tsleep,tclear,samples):
         if not evntTriggeredYN and not holdclick and gyro[gy2] < threshN:
             if gy2 == 0: stepY -= 1
             if gy2 == 1: stepY += 1
-            vibrar(1,stepY)
+            vibrar(vib, 1, stepY)
             evntTriggeredYN = True
             wait2Zero = False
             cycle = 0
@@ -232,7 +228,7 @@ def start(tsleep,tclear,samples):
             if gy1 == 0: stepY -= 1
             if gy1 == 1: stepY += 1
             stepWaitYP = 0
-            vibrar(1,stepY)
+            vibrar(vib, 1, stepY)
 
         if evntTriggeredYN: stepWaitYN += 1
         else: stepWaitYN = 0
@@ -240,7 +236,7 @@ def start(tsleep,tclear,samples):
             if gy1 == 0: stepY += 1
             if gy1 == 1: stepY -= 1
             stepWaitYN = 0
-            vibrar(1,stepY)
+            vibrar(vib, 1, stepY)
 
         #--------------------------------------------
         #maxCalibratePots
@@ -284,7 +280,7 @@ def start(tsleep,tclear,samples):
         if cycle == 20:
             stepY = 0
             stepX = 0
-            vibrar(2)
+            vibrar(vib, 2)
 
         if num % tclear == 0: num = 0
 
@@ -295,7 +291,7 @@ def start(tsleep,tclear,samples):
 #---------------------------------------------------------------
 
 def run():
-    vibrar(4)
+    vibrar(init_vibrator(), 4)
     TSLEEP = 50
     TCLEAR = 10000
     SAMPLES = 5

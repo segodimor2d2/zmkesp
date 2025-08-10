@@ -24,6 +24,7 @@ actions.py
 mpremote repl
 mpremote fs ls
 mpremote connect /dev/ttyUSB0 cp main.py :main.py
+mpremote connect /dev/ttyUSB0 cp config.py :config.py
 mpremote connect /dev/ttyUSB0 cp hw.py :hw.py
 mpremote connect /dev/ttyUSB0 cp actions.py :actions.py
 mpremote connect /dev/ttyUSB0 cp pots.py :pots.py

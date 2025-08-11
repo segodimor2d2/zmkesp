@@ -1,24 +1,13 @@
 
-projeto/
-│
-├── main.py                 # Ponto de entrada
-├── hardware.py              # Inicialização de pinos, I2C e sensores
-├── utils.py                 # Funções utilitárias (vibrar, média, etc.)
-├── sensors.py               # Lógica de leitura e configuração de sensores
-└── actions.py               # Ações executadas pelos sensores
+
+- terminar a parte da ezquerda
+- ajustar os dados certos row/col
+- protocolo de envio para nRF52840
+- soldas e ajustes novos
+- ver a sincornizacao para envio de dados
+- pensar no mouse
 
 
-a estrutura do meu progama está assim:
-
-tar -czvf nome-do-arquivo.tar.gz pasta/
-tar -czvf use.tar.gz use/
-
-
-main.py
-hardware.py
-utils.py
-sensors.py
-actions.py
 
 
 mpremote repl
@@ -31,9 +20,6 @@ mpremote connect /dev/ttyUSB0 cp pots.py :pots.py
 mpremote connect /dev/ttyUSB0 cp gyro.py :gyro.py
 mpremote connect /dev/ttyUSB0 cp mpu6050.py :mpu6050.py
 
-mpremote connect /dev/ttyUSB0 cp utils.py :utils.py
-mpremote connect /dev/ttyUSB0 cp sensors.py :sensors.py
-
 
 ---
 
@@ -41,6 +27,7 @@ mpremote fs ls
 mpremote rm nome_do_arquivo.py
 mpremote rm hidcodes.py
 mpremote rm hardware.py
+mpremote rm sensors.py
 
 rshell --port /dev/ttyACM0
 

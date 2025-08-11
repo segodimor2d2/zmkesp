@@ -1,6 +1,7 @@
 import machine
 
-class MPU6050():
+
+class accel():
     def __init__(self, i2c, addr=0x68):
         self.iic = i2c
         self.addr = addr
@@ -44,4 +45,3 @@ class MPU6050():
         while 1:
             print(self.get_values())
             sleep(0.05)
-

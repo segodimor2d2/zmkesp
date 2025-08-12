@@ -21,8 +21,11 @@ mpremote connect /dev/ttyUSB0 cp alesp/mpu6050.py :mpu6050.py
 
 # pots
 1 0 2 4 3 
+
 (gzar 2) (gz 1) (gzre 0)
 (gyar 1) (gy 2) (gyre 3)
+
+
 
 
 
@@ -56,9 +59,29 @@ GY1, GY2 = 1, 0         # Eixo X primeiro, depois Y
 (gxar 1) (gx 0) (gxre -1)
 (gyar 1) (gy 0) (gyre -1)
 
+---
 
 
+enviar_evento(row, col, pressionado)
 
+             r c stts
+0 [0, 1] 1 = 3 5 1
+1 [0, 1] 1 = 0 1 1
+2 [0, 1] 1 = 0 2 1
+3 [0, 1] 1 = 0 3 1
+4 [0, 1] 1 = 0 4 1
+
+0 [0, 0] 1 = 3 5 1
+1 [0, 0] 1 = 0 1 1
+2 [0, 0] 1 = 0 2 1
+3 [0, 0] 1 = 0 3 1
+4 [0, 0] 1 = 0 4 1
+
+0 [0, -1] 1 = 3 5 1
+1 [0, -1] 1 = 0 1 1
+2 [0, -1] 1 = 0 2 1
+3 [0, -1] 1 = 0 3 1
+4 [0, -1] 1 = 0 4 1
 
 
 ---

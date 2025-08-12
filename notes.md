@@ -57,7 +57,6 @@ GY1, GY2 = 1, 0         # Eixo X primeiro, depois Y
 (gyar 1) (gy 0) (gyre -1)
 
 
-no meu código ao receber stepX do check_step_wait ele incrementa se eu giro para um lado e decrementa se eu girp para o sentido contrario, eu quero poder invertir esse sentido, e decrementar o que incrementada e incrementar o que decrementava
 
 
 

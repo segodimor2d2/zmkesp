@@ -2,6 +2,9 @@
 # CONFIGURAÇÕES DO SISTEMA
 # -----------------------------
 
+# Pinos dos touchpads
+THIS_IS = 0 # 0=L, 1=R
+
 # Giroscópio
 ## Limite base para thresholds
 PORAGORA = 14000        # 8000 (mais sensível) e 20000 (menos sensível)
@@ -32,13 +35,12 @@ INVERT_Y = True         # True re(+) ar(-) False o contrario
 # Ordem dos eixos do giroscópio
 GY1, GY2 = 0, 1         # Eixo X primeiro, depois Y
 
-# Pinos dos touchpads
-THIS_IS = 0 # 0=L, 1=R
-
 PINOS_R = 13,12,14,27,4
+INDEX_MAP_R = 0,1,2,3,4
 PINOS_VIB_R = 33
 
-PINOS_L = 14,13,15,4,12
+PINOS_L = 12,13,14,27,4
+INDEX_MAP_L = 0,1,2,4,3
 PINOS_VIB_L = 32
 
 

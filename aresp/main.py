@@ -74,8 +74,6 @@ def check_step_wait(event_triggered, step_wait, step, delta, vib):
         step_wait = 0
     return step_wait, step
 
-
-
 def check_pots(pvals, thresh, triggerPot, abclevel, holdclick, wait2Zero, cycle):
     """Verifica potenciômetros e envia eventos."""
     for i, val in enumerate(pvals):

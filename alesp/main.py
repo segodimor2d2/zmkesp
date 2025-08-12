@@ -32,9 +32,10 @@ def calibrate_pots(pots):
     bufferPot = [[] for _ in pots]
     for _ in range(config.POT_CALIBRATION_SAMPLES):
         pval = [pot.read() for pot in pots]
-        log("pot sample:", pval)
+        log("pot sample:", 0, pval)
         add_pot_samples(bufferPot, pval)
         time.sleep_ms(config.POT_CALIBRATION_DELAY_MS)
+    log('run...', 0)
     return calc_calibrate(bufferPot)
 
 def check_gyro_axis(axis_index, pos_thresh, neg_thresh, step, event_pos, event_neg, vib, invert=False):
@@ -138,29 +139,28 @@ def start(i2c=None, mpu=None, pots=None, vib=None):
 
         # Movimento no eixo X
         stepX, evntTriggeredXP, evntTriggeredXN = check_gyro_axis(
-            gy1, threshXP, threshXN, stepX, evntTriggeredXP, evntTriggeredXN, vib
+            gy1, threshXP, threshXN, stepX, evntTriggeredXP, evntTriggeredXN, vib, invert=config.INVERT_X
         )
 
         # Movimento no eixo Y
         stepY, evntTriggeredYP, evntTriggeredYN = check_gyro_axis(
-            gy2, threshP, threshN, stepY, evntTriggeredYP, evntTriggeredYN, vib
+            gy2, threshP, threshN, stepY, evntTriggeredYP, evntTriggeredYN, vib, invert=config.INVERT_Y
         )
 
         # Controle de repetição automática
-        stepWaitXP, stepX = check_step_wait(evntTriggeredXP, stepWaitXP, stepX, 1 if gy1 == 0 else -1, vib)
-        stepWaitXN, stepX = check_step_wait(evntTriggeredXN, stepWaitXN, stepX, -1 if gy1 == 0 else 1, vib)
-        stepWaitYP, stepY = check_step_wait(evntTriggeredYP, stepWaitYP, stepY, -1 if gy1 == 0 else 1, vib)
-        stepWaitYN, stepY = check_step_wait(evntTriggeredYN, stepWaitYN, stepY, 1 if gy1 == 0 else -1, vib)
+        invX = -1 if config.INVERT_X else 1
+        invY = -1 if config.INVERT_Y else 1
+
+        stepWaitXP, stepX = check_step_wait(evntTriggeredXP, stepWaitXP, stepX, invX * (1 if gy1 == 0 else -1), vib)
+        stepWaitXN, stepX = check_step_wait(evntTriggeredXN, stepWaitXN, stepX, invX * (-1 if gy1 == 0 else 1), vib)
+        stepWaitYP, stepY = check_step_wait(evntTriggeredYP, stepWaitYP, stepY, invY * (-1 if gy1 == 0 else 1), vib)
+        stepWaitYN, stepY = check_step_wait(evntTriggeredYN, stepWaitYN, stepY, invY * (1 if gy1 == 0 else -1), vib)
 
         # Leitura dos potenciômetros
         pval = [pot.read() - maxCalibratePots[i] for i, pot in enumerate([pot1, pot2, pot3, pot4, pot5])]
-        log(f"[POT VALS] {pval}")
+        log(f"[POT VALS] {pval}", 2)
 
-        # Definição do nível
-        if -1 <= stepX <= 1 and -2 <= stepY <= 2:
-            abclevel = [stepX + 1, 2 - stepY]
-        else:
-            abclevel = None
+        abclevel = [stepX,stepY]
 
         # Eventos de pots
         triggerPot, holdclick, wait2Zero, cycle = check_pots(

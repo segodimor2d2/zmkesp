@@ -9,49 +9,55 @@
 
 
 # ALESP L
-
-mpremote repl
 mpremote fs ls
-mpremote connect /dev/ttyUSB0 cp alesp/main.py :main.py
+mpremote repl
 mpremote connect /dev/ttyUSB0 cp alesp/config.py :config.py
+mpremote connect /dev/ttyUSB0 cp alesp/main.py :main.py
 mpremote connect /dev/ttyUSB0 cp alesp/hw.py :hw.py
 mpremote connect /dev/ttyUSB0 cp alesp/actions.py :actions.py
 mpremote connect /dev/ttyUSB0 cp alesp/pots.py :pots.py
 mpremote connect /dev/ttyUSB0 cp alesp/gyro.py :gyro.py
 mpremote connect /dev/ttyUSB0 cp alesp/mpu6050.py :mpu6050.py
 
-
+# pots
+1 0 2 4 3 
+(gzar 2) (gz 1) (gzre 0)
+(gyar 1) (gy 2) (gyre 3)
 
 
 
 # ALESP R
-
 mpremote fs ls
 mpremote repl
-mpremote connect /dev/ttyUSB0 cp aresp/main.py :main.py
 mpremote connect /dev/ttyUSB0 cp aresp/config.py :config.py
+mpremote connect /dev/ttyUSB0 cp aresp/main.py :main.py
 mpremote connect /dev/ttyUSB0 cp aresp/hw.py :hw.py
 mpremote connect /dev/ttyUSB0 cp aresp/actions.py :actions.py
 mpremote connect /dev/ttyUSB0 cp aresp/pots.py :pots.py
 mpremote connect /dev/ttyUSB0 cp aresp/gyro.py :gyro.py
 mpremote connect /dev/ttyUSB0 cp aresp/mpu6050.py :mpu6050.py
 
+# pots
+0 1 2 3 4
 
 
+GY1, GY2 = 0, 1         # Eixo X primeiro, depois Y
+# Eixo x primeiro, depois y
+## pot [gx, gy] status [M,T]
+1 [0, -1] 1
+
+(gxar 1) (gx 0) (gxre -1)
+(gyar 1) (gy 0) (gyre -1)
 
 
-# Supondo config.DEBUG = 'l1'
-log("Isso aparece", l=1)  # Será impresso
-log("Isso não aparece", level=0)  # Não será impresso
+GY1, GY2 = 1, 0         # Eixo X primeiro, depois Y
+# Eixo y primeiro, depois x
+## pot [gy, gx] status [T,M]
+(gxar 1) (gx 0) (gxre -1)
+(gyar 1) (gy 0) (gyre -1)
 
-# Supondo config.DEBUG = 'l0'
-log("Isso não aparece", l=1)  # Não será impresso
-log("Isso aparece", l=0)  # Será impresso
 
-# Sem config.DEBUG definido ou com outro valor
-log("Isso sempre aparece")  # Será impresso (l=1 padrão)
-log("Isso também", l=0)  # Será impresso
-
+no meu código ao receber stepX do check_step_wait ele incrementa se eu giro para um lado e decrementa se eu girp para o sentido contrario, eu quero poder invertir esse sentido, e decrementar o que incrementada e incrementar o que decrementava
 
 
 

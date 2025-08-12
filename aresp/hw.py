@@ -1,5 +1,14 @@
 from machine import Pin, SoftI2C, TouchPad
 import time
+import config
+
+if config.THIS_IS == 1:
+    pinos = config.PINOS_R
+    pinos_vib = config.PINOS_VIB_R
+
+if config.THIS_IS == 0:
+    pinos = config.PINOS_L
+    pinos_vib = config.PINOS_VIB_L
 
 def init_i2c(scl_pin=22, sda_pin=21):
     return SoftI2C(scl=Pin(scl_pin), sda=Pin(sda_pin))
@@ -14,7 +23,7 @@ def init_mpu(i2c):
         print("init_mpu erro:", e)
         return None
 
-def init_vibrator(pin_no=33):
+def init_vibrator(pin_no=(pinos_vib)):
     p = Pin(pin_no, Pin.OUT)
     try:
         p.off()
@@ -22,7 +31,7 @@ def init_vibrator(pin_no=33):
         pass
     return p
 
-def init_pots(pins=(13,12,14,27,4)):
+def init_pots(pins=(pinos)):
     return [TouchPad(Pin(p)) for p in pins]
 
 # teste rápido:

@@ -10,8 +10,20 @@ from gyro import append_gyro, average_and_slide
 # Função de log centralizada
 # -----------------------------
 def log(*args, **kwargs):
-    if config.DEBUG:
-        print(*args, **kwargs)
+    level = None  # Sem nível por padrão
+    if len(args) > 1 and isinstance(args[1], int) and args[1] >= 0:
+        level = args[1]
+        args = (args[0],) + args[2:]  # Remove o level dos args
+    
+    debug_level = getattr(config, 'DEBUG', None)
+    
+    if debug_level is not None and level is not None and level != debug_level:
+        return
+    
+    if debug_level is not None and level is None:
+        return
+    
+    print(*args, **kwargs)
 
 # -----------------------------
 # Funções auxiliares
@@ -20,9 +32,10 @@ def calibrate_pots(pots):
     bufferPot = [[] for _ in pots]
     for _ in range(config.POT_CALIBRATION_SAMPLES):
         pval = [pot.read() for pot in pots]
-        log("pot sample:", pval)
+        log("pot sample:", 0, pval)
         add_pot_samples(bufferPot, pval)
         time.sleep_ms(config.POT_CALIBRATION_DELAY_MS)
+    log('run...', 0)
     return calc_calibrate(bufferPot)
 
 def check_gyro_axis(axis_index, pos_thresh, neg_thresh, step, event_pos, event_neg, vib, invert=False):

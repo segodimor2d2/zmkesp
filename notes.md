@@ -8,17 +8,52 @@
 - pensar no mouse
 
 
-
+# ALESP L
 
 mpremote repl
 mpremote fs ls
-mpremote connect /dev/ttyUSB0 cp main.py :main.py
-mpremote connect /dev/ttyUSB0 cp config.py :config.py
-mpremote connect /dev/ttyUSB0 cp hw.py :hw.py
-mpremote connect /dev/ttyUSB0 cp actions.py :actions.py
-mpremote connect /dev/ttyUSB0 cp pots.py :pots.py
-mpremote connect /dev/ttyUSB0 cp gyro.py :gyro.py
-mpremote connect /dev/ttyUSB0 cp mpu6050.py :mpu6050.py
+mpremote connect /dev/ttyUSB0 cp alesp/main.py :main.py
+mpremote connect /dev/ttyUSB0 cp alesp/config.py :config.py
+mpremote connect /dev/ttyUSB0 cp alesp/hw.py :hw.py
+mpremote connect /dev/ttyUSB0 cp alesp/actions.py :actions.py
+mpremote connect /dev/ttyUSB0 cp alesp/pots.py :pots.py
+mpremote connect /dev/ttyUSB0 cp alesp/gyro.py :gyro.py
+mpremote connect /dev/ttyUSB0 cp alesp/mpu6050.py :mpu6050.py
+
+
+
+
+
+# ALESP R
+
+mpremote fs ls
+mpremote repl
+mpremote connect /dev/ttyUSB0 cp aresp/main.py :main.py
+mpremote connect /dev/ttyUSB0 cp aresp/config.py :config.py
+mpremote connect /dev/ttyUSB0 cp aresp/hw.py :hw.py
+mpremote connect /dev/ttyUSB0 cp aresp/actions.py :actions.py
+mpremote connect /dev/ttyUSB0 cp aresp/pots.py :pots.py
+mpremote connect /dev/ttyUSB0 cp aresp/gyro.py :gyro.py
+mpremote connect /dev/ttyUSB0 cp aresp/mpu6050.py :mpu6050.py
+
+
+
+
+
+# Supondo config.DEBUG = 'l1'
+log("Isso aparece", l=1)  # Será impresso
+log("Isso não aparece", level=0)  # Não será impresso
+
+# Supondo config.DEBUG = 'l0'
+log("Isso não aparece", l=1)  # Não será impresso
+log("Isso aparece", l=0)  # Será impresso
+
+# Sem config.DEBUG definido ou com outro valor
+log("Isso sempre aparece")  # Será impresso (l=1 padrão)
+log("Isso também", l=0)  # Será impresso
+
+
+
 
 
 ---
@@ -446,3 +481,115 @@ if __name__ == "__main__":
 ---
 
 Se quiser eu já te entrego os pequenos scripts de teste (`test_hw.py`, `test_utils.py`, `test_pots.py`, `test_gyro.py`) prontos, ou posso adaptar os módulos para usar debounce/filtragem diferente, ou ainda transformar o `main.start` em um estado‑machine mais testável. Qual próximo passo prefere: **receber os scripts de teste** ou **eu já aplico alguma otimização extra (ex.: ring buffer, log leve, thresholds configuráveis)**?
+
+
+
+
+
+Entendi sua dúvida! Vamos analisar exatamente **quando os logs são mostrados ou filtrados** na sua função, e como configurar para ver apenas o que você quer.
+
+---
+
+### Comportamento Atual da Sua Função:
+```python
+def log(*args, **kwargs):
+    level = None
+    if len(args) > 1 and isinstance(args[1], int) and args[1] >= 0:
+        level = args[1]  # Extrai o nível (ex: log("msg", 2) → level=2)
+        args = (args[0],) + args[2:]  # Remove o nível dos argumentos
+    
+    debug_level = getattr(config, 'DEBUG_LEVEL', None)  # Nível configurado
+    
+    # Regras de filtro:
+    if debug_level is not None and level is not None and level != debug_level:
+        return  # Ignora se o nível do log ≠ nível do debug
+    
+    if debug_level is not None and level is None:
+        return  # Ignora logs sem nível se debug_level estiver ativo
+    
+    print(*args, **kwargs)  # Mostra o log se passou nos filtros
+```
+
+---
+
+### Quando os Logs **São Mostrados** vs. **São Ignorados**:
+
+| Situação                          | Exemplo de Chamada               | `DEBUG_LEVEL=2` | `DEBUG_LEVEL=None` |
+|-----------------------------------|----------------------------------|-----------------|--------------------|
+| Log **com nível igual** ao config | `log("Erro", 2)`                 | ✅ Mostra       | ✅ Mostra          |
+| Log **com nível diferente**       | `log("Debug", 1)`                | ❌ Ignora       | ✅ Mostra          |
+| Log **sem nível**                 | `log("Mensagem genérica")`       | ❌ Ignora       | ✅ Mostra          |
+
+---
+
+### Como Configurar para Ver **Apenas o Que Você Quer**:
+
+1. **Para ver **apenas logs de nível 2**:
+   ```python
+   config.DEBUG_LEVEL = 2
+   ```
+   - Mostrará: `log("msg", 2)`
+   - Ignorará: `log("msg", 1)`, `log("msg", 3)`, `log("msg")`
+
+2. **Para ver **todos os logs, independente do nível**:
+   ```python
+   config.DEBUG_LEVEL = None  # Ou não defina DEBUG_LEVEL
+   ```
+   - Mostrará **tudo**: `log("msg", 0)`, `log("msg", 1)`, `log("msg")`
+
+3. **Para ver **apenas logs sem nível**:
+   ```python
+   config.DEBUG_LEVEL = -1  # Valor inválido (nenhum log com nível será mostrado)
+   ```
+   - Mostrará: `log("msg")`
+   - Ignorará: `log("msg", 0)`, `log("msg", 1)`
+
+---
+
+### Exemplo Prático:
+```python
+# Configuração (em config.py)
+class config:
+    DEBUG_LEVEL = 1  # Só quero logs de nível 1
+
+# Teste:
+log("Aviso Geral")          # ❌ Ignorado (sem nível)
+log("Erro Crítico", 0)      # ❌ Ignorado (nível 0 ≠ 1)
+log("Erro de Sistema", 1)   # ✅ Mostra "Erro de Sistema"
+log("Debug Detalhado", 2)   # ❌ Ignorado (nível 2 ≠ 1)
+```
+
+---
+
+### Se Você Quiser **Filtrar por Múltiplos Níveis** (ex: níveis 0, 1 e 2):
+Modifique a função para aceitar uma lista de níveis:
+```python
+def log(*args, **kwargs):
+    level = None
+    if len(args) > 1 and isinstance(args[1], int):
+        level = args[1]
+        args = (args[0],) + args[2:]
+    
+    debug_levels = getattr(config, 'DEBUG_LEVELS', None)  # Agora é uma lista
+    
+    if debug_levels is not None:
+        if level is None or level not in debug_levels:
+            return
+    
+    print(*args, **kwargs)
+
+# Config:
+config.DEBUG_LEVELS = [0, 1, 2]  # Mostrará níveis 0, 1 e 2
+```
+
+---
+
+### Resumo dos Filtros:
+| Você Quer...                  | Configuração                  | Comportamento                           |
+|-------------------------------|-------------------------------|----------------------------------------|
+| Só logs de nível X            | `DEBUG_LEVEL = X`             | Ignora tudo ≠ X                        |
+| Todos os logs                 | `DEBUG_LEVEL = None`          | Mostra tudo                            |
+| Logs sem nível                | `DEBUG_LEVEL = -1`            | Mostra só os sem nível                 |
+| Múltiplos níveis (ex: 0,1,2) | `DEBUG_LEVELS = [0, 1, 2]`    | Mostra só esses níveis                 |
+
+Escolha a abordagem que melhor atende sua necessidade!

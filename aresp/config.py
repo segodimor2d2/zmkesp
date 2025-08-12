@@ -3,13 +3,16 @@
 # -----------------------------
 
 # Giroscópio
-PORAGORA = 14000        # Limite base para thresholds
-THRES_PERCENT = 0.1     # Percentual usado para criar thresholds
+## Limite base para thresholds
+PORAGORA = 14000        # 8000 (mais sensível) e 20000 (menos sensível)
+# Percentual usado para criar thresholds
+THRES_PERCENT = 0.1     # 0.05 (5%) e 0.2 (20%). 0.1 (10%)
 
 # Potenciômetros
-THRESH_POT = [-120] * 5 # Thresholds individuais
-POT_CALIBRATION_SAMPLES = 40
-POT_CALIBRATION_DELAY_MS = 70
+## Thresholds individuais
+THRESH_POT = [-120] * 5 # -50 (muito sensível) e -200 (pouco sensível)
+POT_CALIBRATION_SAMPLES = 40 # 20 (rápido) e 100 (preciso)
+POT_CALIBRATION_DELAY_MS = 70 # 0ms e 100ms. 70ms permite leituras estáveis
 
 # Controle de passos automáticos
 STEP_WAIT_LIMIT = 5     # Quantos ciclos esperar antes de repetir passo
@@ -28,4 +31,14 @@ GY1, GY2 = 0, 1         # Eixo X primeiro, depois Y
 # -----------------------------
 # DEBUG
 # -----------------------------
-DEBUG = False  # Se False, não imprime nada
+DEBUG = 0
+"""
+| Você Quer...                  | Configuração        | Comportamento          |
+|-------------------------------|---------------------|------------------------|
+| Só logs de nível X            | `DEBUG = X`         | Ignora tudo ≠ X        |
+| Todos os logs                 | `DEBUG = None`      | Mostra tudo            |
+| Logs sem nível                | `DEBUG = -1`        | Mostra só os sem nível |
+| Múltiplos níveis (ex: 0,1,2)  | `DEBUG = [0, 1, 2]` | Mostra só esses níveis |
+"""
+
+

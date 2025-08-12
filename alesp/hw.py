@@ -22,7 +22,7 @@ def init_vibrator(pin_no=32):
         pass
     return p
 
-def init_pots(pins=(13,12,14,27,4)):
+def init_pots(pins=(14,13,15,04,12)):
     return [TouchPad(Pin(p)) for p in pins]
 
 # teste rápido:

@@ -2,6 +2,11 @@ import time
 
 def send_charPs(abclevel,i,state):
     print(i,abclevel,state)
+    btn [gy,gx] state 
+    0 [0,0] 0
+    0 [0,0] 1
+    0 [0,0] 0
+    0 [0,0] 1
 
 def vibrar(pino_vibracao, n_pulsos, step=None):
     if pino_vibracao is None:

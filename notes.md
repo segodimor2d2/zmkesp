@@ -53,10 +53,19 @@ mpremote connect /dev/ttyUSB0 cp arquivo_local.py :arquivo_remoto.py
 
 
 
+Touch
+<!-- 0,2,3,4,5,6,7,8 -->
+13,12,14,27,33,32,
+15,2,4
 
+Lesp
+def init_vibrator(pin_no=32):
+def init_pots(pins=(33,13,15,04,27)):
+27 33
 
-
-
+Resp
+def init_vibrator(pin_no=33):
+def init_pots(pins=(13,12,14,27,4)):
 
 
 

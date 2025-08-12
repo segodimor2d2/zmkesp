@@ -14,7 +14,7 @@ def init_mpu(i2c):
         print("init_mpu erro:", e)
         return None
 
-def init_vibrator(pin_no=32):
+def init_vibrator(pin_no=33):
     p = Pin(pin_no, Pin.OUT)
     try:
         p.off()

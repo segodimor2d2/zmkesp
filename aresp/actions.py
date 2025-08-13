@@ -1,7 +1,7 @@
 import time
 
-def send_charPs(abclevel,i,state):
-    print(i,abclevel,state)
+def send_charPs(zmkcodes):
+    print(zmkcodes)
 
 def vibrar(pino_vibracao, n_pulsos, step=None):
     if pino_vibracao is None:

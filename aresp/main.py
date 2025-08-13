@@ -5,6 +5,7 @@ from hw import init_i2c, init_mpu, init_vibrator, init_pots
 from actions import vibrar, send_charPs
 from pots import add_pot_samples, calc_calibrate
 from gyro import append_gyro, average_and_slide
+from dicctozmk import potsgyrotozmk
 
 if config.THIS_IS == 1:
     INDEX_MAP_POTS = list(config.INDEX_MAP_R)
@@ -80,16 +81,16 @@ def check_pots(pvals, thresh, triggerPot, abclevel, holdclick, wait2Zero, cycle)
         mapped_i = INDEX_MAP_POTS[i]  # pega índice lógico desejado
 
         if not triggerPot[i] and val < thresh[i]:
-            send_charPs(abclevel, mapped_i, 1)
-            log(f"[POT{mapped_i}] Pressionado | val={val} | abclevel={abclevel}")
+            send_charPs(potsgyrotozmk(abclevel, mapped_i, 1, config.THIS_IS))
+            log(f"[POT{mapped_i}] Pressionado | val={val} | abclevel={abclevel}",2)
             triggerPot[i] = True
             holdclick = True
             wait2Zero = False
             cycle = 0
 
         elif triggerPot[i] and val >= thresh[i]:
-            send_charPs(abclevel, mapped_i, 0)
-            log(f"[POT{mapped_i}] Liberado | val={val}")
+            send_charPs(potsgyrotozmk(abclevel, mapped_i, 0, config.THIS_IS))
+            log(f"[POT{mapped_i}] Pressionado | val={val} | abclevel={abclevel}",2)
             triggerPot[i] = False
             holdclick = False
             wait2Zero = True

@@ -6,8 +6,15 @@ uart = UART(1, baudrate=115200, tx=17, rx=16)
 
 def send_charPs(zmkcodes):
     if zmkcodes is not None:
+        print(zmkcodes)
         row = zmkcodes[0]
         col = zmkcodes[1]
+
+        # Proteção: valores devem estar entre 0 e 255
+        if not (0 <= row <= 255 and 0 <= col <= 255):
+            print(f"[WARNING] row/col fora do range: row={row}, col={col}")
+            return
+
         if zmkcodes[2] == 0:
             event_type = 0x01
         else:

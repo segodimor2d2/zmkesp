@@ -13,6 +13,22 @@ if config.THIS_IS == 1:
 if config.THIS_IS == 0:
     INDEX_MAP_POTS = list(config.INDEX_MAP_L)
 
+# ===== CONFIGS TOUCH =====
+CALIB_SAMPLES   = 100   # Amostras por canal
+PRESS_OFFSET    = 50    # Quanto abaixo do baseline aciona
+RELEASE_OFFSET  = 30    # Quanto abaixo do baseline libera
+DEBOUNCE_COUNT  = 3     # Leituras consecutivas para confirmar toque
+
+# ===== VARIÁVEIS GLOBAIS =====
+baseline        = []
+press_thresh    = []
+release_thresh  = []
+pot_counter     = []
+triggerPot      = []
+pval            = []
+
+
+
 # -----------------------------
 # Função de log centralizada
 # -----------------------------
@@ -36,14 +52,29 @@ def log(*args, **kwargs):
 # Funções auxiliares
 # -----------------------------
 def calibrate_pots(pots):
-    bufferPot = [[] for _ in pots]
-    for _ in range(config.POT_CALIBRATION_SAMPLES):
-        pval = [pot.read() for pot in pots]
-        log("pot sample:", 0, pval)
-        add_pot_samples(bufferPot, pval)
-        time.sleep_ms(config.POT_CALIBRATION_DELAY_MS)
-    log('run...', 0)
-    return calc_calibrate(bufferPot)
+    global baseline, press_thresh, release_thresh, pot_counter, triggerPot, pval
+
+    num_pots = len(pots)
+    baseline        = [0] * num_pots
+    press_thresh    = [0] * num_pots
+    release_thresh  = [0] * num_pots
+    pot_counter     = [0] * num_pots
+    triggerPot      = [False] * num_pots
+    pval            = [0] * num_pots
+
+    print("Calibrando... não toque nos sensores.")
+    for i in range(num_pots):
+        soma = 0
+        for _ in range(CALIB_SAMPLES):
+            soma += pots[i].read()
+            time.sleep_ms(5)
+        baseline[i]       = soma / CALIB_SAMPLES
+        press_thresh[i]   = baseline[i] - PRESS_OFFSET
+        release_thresh[i] = baseline[i] - RELEASE_OFFSET
+
+    print("Baseline:       ", baseline)
+    print("Press thresh:   ", press_thresh)
+    print("Release thresh: ", release_thresh)
 
 def check_gyro_axis(axis_index, pos_thresh, neg_thresh, step, event_pos, event_neg, vib, invert=False):
     """Verifica giroscópio em um eixo e atualiza estado."""
@@ -75,27 +106,37 @@ def check_step_wait(event_triggered, step_wait, step, delta, vib):
         step_wait = 0
     return step_wait, step
 
-def check_pots(pvals, thresh, triggerPot, abclevel, holdclick, wait2Zero, cycle):
-    """Verifica potenciômetros e envia eventos."""
-    for i, val in enumerate(pvals):
-        mapped_i = INDEX_MAP_POTS[i]  # pega índice lógico desejado
+def check_pots(pots, abclevel, wait2Zero, cycle):
+    global pval, triggerPot, pot_counter
 
-        if not triggerPot[i] and val < thresh[i]:
-            send_charPs(potsgyrotozmk(abclevel, mapped_i, 1, config.THIS_IS))
-            log(f"[POT{mapped_i}] Pressionado | val={val} | abclevel={abclevel}",2)
-            triggerPot[i] = True
-            holdclick = True
-            wait2Zero = False
-            cycle = 0
+    for i, pot in enumerate(pots):
+        val = pot.read()
+        pval[i] = val
+        mapped_i = INDEX_MAP_POTS[i]
 
-        elif triggerPot[i] and val >= thresh[i]:
-            send_charPs(potsgyrotozmk(abclevel, mapped_i, 0, config.THIS_IS))
-            log(f"[POT{mapped_i}] Pressionado | val={val} | abclevel={abclevel}",2)
-            triggerPot[i] = False
-            holdclick = False
-            wait2Zero = True
+        if not triggerPot[i] and val < press_thresh[i]:
+            pot_counter[i] += 1
+            if pot_counter[i] >= DEBOUNCE_COUNT:
+                send_charPs(potsgyrotozmk(abclevel, mapped_i, 1, config.THIS_IS))
+                log(f"[POT{mapped_i}] Pressionado | val={val} | abclevel={abclevel}", 2)
+                triggerPot[i] = True
+                pot_counter[i] = 0
+                wait2Zero = False
+                cycle = 0
 
-    return triggerPot, holdclick, wait2Zero, cycle
+        elif triggerPot[i] and val > release_thresh[i]:
+            pot_counter[i] += 1
+            if pot_counter[i] >= DEBOUNCE_COUNT:
+                send_charPs(potsgyrotozmk(abclevel, mapped_i, 0, config.THIS_IS))
+                log(f"[POT{mapped_i}] Liberado | val={val} | abclevel={abclevel}", 2)
+                triggerPot[i] = False
+                pot_counter[i] = 0
+                wait2Zero = True
+
+        else:
+            pot_counter[i] = 0
+
+    return wait2Zero, cycle
 
 # -----------------------------
 # Função principal
@@ -109,8 +150,7 @@ def start(i2c=None, mpu=None, pots=None, vib=None):
     pot1, pot2, pot3, pot4, pot5 = pots
 
     # Calibração de pots
-    maxCalibratePots = calibrate_pots(pots)
-    log("maxCalibratePots:", maxCalibratePots)
+    calibrate_pots(pots)
 
     # Prepara buffer do gyro
     buffer = [[] for _ in range(6)]
@@ -168,15 +208,8 @@ def start(i2c=None, mpu=None, pots=None, vib=None):
         stepWaitYN, stepY = check_step_wait(evntTriggeredYN, stepWaitYN, stepY, invY * (1 if gy1 == 0 else -1), vib)
 
         # Leitura dos potenciômetros
-        pval = [pot.read() - maxCalibratePots[i] for i, pot in enumerate([pot1, pot2, pot3, pot4, pot5])]
-        log(f"[POT VALS] {pval}", 2)
-
-        abclevel = [stepX,stepY]
-
-        # Eventos de pots
-        triggerPot, holdclick, wait2Zero, cycle = check_pots(
-            pval, threshPot, triggerPot, abclevel, holdclick, wait2Zero, cycle
-        )
+        abclevel = [stepX, stepY]
+        wait2Zero, cycle = check_pots(pots, abclevel, wait2Zero, cycle)
 
         # Reset se parado
         if wait2Zero:
@@ -185,6 +218,7 @@ def start(i2c=None, mpu=None, pots=None, vib=None):
             stepY = stepX = 0
             vibrar(vib, 2)
             log("[RESET] StepX e StepY resetados")
+            cycle = 0
 
         if num % config.TCLEAR == 0:
             num = 0

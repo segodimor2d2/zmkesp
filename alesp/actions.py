@@ -4,18 +4,26 @@ import time
 # UART - ajuste TX e RX conforme o seu hardware
 uart = UART(1, baudrate=115200, tx=17, rx=16)
 
-
 def send_charPs(zmkcodes):
     if zmkcodes is not None:
-        row, col, status = zmkcodes
-        if status == 1:  # pressionado
+        print(zmkcodes)
+        row = zmkcodes[0]
+        col = zmkcodes[1]
+
+        # Proteção: valores devem estar entre 0 e 255
+        if not (0 <= row <= 255 and 0 <= col <= 255):
+            print(f"[WARNING] row/col fora do range: row={row}, col={col}")
+            return
+
+        if zmkcodes[2] == 0:
             event_type = 0x01
-        else:  # solto
+        else:
             event_type = 0x00
         checksum = event_type ^ row ^ col
         packet = bytes([0xAA, event_type, row, col, checksum])
+        # print(packet)
         uart.write(packet)
-        print(packet)
+
 
 def vibrar(pino_vibracao, n_pulsos, step=None):
     if pino_vibracao is None:

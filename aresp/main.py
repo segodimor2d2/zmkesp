@@ -192,6 +192,9 @@ def start(i2c=None, mpu=None, pots=None, vib=None):
         time.sleep_ms(config.TSLEEP)
 
 # -----------------------------
-def run():
-    vibrar(init_vibrator(), 4)
-    start()
+# def run():
+#     vibrar(init_vibrator(), 4)
+#     start()
+
+start()
+vibrar(init_vibrator(), 4)

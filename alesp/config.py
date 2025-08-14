@@ -35,6 +35,7 @@ INVERT_Y = True         # True re(+) ar(-) False o contrario
 # Ordem dos eixos do giroscópio
 GY1, GY2 = 0, 1         # Eixo X primeiro, depois Y
 
+# GPIOs / remap
 PINOS_R = 13,12,14,27,4
 INDEX_MAP_R = 0,1,2,3,4
 PINOS_VIB_R = 33

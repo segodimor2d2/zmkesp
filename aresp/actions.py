@@ -1,7 +1,22 @@
+from machine import Pin, UART
 import time
 
+# UART - ajuste TX e RX conforme o seu hardware
+uart = UART(1, baudrate=115200, tx=17, rx=16)
+
 def send_charPs(zmkcodes):
-    print(zmkcodes)
+    if zmkcodes is not None:
+        row = zmkcodes[0]
+        col = zmkcodes[1]
+        if zmkcodes[2] == 0:
+            event_type = 0x01
+        else:
+            event_type = 0x00
+        checksum = event_type ^ row ^ col
+        packet = bytes([0xAA, event_type, row, col, checksum])
+        # print(packet)
+        uart.write(packet)
+
 
 def vibrar(pino_vibracao, n_pulsos, step=None):
     if pino_vibracao is None:

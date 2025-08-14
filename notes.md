@@ -28,8 +28,6 @@ mpremote connect /dev/ttyUSB0 cp alesp/mpu6050.py :mpu6050.py
 
 
 
-
-
 # ALESP R
 mpremote fs ls
 mpremote repl
@@ -284,3 +282,76 @@ Lado Direito:
 2 [-1,0] = 10 2 # ,
 3 [-1,0] = 10 3 # ,
 4 [-1,0] = 10 4 # ;
+
+
+---
+
+row, col, status
+
+zmkcodes
+
+---
+No **Pro Micro nRF52840** (especialmente nas placas no estilo *nice!nano*, Elite-Pi ou clones), a escolha entre **B+** e **RAW** depende de **como** você quer alimentar e carregar a bateria.
+
+---
+
+## 📌 Diferença entre os pinos:
+
+* **B+**
+
+  * Vai direto para a bateria LiPo/Li-ion (normalmente 3,0 V–4,2 V).
+  * Passa pelo circuito de carregamento interno (se a placa tiver carregador).
+  * Usado para conectar **diretamente** a bateria, respeitando polaridade.
+  * **Se a placa tiver carregador integrado** (muitos clones têm um chip TP4056 ou MCP73831), o conector JST e o pino B+ são equivalentes.
+
+* **RAW**
+
+  * Entrada de tensão não regulada para passar pelo regulador interno (normalmente aceita 5 V, alguns aceitam até \~6 V).
+  * **Não** é para conectar diretamente bateria LiPo — vai desperdiçar energia e pode causar descarregamento indesejado, pois passa pelo regulador.
+
+---
+
+## 💡 Em resumo:
+
+* Se for **bateria LiPo recarregável** (3,7 V nominal), **use o pino B+** ou o conector JST da placa.
+* Se for alimentar com fonte **maior que 5 V** (USB, pack AA, etc.), use **RAW**.
+
+⚠️ Atenção: Inverter polaridade no **B+** pode queimar a placa. Sempre confira com multímetro antes de ligar.
+
+---
+
+Se quiser, eu posso te mandar um **diagrama de ligação** mostrando a bateria no **B+** e o fluxo de energia para o nRF52840 e para o carregador USB. Isso ajuda a evitar erro na fiação.
+
+---
+
+Se você quer alimentar um **ESP32** a partir do seu **Pro Micro nRF52840**, a escolha do pino depende de **qual tensão você quer fornecer** e de **como as placas estão sendo alimentadas**.
+
+---
+
+## 📌 Opções
+
+1. **Se o ESP32 for rodar em 3,3 V** (a maioria das versões “ESP32-WROOM” e “ESP32-S3” cruas):
+
+   * Pegue o **VCC / 3V3** do Pro Micro nRF52840 (às vezes rotulado como `3V` ou `VCC`).
+   * Esse pino é **regulado**, então a tensão vai ser estável mesmo que a bateria esteja variando entre 3,0–4,2 V.
+
+2. **Se o ESP32 tiver regulador onboard** (por exemplo, módulos tipo “ESP32 DevKit” com entrada em `5V`/`VIN`):
+
+   * Você pode alimentar pelo **RAW** do Pro Micro (se ele estiver recebendo >3,7 V da bateria ou USB) **ou** pelo **5V** direto se a placa do Pro Micro estiver no USB.
+   * Nesse caso o ESP32 regula para 3,3 V internamente.
+
+---
+
+## ⚠️ Atenções importantes
+
+* O **nRF52840 não consegue fornecer muita corrente** — a linha de 3,3 V dele aguenta normalmente uns **300–500 mA** no máximo.
+  O ESP32, especialmente com Wi-Fi ativo, pode puxar picos de **>400 mA**, o que pode causar resets se a bateria/regulador não aguentar.
+* Idealmente, **ambos devem ser alimentados da mesma fonte** (ex.: mesma bateria LiPo), cada um com seu regulador, ou usando um regulador único dimensionado para a carga total.
+* Sempre conecte **terra (GND)** dos dois para evitar problemas de comunicação.
+
+---
+
+💡 Se você me disser **se o ESP32 é módulo cru ou placa DevKit**, eu posso te indicar exatamente **qual pino** usar no Pro Micro para ligar o VCC dele sem risco.
+Você quer que eu já faça esse diagrama de ligação?
+
+

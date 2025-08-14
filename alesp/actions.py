@@ -1,12 +1,21 @@
+from machine import Pin, UART
 import time
 
-def send_charPs(abclevel,i,state):
-    print(i,abclevel,state)
-    btn [gy,gx] state 
-    0 [0,0] 0
-    0 [0,0] 1
-    0 [0,0] 0
-    0 [0,0] 1
+# UART - ajuste TX e RX conforme o seu hardware
+uart = UART(1, baudrate=115200, tx=17, rx=16)
+
+
+def send_charPs(zmkcodes):
+    if zmkcodes is not None:
+        row, col, status = zmkcodes
+        if status == 1:  # pressionado
+            event_type = 0x01
+        else:  # solto
+            event_type = 0x00
+        checksum = event_type ^ row ^ col
+        packet = bytes([0xAA, event_type, row, col, checksum])
+        uart.write(packet)
+        print(packet)
 
 def vibrar(pino_vibracao, n_pulsos, step=None):
     if pino_vibracao is None:

@@ -27,7 +27,6 @@ mpremote connect /dev/ttyUSB0 cp alesp/mpu6050.py :mpu6050.py
 (gyar 1) (gy 2) (gyre 3)
 
 
-
 # ALESP R
 mpremote fs ls
 mpremote repl
@@ -356,17 +355,19 @@ Você quer que eu já faça esse diagrama de ligação?
 
 
 
+m,,,
+
 
 
 ---
 
 eu estou rodando ZMK no nRF52840 com dois micros com um teclado split um central e um peripheral
-cada um esta recebendo dados via UART de um ESP32
+cada um esta recebendo dados via UART de um ESP32.
 agora eu posso acionar eventos com os switches do nRF52840 ou dados via Uart dede o ESP32.
 
-ao testar com os switches do nRF52840 o peripheral envia tudo certo para o central
-mas quando eu tento enviar via UART e o peripheral, o central envia as letras corretas
-mas ficam em press e não libera o release
+meu problema é que ao enviar os eventos do esp32 para o nRF52840 o evento fica em press e não libera o release,
+validando o esp32, antes de enviar os dados via UART ele esta fazendo o press e release tudo certinho,
+e é importante esclarecer que ao testar com os pines do nRF52840 o peripheral envia tudo certo para o central
 
 eu estou usando checksum para validar os dados na comunicação UART
 e estou enviando um byte inicial assim:
@@ -384,14 +385,11 @@ b'\xaa\x00\x01\x01\x00'
 b'\xaa\x01\x00\x01\x00'
 b'\xaa\x00\x00\x01\x01'
 
-meu problema é que o switch fica em press e acontece somente do lado do peripheral mas não do lado central, se
-eu deligar o o peripheral o centrar continua enviando como se estivece precionando o switch
-mas se eu testar o press e o release do lado central via UART funciona tudo certo
 
 
 
 
-
+----
 
 me ajude achar o meu problema:
 
@@ -536,463 +534,6 @@ Assim, você só ajustaria os thresholds no `config.py`.
 
 
 
-
-
-
----
-
-Beleza — vou te passar um exemplo que combina **calibração individual**, **histerese** e **debounce** usando a sua função `calc_calibrate()` como ponto de partida.
-Assim, cada canal vai ter seus próprios thresholds, e o código vai filtrar os toques “instáveis”.
-
----
-
-## 1️⃣ Calibração (`calc_calibrate`)
-
-```python
-# Quantas amostras para calibrar
-CALIB_SAMPLES = 100  
-
-# Quanto abaixo do baseline considera toque
-PRESS_OFFSET = 50     
-RELEASE_OFFSET = 30   # solta quando volta acima disso
-
-def calc_calibrate():
-    global baseline, press_thresh, release_thresh, pot_counter, triggerPot
-
-    num_pots = len(pots)  # 'pots' = lista de objetos de leitura touch
-    baseline = [0] * num_pots
-    press_thresh = [0] * num_pots
-    release_thresh = [0] * num_pots
-    pot_counter = [0] * num_pots
-    triggerPot = [False] * num_pots
-
-    print("Calibrando... não toque nos sensores.")
-    for i in range(num_pots):
-        soma = 0
-        for _ in range(CALIB_SAMPLES):
-            soma += pots[i].read()
-        baseline[i] = soma / CALIB_SAMPLES
-        press_thresh[i] = baseline[i] - PRESS_OFFSET
-        release_thresh[i] = baseline[i] - RELEASE_OFFSET
-
-    print("Baseline:", baseline)
-    print("Press thresholds:", press_thresh)
-    print("Release thresholds:", release_thresh)
-```
-
----
-
-## 2️⃣ Leitura e detecção (`check_pots`)
-
-```python
-# Quantas leituras consecutivas precisa para confirmar
-DEBOUNCE_COUNT = 3
-
-def check_pots():
-    for i in range(len(pots)):
-        val = pots[i].read()
-
-        if not triggerPot[i] and val < press_thresh[i]:
-            pot_counter[i] += 1
-            if pot_counter[i] >= DEBOUNCE_COUNT:
-                triggerPot[i] = True
-                pot_counter[i] = 0
-                pot_hit(i)  # sua função para evento de toque
-
-        elif triggerPot[i] and val > release_thresh[i]:
-            pot_counter[i] += 1
-            if pot_counter[i] >= DEBOUNCE_COUNT:
-                triggerPot[i] = False
-                pot_counter[i] = 0
-                pot_release(i)  # sua função para evento de soltar
-
-        else:
-            # leitura não consistente, zera contador
-            pot_counter[i] = 0
-```
-
----
-
-## 3️⃣ Como funciona
-
-* **`calc_calibrate()`**
-
-  * Mede a média de cada canal separadamente.
-  * Calcula thresholds individuais (`press_thresh[i]` e `release_thresh[i]`).
-* **`check_pots()`**
-
-  * Aplica histerese (press < press\_thresh, release > release\_thresh).
-  * Usa debounce por número de leituras estáveis (`DEBOUNCE_COUNT`).
-
-Isso vai:
-
-* Eliminar flicker no limiar de toque.
-* Compensar diferença de sensibilidade entre canais.
-* Ser mais estável em ambientes ruidosos.
-
----
-
-Posso já adaptar isso direto para o **seu** código original mantendo nomes e estruturas que você usa hoje na Maxima, para encaixar sem quebrar nada.
-Quer que eu faça essa integração já pronta?
-
-
-
-
-
-
-
-
-
-
----
-
-
-Então vamos integrar direto no seu fluxo da Maxima, mantendo os nomes que você já usa.
-Vou assumir que:
-
-* Você já tem a lista `pots` com seus objetos de leitura touch.
-* `triggerPot` e `pval` já existem no seu código.
-* `calc_calibrate()` é chamado na inicialização.
-* `check_pots()` é chamado no loop principal.
-
----
-
-## **Integração sugerida**
-
-```python
-# ===== CONFIGURAÇÃO =====
-CALIB_SAMPLES   = 100   # Amostras para calibrar cada canal
-PRESS_OFFSET    = 50    # Diferença do baseline para considerar pressionado
-RELEASE_OFFSET  = 30    # Diferença para considerar liberado
-DEBOUNCE_COUNT  = 3     # Leituras consecutivas para confirmar toque
-
-# ===== VARIÁVEIS GLOBAIS =====
-baseline        = []
-press_thresh    = []
-release_thresh  = []
-pot_counter     = []
-triggerPot      = []
-pval            = []
-
-# ===== CALIBRAÇÃO =====
-def calc_calibrate():
-    global baseline, press_thresh, release_thresh, pot_counter, triggerPot, pval
-
-    num_pots = len(pots)
-    baseline        = [0] * num_pots
-    press_thresh    = [0] * num_pots
-    release_thresh  = [0] * num_pots
-    pot_counter     = [0] * num_pots
-    triggerPot      = [False] * num_pots
-    pval            = [0] * num_pots
-
-    print("Calibrando... não toque nos sensores.")
-    for i in range(num_pots):
-        soma = 0
-        for _ in range(CALIB_SAMPLES):
-            soma += pots[i].read()
-        baseline[i]       = soma / CALIB_SAMPLES
-        press_thresh[i]   = baseline[i] - PRESS_OFFSET
-        release_thresh[i] = baseline[i] - RELEASE_OFFSET
-
-    print("Baseline:       ", baseline)
-    print("Press thresh:   ", press_thresh)
-    print("Release thresh: ", release_thresh)
-
-# ===== LEITURA E DETECÇÃO =====
-def check_pots():
-    for i in range(len(pots)):
-        val = pots[i].read()
-        pval[i] = val  # mantém valor atual para uso externo
-
-        if not triggerPot[i] and val < press_thresh[i]:
-            pot_counter[i] += 1
-            if pot_counter[i] >= DEBOUNCE_COUNT:
-                triggerPot[i] = True
-                pot_counter[i] = 0
-                pot_hit(i)  # chama função de toque
-
-        elif triggerPot[i] and val > release_thresh[i]:
-            pot_counter[i] += 1
-            if pot_counter[i] >= DEBOUNCE_COUNT:
-                triggerPot[i] = False
-                pot_counter[i] = 0
-                pot_release(i)  # chama função de soltar
-
-        else:
-            pot_counter[i] = 0
-```
-
----
-
-## **Onde encaixar no seu código**
-
-1. Substituir a função antiga `calc_calibrate()` por essa versão.
-2. Substituir a função antiga `check_pots()` por essa versão.
-3. Garantir que `calc_calibrate()` seja chamado **logo após iniciar o sistema**, antes do loop principal.
-4. No loop principal, manter `check_pots()` sendo chamado a cada ciclo.
-
----
-
-💡 Com isso, você vai ter:
-
-* **Calibração individual por canal** (corrige diferenças de sensibilidade).
-* **Histerese automática** (não pisca no limiar).
-* **Debounce** (filtra ruído rápido).
-
----
-
-Se quiser, eu posso ainda adicionar **recalibração automática** — por exemplo, se um pino ficar muito tempo sem toque, ele atualiza o baseline sozinho.
-Isso deixa o sistema “autoajustável” para mudanças de temperatura e umidade.
-
-Quer que eu já adicione essa recalibração automática também?
-
-
-
----
-
-
-
-
-Entendi — no seu código atual você usa `calibrate_pots()` e `calc_calibrate()`
-para gerar **um único valor de baseline por canal**,
-mas depois aplica um `config.THRESH_POT` fixo para todos.
-A integração que te propus vai trocar isso por **thresholds individuais e histerese**,
-mas mantendo sua estrutura de `start()`.
-
-Vou te mostrar como ficaria adaptado para o seu `main`, usando:
-
-* **Baseline por canal**
-* **`press_thresh[i]`** e **`release_thresh[i]`** separados
-* **Debounce**
-* Aproveitando seus `INDEX_MAP_POTS` e chamadas `send_charPs(...)`
-
----
-
-### 1️⃣ No topo do arquivo (depois dos imports)
-
-```python
-# ===== CONFIGS TOUCH =====
-CALIB_SAMPLES   = 100   # Amostras por canal
-PRESS_OFFSET    = 50    # Quanto abaixo do baseline aciona
-RELEASE_OFFSET  = 30    # Quanto abaixo do baseline libera
-DEBOUNCE_COUNT  = 3     # Leituras consecutivas para confirmar toque
-
-# ===== VARIÁVEIS GLOBAIS =====
-baseline        = []
-press_thresh    = []
-release_thresh  = []
-pot_counter     = []
-triggerPot      = []
-pval            = []
-```
-
----
-
-### 2️⃣ Nova calibração de pots (substitui `calibrate_pots`)
-
-```python
-def calibrate_pots(pots):
-    global baseline, press_thresh, release_thresh, pot_counter, triggerPot, pval
-
-    num_pots = len(pots)
-    baseline        = [0] * num_pots
-    press_thresh    = [0] * num_pots
-    release_thresh  = [0] * num_pots
-    pot_counter     = [0] * num_pots
-    triggerPot      = [False] * num_pots
-    pval            = [0] * num_pots
-
-    print("Calibrando... não toque nos sensores.")
-    for i in range(num_pots):
-        soma = 0
-        for _ in range(CALIB_SAMPLES):
-            soma += pots[i].read()
-            time.sleep_ms(5)
-        baseline[i]       = soma / CALIB_SAMPLES
-        press_thresh[i]   = baseline[i] - PRESS_OFFSET
-        release_thresh[i] = baseline[i] - RELEASE_OFFSET
-
-    print("Baseline:       ", baseline)
-    print("Press thresh:   ", press_thresh)
-    print("Release thresh: ", release_thresh)
-```
-
----
-
-### 3️⃣ Nova verificação de pots (substitui `check_pots`)
-
-```python
-def check_pots(abclevel):
-    global pval, triggerPot, pot_counter
-
-    for i, pot in enumerate(pots):
-        val = pot.read()
-        pval[i] = val
-        mapped_i = INDEX_MAP_POTS[i]
-
-        if not triggerPot[i] and val < press_thresh[i]:
-            pot_counter[i] += 1
-            if pot_counter[i] >= DEBOUNCE_COUNT:
-                send_charPs(potsgyrotozmk(abclevel, mapped_i, 1, config.THIS_IS))
-                log(f"[POT{mapped_i}] Pressionado | val={val} | abclevel={abclevel}", 2)
-                triggerPot[i] = True
-                pot_counter[i] = 0
-
-        elif triggerPot[i] and val > release_thresh[i]:
-            pot_counter[i] += 1
-            if pot_counter[i] >= DEBOUNCE_COUNT:
-                send_charPs(potsgyrotozmk(abclevel, mapped_i, 0, config.THIS_IS))
-                log(f"[POT{mapped_i}] Liberado | val={val} | abclevel={abclevel}", 2)
-                triggerPot[i] = False
-                pot_counter[i] = 0
-
-        else:
-            pot_counter[i] = 0
-```
-
----
-
-### 4️⃣ Alterações no `start()`
-
-No início do `start()` troque:
-
-```python
-maxCalibratePots = calibrate_pots(pots)
-log("maxCalibratePots:", maxCalibratePots)
-```
-
-por:
-
-```python
-calibrate_pots(pots)
-```
-
-E na parte do loop principal, remova esta parte:
-
-```python
-pval = [pot.read() - maxCalibratePots[i] for i, pot in enumerate([pot1, pot2, pot3, pot4, pot5])]
-log(f"[POT VALS] {pval}", 2)
-
-abclevel = [stepX, stepY]
-
-triggerPot, holdclick, wait2Zero, cycle = check_pots(
-    pval, threshPot, triggerPot, abclevel, holdclick, wait2Zero, cycle
-)
-```
-
-e coloque:
-
-```python
-abclevel = [stepX, stepY]
-check_pots(abclevel)
-```
-
----
-
-### 5️⃣ Resultado
-
-* Cada canal terá **baseline** e thresholds próprios.
-* O disparo só ocorre se o valor ficar **abaixo do press threshold por 3 leituras seguidas**.
-* A liberação só ocorre se o valor subir **acima do release threshold**.
-* Isso corrige a sensibilidade desigual que você sentia na Maxima.
-
----
-
-Se quiser, eu também consigo incluir **recalibração automática** no `check_pots()` para quando o sensor ficar muito tempo sem toque, assim ele compensa variações ambientais sem precisar reiniciar.
-Quer que eu já coloque isso também?
-
-
-então 
-
-
-# Reset se parado
-if wait2Zero:
-    cycle += 1
-if cycle == config.CYCLE_RESET_LIMIT:
-    stepY = stepX = 0
-    vibrar(vib, 2)
-    log("[RESET] StepX e StepY resetados")
-
-
-wait2Zero e o cycle 
-
-
-
----
-
-Beleza — vou ajustar para:
-
-1. **Passar `pots` como parâmetro** para evitar erro.
-2. **Manter a lógica antiga do `wait2Zero` e `cycle`**, igual você usava no `check_pots()` antigo.
-
-Ficaria assim:
-
-```python
-def check_pots(pots, abclevel, wait2Zero, cycle):
-    global pval, triggerPot, pot_counter
-
-    for i, pot in enumerate(pots):
-        val = pot.read()
-        pval[i] = val
-        mapped_i = INDEX_MAP_POTS[i]
-
-        if not triggerPot[i] and val < press_thresh[i]:
-            pot_counter[i] += 1
-            if pot_counter[i] >= DEBOUNCE_COUNT:
-                send_charPs(potsgyrotozmk(abclevel, mapped_i, 1, config.THIS_IS))
-                log(f"[POT{mapped_i}] Pressionado | val={val} | abclevel={abclevel}", 2)
-                triggerPot[i] = True
-                pot_counter[i] = 0
-                wait2Zero = False
-                cycle = 0
-
-        elif triggerPot[i] and val > release_thresh[i]:
-            pot_counter[i] += 1
-            if pot_counter[i] >= DEBOUNCE_COUNT:
-                send_charPs(potsgyrotozmk(abclevel, mapped_i, 0, config.THIS_IS))
-                log(f"[POT{mapped_i}] Liberado | val={val} | abclevel={abclevel}", 2)
-                triggerPot[i] = False
-                pot_counter[i] = 0
-                wait2Zero = True
-
-        else:
-            pot_counter[i] = 0
-
-    return wait2Zero, cycle
-```
-
-E no `start()` trocamos esta parte:
-
-```python
-# Leitura dos potenciômetros
-abclevel = [stepX, stepY]
-wait2Zero, cycle = check_pots(pots, abclevel, wait2Zero, cycle)
-
-# Reset se parado
-if wait2Zero:
-    cycle += 1
-if cycle >= config.CYCLE_RESET_LIMIT:
-    stepY = stepX = 0
-    vibrar(vib, 2)
-    log("[RESET] StepX e StepY resetados")
-    cycle = 0
-```
-
----
-
-Assim:
-
-* **`pots`** é passado para `check_pots()` (evita o `NameError`).
-* **`wait2Zero`** só é `True` quando você solta o último pot.
-* **`cycle`** incrementa só quando está parado e reseta `stepX`/`stepY` após o tempo configurado.
-
-Se quiser, já posso também incluir a detecção de inatividade **usando o giroscópio junto com os pots** — aí só reinicia se **não tiver giro + não tiver pot pressionado**. Isso deixaria o reset bem mais preciso. Quer que eu já faça isso também?
-
-
-
-
-
 ---
 
 Changes not staged for commit:
@@ -1009,5 +550,177 @@ Changes not staged for commit:
 
 
 
+---
 
+
+
+
+
+eu estou rodando ZMK no nRF52840 com dois micros com um teclado split um central e um peripheral
+cada um esta recebendo dados via UART de um ESP32.
+agora eu posso acionar eventos com os switches do nRF52840 ou dados via Uart dede o ESP32.
+
+meu problema é que ao enviar os eventos do esp32 para o nRF52840 o evento fica em press e não libera o release,
+validando o esp32, antes de enviar os dados via UART ele esta fazendo o press e release tudo certinho,
+e é importante esclarecer que ao testar com os pines do nRF52840 o peripheral envia tudo certo para o central
+
+eu estou usando checksum para validar os dados na comunicação UART
+e estou enviando um byte inicial assim:
+
+0xAA
+checksum = event_type ^ row ^ col
+
+exemplo:
+
+Pronto para enviar eventos UART com checksum.
+b'\xaa\x01\x02\x01\x02'
+b'\xaa\x00\x02\x01\x03'
+b'\xaa\x01\x01\x01\x01'
+b'\xaa\x00\x01\x01\x00'
+b'\xaa\x01\x00\x01\x00'
+b'\xaa\x00\x00\x01\x01'
+
+aqui esta o programa que envia os dados via UART:
+aqui esta o programa que receve os dados via UART:
+
+
+---
+
+Obrigado por detalhar tudo, Segodimo. Pelo que você descreveu, o problema está em como o evento de **release** está sendo tratado no lado do nRF52840. Alguns pontos importantes que eu notei:
+
+---
+
+### 1️⃣ Event\_type invertido
+
+No seu envio via ESP32:
+
+```python
+if zmkcodes[2] == 0:
+    event_type = 0x01  # Press
+else:
+    event_type = 0x00  # Release
+```
+
+Mas no seu código C você faz:
+
+```c
+bool pressed = event.event_type == 0x01;
+```
+
+Isso parece correto, então `0x01 = Press` e `0x00 = Release`. Mas se o release não funciona, talvez o problema seja **quando você envia o release**: o ESP32 está enviando `0x00`, mas o pacote pode estar chegando fora de ordem ou sendo sobrescrito.
+
+---
+
+### 2️⃣ Thread que processa o evento
+
+No `led_blink_thread` você processa cada evento recebido:
+
+```c
+int ret = uart_switch_simulate_left(event.row, event.col, pressed);
+```
+
+Se `uart_switch_simulate_left` funciona com eventos vindos dos switches físicos, mas não com os da UART, pode ser um problema de **contexto de chamada**. No ZMK, a simulação de tecla pode exigir que o evento seja chamado em um **thread do kernel ou contexto de interrupção específico**. Atualmente você está chamando de uma thread normal (`led_blink_thread`).
+
+---
+
+### 3️⃣ Callback UART
+
+Você está usando `uart_cb` para ler bytes e colocar na fila. Isso parece correto, mas se o pacote de **release** chega muito rápido depois do press, pode ser que:
+
+* O press ainda esteja sendo processado.
+* A fila encha ou o pacote seja descartado (embora você tenha `K_NO_WAIT`).
+
+Sugiro testar **usar `K_FOREVER` no `k_msgq_put`** temporariamente para garantir que o release nunca seja perdido:
+
+```c
+if (k_msgq_put(&uart_event_msgq, &event, K_FOREVER) != 0) {
+    printk("Fila cheia! Evento (%d,%d) perdido.\n", row, col);
+}
+```
+
+---
+
+### 4️⃣ Delays no envio
+
+Se o ESP32 envia press e release **quase simultaneamente**, o nRF52840 pode processar o press e ainda não estar pronto para o release. Uma solução simples para testar: **adicionar um pequeno delay entre press e release no ESP32**:
+
+```python
+send_charPs([row, col, 0])  # Press
+time.sleep_ms(20)           # Pequeno delay
+send_charPs([row, col, 1])  # Release
+```
+
+Se isso resolver, é realmente um problema de timing.
+
+---
+
+### 5️⃣ Checksum e integridade
+
+Se o checksum falhar, o release será descartado. Pelo seu print:
+
+```
+b'\xaa\x01\x02\x01\x02'
+b'\xaa\x00\x02\x01\x03'
+```
+
+Os checksums parecem corretos (`0x01 ^ 0x02 ^ 0x01 = 0x02` e `0x00 ^ 0x02 ^ 0x01 = 0x03`). Então isso não é problema.
+
+---
+
+### ✅ Resumo das ações recomendadas
+
+1. Adicionar delay entre press e release no ESP32 (20–50 ms para teste).
+2. Testar `K_FOREVER` no `k_msgq_put` para não perder eventos.
+3. Verificar se `uart_switch_simulate_left` funciona **fora do contexto de thread** (algumas funções ZMK precisam ser chamadas de contextos específicos).
+4. Adicionar prints no thread para ver se o release chega:
+
+```c
+printk("Thread processando: Pressed=%d\n", pressed);
+```
+
+5. Se funcionar com delay, depois podemos implementar uma fila de eventos mais robusta ou adicionar timestamp para evitar eventos perdidos.
+
+---
+
+Se você quiser, eu posso te escrever uma **versão do ESP32 e do código nRF52840 ajustada para garantir press e release funcionando**, mantendo a fila e checksum. Isso já resolveria o problema de eventos presos.
+
+Quer que eu faça isso?
+
+
+
+
+antigamente meu codigoa 
+
+
+me ajuda analisar o wait2Zero  e o cycle do meu antigo codigo
+
+me ajuda analisar o wait2Zero  e o cycle
+para ajustar o comportamento no meu novo código
+
+a ideia é que stepY = stepX = 0 depois de 20 ciclos de inatividade depois de,
+ou precionar um pot, ou depois de ter tido uma mudança no gyro
+eu não quero que ele fique repetindo indefinidamente se não tiver atividade 
+
+o fluxo seria assim:
+se muda o gyro ou o pot então vai startar o wait2Zero até o cycle == 20
+em seguida se não ouver nenhuma atividade o cycle vai chegar ate 20 e parar
+e só vai começar novamnete depois de o gyro ou o pot ter uma mundança
+ahí começa o ciclo de novo
+cada vez que o gyro ou o pot ter uma mundança cycle += 1 inicia
+
+
+
+        if cycle == 20:
+            stepY = 0 stepX = 0
+            vibrar(2)
+
+        if cycle == 20:
+            stepY = 0
+            stepX = 0
+            vibrar(2)
+
+
+
+me ajuda a revisar a parte que eu envio o wait2Zero  e o cycle para check_gyro_axis
+eu quero iniciar o conteio se eu mexer no gyro
 

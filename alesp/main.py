@@ -76,13 +76,15 @@ def calibrate_pots(pots):
     print("Press thresh:   ", press_thresh)
     print("Release thresh: ", release_thresh)
 
-def check_gyro_axis(axis_index, pos_thresh, neg_thresh, step, event_pos, event_neg, vib, invert=False):
+def check_gyro_axis(axis_index, pos_thresh, neg_thresh, step, event_pos, event_neg, vib, wait2Zero, cycle, invert=False):
     """Verifica giroscópio em um eixo e atualiza estado."""
     if not event_pos and gyro[axis_index] > pos_thresh:
         step += -1 if invert else 1
         vibrar(vib, 1, step)
         log(f"[GYRO] Eixo {axis_index} POS -> step={step}")
         event_pos = True
+        wait2Zero = True
+        cycle = 0
     elif event_pos and gyro[axis_index] <= pos_thresh:
         event_pos = False
 
@@ -91,10 +93,12 @@ def check_gyro_axis(axis_index, pos_thresh, neg_thresh, step, event_pos, event_n
         vibrar(vib, 1, step)
         log(f"[GYRO] Eixo {axis_index} NEG -> step={step}")
         event_neg = True
+        wait2Zero = True
+        cycle = 0
     elif event_neg and gyro[axis_index] >= neg_thresh:
         event_neg = False
 
-    return step, event_pos, event_neg
+    return step, event_pos, event_neg, wait2Zero, cycle
 
 def check_step_wait(event_triggered, step_wait, step, delta, vib):
     """Controle de espera para repetição automática."""
@@ -176,7 +180,7 @@ def start(i2c=None, mpu=None, pots=None, vib=None):
     evntTriggeredXP = evntTriggeredXN = False
     evntTriggeredYP = evntTriggeredYN = False
 
-    wait2Zero = True
+    wait2Zero = False
     cycle = 0
     stepWaitXP = stepWaitXN = stepWaitYP = stepWaitYN = 0
 
@@ -189,13 +193,13 @@ def start(i2c=None, mpu=None, pots=None, vib=None):
         gyro, accl = average_and_slide(buffer, mpu)
 
         # Movimento no eixo X
-        stepX, evntTriggeredXP, evntTriggeredXN = check_gyro_axis(
-            gy1, threshXP, threshXN, stepX, evntTriggeredXP, evntTriggeredXN, vib, invert=config.INVERT_X
+        stepX, evntTriggeredXP, evntTriggeredXN, wait2Zero, cycle = check_gyro_axis(
+            gy1, threshXP, threshXN, stepX, evntTriggeredXP, evntTriggeredXN, vib, wait2Zero, cycle, invert=config.INVERT_X
         )
 
         # Movimento no eixo Y
-        stepY, evntTriggeredYP, evntTriggeredYN = check_gyro_axis(
-            gy2, threshP, threshN, stepY, evntTriggeredYP, evntTriggeredYN, vib, invert=config.INVERT_Y
+        stepY, evntTriggeredYP, evntTriggeredYN, wait2Zero, cycle = check_gyro_axis(
+            gy2, threshP, threshN, stepY, evntTriggeredYP, evntTriggeredYN, vib, wait2Zero, cycle, invert=config.INVERT_Y
         )
 
         # Controle de repetição automática
@@ -212,13 +216,14 @@ def start(i2c=None, mpu=None, pots=None, vib=None):
         wait2Zero, cycle = check_pots(pots, abclevel, wait2Zero, cycle)
 
         # Reset se parado
-        if wait2Zero:
+        if wait2Zero and cycle < config.CYCLE_RESET_LIMIT:
             cycle += 1
-        if cycle == config.CYCLE_RESET_LIMIT:
-            stepY = stepX = 0
-            vibrar(vib, 2)
-            log("[RESET] StepX e StepY resetados")
-            cycle = 0
+            if cycle == config.CYCLE_RESET_LIMIT:
+                stepY = stepX = 0
+                vibrar(vib, 2)
+                log("[RESET] StepX e StepY resetados")
+                wait2Zero = False
+                cycle = 0
 
         if num % config.TCLEAR == 0:
             num = 0

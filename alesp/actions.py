@@ -16,9 +16,9 @@ def send_charPs(zmkcodes):
             return
 
         if zmkcodes[2] == 0:
-            event_type = 0x01
-        else:
             event_type = 0x00
+        else:
+            event_type = 0x01
         checksum = event_type ^ row ^ col
         packet = bytes([0xAA, event_type, row, col, checksum])
         # print(packet)

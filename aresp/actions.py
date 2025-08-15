@@ -25,6 +25,10 @@ def send_charPs(zmkcodes):
         # print(packet)
         uart.write(packet)
 
+def tstpot(row, col, delay=0.1):
+    send_charPs([row, col, True])
+    time.sleep(delay)
+    send_charPs([row, col, False])
 
 def vibrar(pino_vibracao, n_pulsos, step=None):
     if pino_vibracao is None:

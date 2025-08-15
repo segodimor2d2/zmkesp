@@ -1,10 +1,13 @@
 
 
-- terminar a parte da ezquerda
-- ajustar os dados certos row/col
-- protocolo de envio para nRF52840
-- soldas e ajustes novos
-- ver a sincornizacao para envio de dados
+- mudar conexão da bateria no nRF52840
+- acrescentar um cabo touch
+- ver a parte de ter um conetor
+- reviçar a questão do buffer porque trava
+- testar tirar o chunks
+- ver a parte da tecla press 
+- ver logs no nRF52840
+- mudar eixos do giro e reviçar espaço
 - pensar no mouse
 
 
@@ -14,7 +17,7 @@ mpremote repl
 mpremote connect /dev/ttyUSB0 cp alesp/config.py :config.py
 mpremote connect /dev/ttyUSB0 cp alesp/main.py :main.py
 mpremote connect /dev/ttyUSB0 cp alesp/actions.py :actions.py
-mpremote connect /dev/ttyUSB0 cp aresp/dicctozmk.py :dicctozmk.py
+mpremote connect /dev/ttyUSB0 cp alesp/dicctozmk.py :dicctozmk.py
 mpremote connect /dev/ttyUSB0 cp alesp/hw.py :hw.py
 mpremote connect /dev/ttyUSB0 cp alesp/pots.py :pots.py
 mpremote connect /dev/ttyUSB0 cp alesp/gyro.py :gyro.py
@@ -22,6 +25,14 @@ mpremote connect /dev/ttyUSB0 cp alesp/mpu6050.py :mpu6050.py
 
 # pots
 1 0 2 4 3 
+
+0 4 3 2 1
+
+0 4,3,1,2
+0 1,2,3,4
+
+
+
 
 (gzar 2) (gz 1) (gzre 0)
 (gyar 1) (gy 2) (gyre 3)
@@ -41,6 +52,22 @@ mpremote connect /dev/ttyUSB0 cp aresp/mpu6050.py :mpu6050.py
 
 # pots
 0 1 2 3 4
+1 2 3 4 0
+
+
+from actions import tstpot
+tstpot(0, 1)
+tstpot(0, 10)
+
+# abclevel, gx, gy: (row, col)
+           r,c
+>>> tstpot(3,2) space
+>>> tstpot(3,3) enter
+>>> tstpot(0, 11) backspace
+
+
+
+from pots import add_pot_samples, calc_calibrate
 
 
 GY1, GY2 = 0, 1         # Eixo X primeiro, depois Y
@@ -619,18 +646,25 @@ No `led_blink_thread` você processa cada evento recebido:
 int ret = uart_switch_simulate_left(event.row, event.col, pressed);
 ```
 
-Se `uart_switch_simulate_left` funciona com eventos vindos dos switches físicos, mas não com os da UART, pode ser um problema de **contexto de chamada**. No ZMK, a simulação de tecla pode exigir que o evento seja chamado em um **thread do kernel ou contexto de interrupção específico**. Atualmente você está chamando de uma thread normal (`led_blink_thread`).
+Se `uart_switch_simulate_left` funciona com eventos vindos dos switches físicos,
+mas não com os da UART, pode ser um problema de **contexto de chamada**.
+No ZMK, a simulação de tecla pode exigir que o evento seja chamado em um
+**thread do kernel ou contexto de interrupção específico**.
+Atualmente você está chamando de uma thread normal (`led_blink_thread`).
 
 ---
 
 ### 3️⃣ Callback UART
 
-Você está usando `uart_cb` para ler bytes e colocar na fila. Isso parece correto, mas se o pacote de **release** chega muito rápido depois do press, pode ser que:
+Você está usando `uart_cb` para ler bytes e colocar na fila.
+Isso parece correto, mas se o pacote de **release** chega muito rápido depois do press,
+pode ser que:
 
 * O press ainda esteja sendo processado.
 * A fila encha ou o pacote seja descartado (embora você tenha `K_NO_WAIT`).
 
-Sugiro testar **usar `K_FOREVER` no `k_msgq_put`** temporariamente para garantir que o release nunca seja perdido:
+Sugiro testar **usar `K_FOREVER` no `k_msgq_put`**
+temporariamente para garantir que o release nunca seja perdido:
 
 ```c
 if (k_msgq_put(&uart_event_msgq, &event, K_FOREVER) != 0) {
@@ -642,7 +676,9 @@ if (k_msgq_put(&uart_event_msgq, &event, K_FOREVER) != 0) {
 
 ### 4️⃣ Delays no envio
 
-Se o ESP32 envia press e release **quase simultaneamente**, o nRF52840 pode processar o press e ainda não estar pronto para o release. Uma solução simples para testar: **adicionar um pequeno delay entre press e release no ESP32**:
+Se o ESP32 envia press e release **quase simultaneamente**,
+o nRF52840 pode processar o press e ainda não estar pronto para o release.
+Uma solução simples para testar: **adicionar um pequeno delay entre press e release no ESP32**:
 
 ```python
 send_charPs([row, col, 0])  # Press
@@ -723,4 +759,188 @@ cada vez que o gyro ou o pot ter uma mundança cycle += 1 inicia
 
 me ajuda a revisar a parte que eu envio o wait2Zero  e o cycle para check_gyro_axis
 eu quero iniciar o conteio se eu mexer no gyro
+
+
+
+
+
+---
+
+
+### 2️⃣ Thread que processa o evento
+
+No `led_blink_thread` você processa cada evento recebido:
+
+```c
+int ret = uart_switch_simulate_left(event.row, event.col, pressed);
+```
+
+Se `uart_switch_simulate_left` funciona com eventos vindos dos switches físicos,
+mas não com os da UART, pode ser um problema de **contexto de chamada**.
+No ZMK, a simulação de tecla pode exigir que o evento seja chamado em um
+**thread do kernel ou contexto de interrupção específico**.
+Atualmente você está chamando de uma thread normal (`led_blink_thread`).
+
+
+vamos ver a mesma parte do lado peripheral esquerdo:
+
+parece que ao recever dados via UART esta sobrecarregado o nRF52840,
+tem uma hora que o micro para, por favor me ajuda a revisar o código,
+porfavor tire todos os printk do codigo
+outra coisa que eu gostaria e remover todo o que tem que ver com o led piscando ao recever dados
+
+
+#include <zephyr/kernel.h>
+#include <zephyr/device.h>
+#include <zephyr/drivers/gpio.h>
+#include <zephyr/drivers/uart.h>
+#include <zephyr/init.h>
+#include <zephyr/sys/printk.h>
+#include <zmk/uart_switch_left.h>
+
+#define LED_NODE DT_ALIAS(led0)
+static const struct gpio_dt_spec led = GPIO_DT_SPEC_GET(LED_NODE, gpios);
+
+static const struct device *uart = DEVICE_DT_GET(DT_NODELABEL(uart0));
+
+// Pacote UART: [0xAA][event_type][row][col][checksum]
+static uint8_t buf[5];
+static int buf_pos = 0;
+
+// Estrutura para armazenar evento UART
+struct uart_event_t {
+    uint8_t event_type;
+    uint8_t row;
+    uint8_t col;
+};
+
+// Fila para armazenar até 10 eventos UART
+#define UART_EVENT_QUEUE_SIZE 10
+K_MSGQ_DEFINE(uart_event_msgq, sizeof(struct uart_event_t), UART_EVENT_QUEUE_SIZE, 4);
+
+// Stack e thread para processar eventos UART e piscar o LED
+K_THREAD_STACK_DEFINE(led_stack, 512);
+static struct k_thread led_thread_data;
+
+void led_blink_thread(void *a, void *b, void *c)
+{
+    struct uart_event_t event;
+
+    while (1) {
+        // Espera até que um evento esteja disponível
+        k_msgq_get(&uart_event_msgq, &event, K_FOREVER);
+
+        bool pressed = event.event_type == 0x01;
+
+        printk("UART: %s (%d,%d)\n", pressed ? "Press" : "Release", event.row, event.col);
+        printk("Pacote UART recebido: 0xAA 0x%02X 0x%02X 0x%02X (Checksum OK)\n", event.event_type, event.row, event.col);
+
+        int ret = uart_switch_simulate_left(event.row, event.col, pressed);
+        if (ret < 0) {
+            printk("Erro ao simular tecla (%d,%d)\n", event.row, event.col);
+        }
+
+        // Pisca LED como indicação do evento
+        gpio_pin_set_dt(&led, 1);
+        k_sleep(K_MSEC(100));
+        gpio_pin_set_dt(&led, 0);
+    }
+}
+
+static void uart_cb(const struct device *dev, void *user_data)
+{
+    uint8_t c;
+
+    while (uart_fifo_read(dev, &c, 1) > 0) {
+        // Aguarda byte inicial 0xAA
+        if (buf_pos == 0 && c != 0xAA) {
+            continue;
+        }
+
+        buf[buf_pos++] = c;
+
+        if (buf_pos == 5) {
+            uint8_t event_type = buf[1];
+            uint8_t row = buf[2];
+            uint8_t col = buf[3];
+            uint8_t checksum = buf[4];
+            uint8_t expected_checksum = event_type ^ row ^ col;
+
+            if (checksum != expected_checksum) {
+                printk("Checksum inválido! Recebido: 0x%02X, Esperado: 0x%02X\n", checksum, expected_checksum);
+                buf_pos = 0;
+                continue;  // descarta pacote
+            }
+
+            struct uart_event_t event = {
+                .event_type = event_type,
+                .row = row,
+                .col = col
+            };
+
+            // Envia para a fila
+            if (k_msgq_put(&uart_event_msgq, &event, K_NO_WAIT) != 0) {
+                printk("Fila cheia! Evento (%d,%d) perdido.\n", row, col);
+            }
+
+            buf_pos = 0; // Reinicia buffer para o próximo pacote
+        }
+    }
+}
+
+void uart_receiver_init(void)
+{
+    if (!device_is_ready(led.port)) {
+        printk("LED device not ready\n");
+        return;
+    }
+    gpio_pin_configure_dt(&led, GPIO_OUTPUT_INACTIVE);
+
+    if (!device_is_ready(uart)) {
+        printk("UART device not ready\n");
+        return;
+    }
+
+    uart_irq_callback_user_data_set(uart, uart_cb, NULL);
+    uart_irq_rx_enable(uart);
+
+    k_thread_create(&led_thread_data, led_stack, K_THREAD_STACK_SIZEOF(led_stack),
+                    led_blink_thread, NULL, NULL, NULL,
+                    7, 0, K_NO_WAIT);
+
+    printk("UART Receiver iniciado\n");
+}
+
+static int uart_receiver_sys_init(void)
+{
+    uart_receiver_init();
+    return 0;
+}
+
+SYS_INIT(uart_receiver_sys_init, APPLICATION, CONFIG_APPLICATION_INIT_PRIORITY);
+
+
+
+---
+
+
+Changes to be committed:
+  (use "git restore --staged <file>..." to unstage)
+        modified:   alesp/actions.py
+        modified:   alesp/config.py
+        modified:   alesp/dicctozmk.py
+        modified:   aresp/actions.py
+        modified:   aresp/config.py
+        modified:   aresp/dicctozmk.py
+        modified:   firmwar/corne_left.uf2
+        modified:   firmwar/corne_right.uf2
+        modified:   notes.md
+
+➜  zmkesp git:(main) ✗ 
+
+
+
+
+
+
 

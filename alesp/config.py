@@ -21,19 +21,19 @@ THRES_PERCENT = 0.1     # 0.05 (5%) e 0.2 (20%). 0.1 (10%)
 STEP_WAIT_LIMIT = 5     # Quantos ciclos esperar antes de repetir passo
 
 # Reset
-CYCLE_RESET_LIMIT = 30  # Quantos ciclos parado até resetar stepX/stepY
+CYCLE_RESET_LIMIT = 20  # Quantos ciclos parado até resetar stepX/stepY
 
 # Loop principal
 TSLEEP = 50             # Delay entre loops (ms)
 TCLEAR = 10000          # Intervalo para reset de contador
 SAMPLES = 5             # Amostras iniciais do giroscópio
 
+# Ordem dos eixos do giroscópio
+GY1, GY2 = 1, 0         # Eixo X primeiro, depois Y
+
 # Inverter sentido do eixo X e/ou Y
 INVERT_X = False         # True re(+) ar(-) False o contrario
 INVERT_Y = True         # True re(+) ar(-) False o contrario
-
-# Ordem dos eixos do giroscópio
-GY1, GY2 = 1, 0         # Eixo X primeiro, depois Y
 
 PINOS_R = 13,12,14,27,4
 INDEX_MAP_R = 0,1,2,3,4

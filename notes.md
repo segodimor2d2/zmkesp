@@ -13,7 +13,7 @@
 
 # ALESP L
 mpremote fs ls
-mpremote repl
+mpremote connect /dev/ttyUSB0 
 mpremote connect /dev/ttyUSB0 cp alesp/config.py :config.py
 mpremote connect /dev/ttyUSB0 cp alesp/main.py :main.py
 mpremote connect /dev/ttyUSB0 cp alesp/actions.py :actions.py
@@ -38,9 +38,16 @@ mpremote connect /dev/ttyUSB0 cp alesp/mpu6050.py :mpu6050.py
 (gyar 1) (gy 2) (gyre 3)
 
 
+mpremote connect /dev/ttyUSB0 
+mpremote connect auto
+mpremote repl
+mpremote connect list
+ls /dev/tty*
+
+
 # ALESP R
 mpremote fs ls
-mpremote repl
+mpremote connect /dev/ttyUSB0 
 mpremote connect /dev/ttyUSB0 cp aresp/config.py :config.py
 mpremote connect /dev/ttyUSB0 cp aresp/main.py :main.py
 mpremote connect /dev/ttyUSB0 cp aresp/actions.py :actions.py
@@ -58,6 +65,8 @@ mpremote connect /dev/ttyUSB0 cp aresp/mpu6050.py :mpu6050.py
 from actions import tstpot
 tstpot(0, 1)
 tstpot(0, 10)
+tstpot(0, 7)
+tstpot(0, 11)
 
 # abclevel, gx, gy: (row, col)
            r,c
@@ -926,12 +935,15 @@ SYS_INIT(uart_receiver_sys_init, APPLICATION, CONFIG_APPLICATION_INIT_PRIORITY);
 
 Changes to be committed:
   (use "git restore --staged <file>..." to unstage)
+
         modified:   alesp/actions.py
         modified:   alesp/config.py
         modified:   alesp/dicctozmk.py
+
         modified:   aresp/actions.py
         modified:   aresp/config.py
         modified:   aresp/dicctozmk.py
+
         modified:   firmwar/corne_left.uf2
         modified:   firmwar/corne_right.uf2
         modified:   notes.md

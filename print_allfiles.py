@@ -1,6 +1,6 @@
 import os
 
-def consolidar_codigos(pasta_origem, arquivo_saida='print_allfiles_out.txt'):
+def consolidar_codigos(pasta_origem, arquivo_saida='out_print_allfiles.md'):
     """
     Consolida todos os arquivos de código de uma pasta em um único arquivo de texto.
     

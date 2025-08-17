@@ -7,8 +7,11 @@ from pots import add_pot_samples, calc_calibrate
 from gyro import append_gyro, average_and_slide
 from dicctozmk import potsgyrotozmk
 
+if config.THIS_IS == 1:
+    INDEX_MAP_POTS = list(config.INDEX_MAP_R)
 
-INDEX_MAP_POTS = list(config.INDEX_MAP_L if config.THIS_IS == 0 else config.INDEX_MAP_R)
+if config.THIS_IS == 0:
+    INDEX_MAP_POTS = list(config.INDEX_MAP_L)
 
 # ===== CONFIGS TOUCH =====
 CALIB_SAMPLES   = 100   # Amostras por canal

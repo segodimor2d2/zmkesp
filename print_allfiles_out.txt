@@ -1,15 +1,15 @@
-=== CONSOLIDAÇÃO DE CÓDIGOS DA PASTA: aresp ===
+=== CONSOLIDAÇÃO DE CÓDIGOS DA PASTA: alesp ===
 
 
 
-=== ARQUIVO: aresp/config.py ===
+=== ARQUIVO: alesp/config.py ===
 
 # -----------------------------
 # CONFIGURAÇÕES DO SISTEMA
 # -----------------------------
 
 # Pinos dos touchpads
-THIS_IS = 1 # 0=L, 1=R
+THIS_IS = 0 # 0=L, 1=R
 
 # Potenciômetros
 ## Thresholds individuais
@@ -34,20 +34,20 @@ TSLEEP = 50             # Delay entre loops (ms)
 TCLEAR = 10000          # Intervalo para reset de contador
 SAMPLES = 5             # Amostras iniciais do giroscópio
 
-# Inverter sentido do eixo X e/ou Y
-INVERT_X = True         # True re(+) ar(-) False o contrario
-INVERT_Y = True         # True re(+) ar(-) False o contrario
-
 # Ordem dos eixos do giroscópio
-GY1, GY2 = 0, 1         # Eixo X primeiro, depois Y
+GY1, GY2 = 1, 0         # Eixo X primeiro, depois Y
+
+# Inverter sentido do eixo X e/ou Y
+INVERT_X = False         # True re(+) ar(-) False o contrario
+INVERT_Y = True         # True re(+) ar(-) False o contrario
 
 PINOS_R = 13,12,14,27,4
 INDEX_MAP_R = 0,1,2,3,4
-PINOS_VIB_R = 33
+PINOS_VIB_R = 26
 
 PINOS_L = 12,13,14,27,4
-INDEX_MAP_L = 0,1,2,3,4
-PINOS_VIB_L = 32
+INDEX_MAP_L = 0,1,2,4,3
+PINOS_VIB_L = 26
 
 
 # -----------------------------
@@ -66,7 +66,7 @@ DEBUG = 0
 
 
 
-=== ARQUIVO: aresp/actions.py ===
+=== ARQUIVO: alesp/actions.py ===
 
 from machine import Pin, UART
 import time
@@ -79,15 +79,26 @@ def send_charPs(zmkcodes):
         print(zmkcodes)
         row = zmkcodes[0]
         col = zmkcodes[1]
+
+        # Proteção: valores devem estar entre 0 e 255
+        if not (0 <= row <= 255 and 0 <= col <= 255):
+            print(f"[WARNING] row/col fora do range: row={row}, col={col}")
+            return
+
         if zmkcodes[2] == 0:
-            event_type = 0x01
-        else:
             event_type = 0x00
+        else:
+            event_type = 0x01
+
         checksum = event_type ^ row ^ col
         packet = bytes([0xAA, event_type, row, col, checksum])
         # print(packet)
         uart.write(packet)
 
+def tstpot(row, col, delay=0.1):
+    send_charPs([row, col, True])
+    time.sleep(delay)
+    send_charPs([row, col, False])
 
 def vibrar(pino_vibracao, n_pulsos, step=None):
     if pino_vibracao is None:
@@ -113,7 +124,7 @@ def vibrar(pino_vibracao, n_pulsos, step=None):
 
 
 
-=== ARQUIVO: aresp/hw.py ===
+=== ARQUIVO: alesp/hw.py ===
 
 from machine import Pin, SoftI2C, TouchPad
 import time
@@ -160,7 +171,7 @@ if __name__ == "__main__":
     print("hw init done, mpu:", bool(mpu), "pots:", [type(p) for p in pots])
 
 
-=== ARQUIVO: aresp/dicctozmk.py ===
+=== ARQUIVO: alesp/dicctozmk.py ===
 
 
 
@@ -172,82 +183,82 @@ if __name__ == "__main__":
 MAPL = {
     # abclevel, gx, gy: (row, col)
 
-    # --- Gyro (1,0) [M,T] ---
-    (0,  1,  0): (3, 5),  # space
-    (1,  1,  0): (0, 1),  # q
-    (2,  1,  0): (0, 2),  # w
-    (3,  1,  0): (0, 3),  # e
-    (4,  1,  0): (0, 4),  # r
+    # --- Gyro (1,0) [P,M,T] ---
+    (0,  1,  0): (3, 2),  # space
+    (1,  1,  0): (0, 4),  # r
+    (2,  1,  0): (0, 3),  # e
+    (3,  1,  0): (0, 2),  # w
+    (4,  1,  0): (0, 1),  # q
 
-    # --- Gyro (0,0) [M,T] ---
-    (0,  0,  0): (3, 5),  # space
-    (1,  0,  0): (1, 1),  # a
-    (2,  0,  0): (1, 2),  # s
-    (3,  0,  0): (1, 3),  # d
-    (4,  0,  0): (1, 4),  # f
+    # --- Gyro (0,0) [P,M,T] ---
+    (0,  0,  0): (3, 2),  # space
+    (1,  0,  0): (1, 4),  # f
+    (2,  0,  0): (1, 3),  # d
+    (3,  0,  0): (1, 2),  # s
+    (4,  0,  0): (1, 1),  # a
 
-    # --- Gyro (-1,0) [M,T] ---
-    (0, -1,  0): (3, 5),  # space
-    (1, -1,  0): (2, 1),  # z
-    (2, -1,  0): (2, 2),  # x
-    (3, -1,  0): (2, 3),  # c
-    (4, -1,  0): (2, 4),  # v
+    # --- Gyro (-1,0) [P,M,T] ---
+    (0, -1,  0): (3, 2),  # space
+    (1, -1,  0): (2, 4),  # v
+    (2, -1,  0): (2, 3),  # c
+    (3, -1,  0): (2, 2),  # x
+    (4, -1,  0): (2, 1),  # z
 
-    # --- Gyro (1,1) [M,T] ---
-    (0,  1,  1): (3, 5),  # space
-    (1,  1,  1): (1, 5),  # t
+    # --- Gyro (1,1) [P,M,T] ---
+    (0,  1,  1): (3, 2),  # space
+    (1,  1,  1): (0, 5),  # t
     (4,  1,  1): (0, 0),  # esc
 
-    # --- Gyro (0,1) [M,T] ---
-    (0,  0,  1): (3, 5),  # space
+    # --- Gyro (0,1) [P,M,T] ---
+    (0,  0,  1): (3, 2),  # space
     (1,  0,  1): (1, 5),  # g
     (4,  0,  1): (0, 0),  # esc
 
-    # --- Gyro (-1,1) [M,T] ---
-    (0, -1,  1): (3, 5),  # space
-    (1, -1,  1): (1, 5),  # b
+    # --- Gyro (-1,1) [P,M,T] ---
+    (0, -1,  1): (3, 2),  # space
+    (1, -1,  1): (2, 5),  # b
     (4, -1,  1): (0, 0),  # esc
+
 }
 
 MAPR = {
-    # --- Gyro (1,1) [M,T] ---
-    (0,  1,  1): (3, 6),   # space
-    (1,  1,  1): (1, 6),   # y
-    (4,  1,  1): (12, 0),  # backspace
+    # --- Gyro (1,0) [P,M,T] ---
+    (0,  1,  0): (3, 3),   # enter
+    (1,  1,  0): (0, 7),   # u
+    (2,  1,  0): (0, 8),   # i
+    (3,  1,  0): (0, 9),   # o
+    (4,  1,  0): (0, 10),  # p
+    # --- Gyro (1,1) [P,M,T] ---
+    (0,  1,  1): (3, 3),   # enter
+    (1,  1,  1): (0, 6),   # y
+    (4,  1,  1): (0, 11),  # backspace
 
-    # --- Gyro (0,1) [M,T] ---
-    (0,  1,  0): (3, 6),   # space
-    (1,  1,  0): (1, 6),   # h
-    (4,  1,  0): (12, 0),  # enter
+    # --- Gyro (0,0) [P,M,T] ---
+    (0,  0,  0): (3, 3),   # enter
+    (1,  0,  0): (1, 7),   # j
+    (2,  0,  0): (1, 8),   # k
+    (3,  0,  0): (1, 9),   # l
+    (4,  0,  0): (1, 10),  # c
+    # --- Gyro (0,1) [P,M,T] ---
+    (0,  0,  1): (3, 3),   # enter
+    (1,  0,  1): (1, 6),   # h
+    (4,  0,  1): (0, 11),  # backspace
 
-    # --- Gyro (-1,1) [M,T] ---
-    (0,  1, -1): (3, 6),   # space
-    (1,  1, -1): (1, 6),   # n
-    (4,  1, -1): (12, 0),  # ctrl
+    # --- Gyro (-1,0) [P,M,T] ---
+    (0, -1,  0): (3, 3),   # enter
+    (1, -1,  0): (2, 7),  # m
+    (2, -1,  0): (2, 8),  # ,
+    (3, -1,  0): (2, 9),  # .
+    (4, -1,  0): (2, 10), # ;
+    # --- Gyro (-1,1) [P,M,T] ---
+    (0,  -1, 1): (3, 3),   # enter
+    (1,  -1, 1): (2, 6),   # n
+    (4,  -1, 1): (0, 11),  # backspace
 
-    # --- Gyro (1,0) [M,T] ---
-    (0,  1,  0): (3, 6),   # space
-    (1,  1,  0): (1, 7),   # u
-    (2,  1,  0): (1, 8),   # i
-    (3,  1,  0): (1, 9),   # o
-    (4,  1,  0): (1, 10),   # p
-
-    # --- Gyro (0,0) [M,T] ---
-    (0,  0,  0): (3, 6),   # space
-    (1,  0,  0): (0, 7),   # j
-    (2,  0,  0): (0, 8),   # k
-    (3,  0,  0): (0, 9),   # l
-    (4,  0,  0): (0, 10),   # c
-
-    # --- Gyro (-1,0) [M,T] ---
-    (0, -1,  0): (3, 6),   # space
-    (1, -1,  0): (-1, 7),  # m
-    (2, -1,  0): (-1, 8),  # ,
-    (3, -1,  0): (-1, 9),  # .
-    (4, -1,  0): (-1, 10),  # ;
 }
 
 def potsgyrotozmk(abclevel, mapped_i, status, side):
+    print(abclevel, mapped_i, status, side)
     """
     Traduz (abclevel, gx, gy, status) -> (row, col, status)
     side: 0 = left, 1 = right
@@ -261,7 +272,7 @@ def potsgyrotozmk(abclevel, mapped_i, status, side):
 
 
 
-=== ARQUIVO: aresp/pots.py ===
+=== ARQUIVO: alesp/pots.py ===
 
 def add_pot_samples(bufferPot, pval):
     """bufferPot: list de listas; pval: lista com leituras atuais"""
@@ -277,7 +288,7 @@ def calc_calibrate(bufferPot):
     return maxCalc
 
 
-=== ARQUIVO: aresp/gyro.py ===
+=== ARQUIVO: alesp/gyro.py ===
 
 def append_gyro(buffer, mpuSensor):
     """Adiciona uma leitura ao buffer (6 listas)"""
@@ -310,7 +321,7 @@ def average_and_slide(buffer, mpuSensor):
     return gyro, accl
 
 
-=== ARQUIVO: aresp/mpu6050.py ===
+=== ARQUIVO: alesp/mpu6050.py ===
 
 import machine
 
@@ -361,7 +372,7 @@ class MPU6050():
 
 
 
-=== ARQUIVO: aresp/main.py ===
+=== ARQUIVO: alesp/main.py ===
 
 import time
 import math
@@ -377,6 +388,22 @@ if config.THIS_IS == 1:
 
 if config.THIS_IS == 0:
     INDEX_MAP_POTS = list(config.INDEX_MAP_L)
+
+# ===== CONFIGS TOUCH =====
+CALIB_SAMPLES   = 100   # Amostras por canal
+PRESS_OFFSET    = 50    # Quanto abaixo do baseline aciona
+RELEASE_OFFSET  = 30    # Quanto abaixo do baseline libera
+DEBOUNCE_COUNT  = 3     # Leituras consecutivas para confirmar toque
+
+# ===== VARIÁVEIS GLOBAIS =====
+baseline        = []
+press_thresh    = []
+release_thresh  = []
+pot_counter     = []
+triggerPot      = []
+pval            = []
+
+
 
 # -----------------------------
 # Função de log centralizada
@@ -401,22 +428,39 @@ def log(*args, **kwargs):
 # Funções auxiliares
 # -----------------------------
 def calibrate_pots(pots):
-    bufferPot = [[] for _ in pots]
-    for _ in range(config.POT_CALIBRATION_SAMPLES):
-        pval = [pot.read() for pot in pots]
-        log("pot sample:", 0, pval)
-        add_pot_samples(bufferPot, pval)
-        time.sleep_ms(config.POT_CALIBRATION_DELAY_MS)
-    log('run...', 0)
-    return calc_calibrate(bufferPot)
+    global baseline, press_thresh, release_thresh, pot_counter, triggerPot, pval
 
-def check_gyro_axis(axis_index, pos_thresh, neg_thresh, step, event_pos, event_neg, vib, invert=False):
+    num_pots = len(pots)
+    baseline        = [0] * num_pots
+    press_thresh    = [0] * num_pots
+    release_thresh  = [0] * num_pots
+    pot_counter     = [0] * num_pots
+    triggerPot      = [False] * num_pots
+    pval            = [0] * num_pots
+
+    print("Calibrando... não toque nos sensores.")
+    for i in range(num_pots):
+        soma = 0
+        for _ in range(CALIB_SAMPLES):
+            soma += pots[i].read()
+            time.sleep_ms(5)
+        baseline[i]       = soma / CALIB_SAMPLES
+        press_thresh[i]   = baseline[i] - PRESS_OFFSET
+        release_thresh[i] = baseline[i] - RELEASE_OFFSET
+
+    print("Baseline:       ", baseline)
+    print("Press thresh:   ", press_thresh)
+    print("Release thresh: ", release_thresh)
+
+def check_gyro_axis(axis_index, pos_thresh, neg_thresh, step, event_pos, event_neg, vib, wait2Zero, cycle, invert=False):
     """Verifica giroscópio em um eixo e atualiza estado."""
     if not event_pos and gyro[axis_index] > pos_thresh:
         step += -1 if invert else 1
         vibrar(vib, 1, step)
         log(f"[GYRO] Eixo {axis_index} POS -> step={step}")
         event_pos = True
+        wait2Zero = True
+        cycle = 0
     elif event_pos and gyro[axis_index] <= pos_thresh:
         event_pos = False
 
@@ -425,10 +469,12 @@ def check_gyro_axis(axis_index, pos_thresh, neg_thresh, step, event_pos, event_n
         vibrar(vib, 1, step)
         log(f"[GYRO] Eixo {axis_index} NEG -> step={step}")
         event_neg = True
+        wait2Zero = True
+        cycle = 0
     elif event_neg and gyro[axis_index] >= neg_thresh:
         event_neg = False
 
-    return step, event_pos, event_neg
+    return step, event_pos, event_neg, wait2Zero, cycle
 
 def check_step_wait(event_triggered, step_wait, step, delta, vib):
     """Controle de espera para repetição automática."""
@@ -440,27 +486,37 @@ def check_step_wait(event_triggered, step_wait, step, delta, vib):
         step_wait = 0
     return step_wait, step
 
-def check_pots(pvals, thresh, triggerPot, abclevel, holdclick, wait2Zero, cycle):
-    """Verifica potenciômetros e envia eventos."""
-    for i, val in enumerate(pvals):
-        mapped_i = INDEX_MAP_POTS[i]  # pega índice lógico desejado
+def check_pots(pots, abclevel, wait2Zero, cycle):
+    global pval, triggerPot, pot_counter
 
-        if not triggerPot[i] and val < thresh[i]:
-            send_charPs(potsgyrotozmk(abclevel, mapped_i, 1, config.THIS_IS))
-            log(f"[POT{mapped_i}] Pressionado | val={val} | abclevel={abclevel}",2)
-            triggerPot[i] = True
-            holdclick = True
-            wait2Zero = False
-            cycle = 0
+    for i, pot in enumerate(pots):
+        val = pot.read()
+        pval[i] = val
+        mapped_i = INDEX_MAP_POTS[i]
 
-        elif triggerPot[i] and val >= thresh[i]:
-            send_charPs(potsgyrotozmk(abclevel, mapped_i, 0, config.THIS_IS))
-            log(f"[POT{mapped_i}] Pressionado | val={val} | abclevel={abclevel}",2)
-            triggerPot[i] = False
-            holdclick = False
-            wait2Zero = True
+        if not triggerPot[i] and val < press_thresh[i]:
+            pot_counter[i] += 1
+            if pot_counter[i] >= DEBOUNCE_COUNT:
+                send_charPs(potsgyrotozmk(abclevel, mapped_i, 1, config.THIS_IS))
+                log(f"[POT{mapped_i}] Pressionado | val={val} | abclevel={abclevel}", 2)
+                triggerPot[i] = True
+                pot_counter[i] = 0
+                wait2Zero = False
+                cycle = 0
 
-    return triggerPot, holdclick, wait2Zero, cycle
+        elif triggerPot[i] and val > release_thresh[i]:
+            pot_counter[i] += 1
+            if pot_counter[i] >= DEBOUNCE_COUNT:
+                send_charPs(potsgyrotozmk(abclevel, mapped_i, 0, config.THIS_IS))
+                log(f"[POT{mapped_i}] Liberado | val={val} | abclevel={abclevel}", 2)
+                triggerPot[i] = False
+                pot_counter[i] = 0
+                wait2Zero = True
+
+        else:
+            pot_counter[i] = 0
+
+    return wait2Zero, cycle
 
 # -----------------------------
 # Função principal
@@ -474,8 +530,7 @@ def start(i2c=None, mpu=None, pots=None, vib=None):
     pot1, pot2, pot3, pot4, pot5 = pots
 
     # Calibração de pots
-    maxCalibratePots = calibrate_pots(pots)
-    log("maxCalibratePots:", maxCalibratePots)
+    calibrate_pots(pots)
 
     # Prepara buffer do gyro
     buffer = [[] for _ in range(6)]
@@ -501,7 +556,7 @@ def start(i2c=None, mpu=None, pots=None, vib=None):
     evntTriggeredXP = evntTriggeredXN = False
     evntTriggeredYP = evntTriggeredYN = False
 
-    wait2Zero = True
+    wait2Zero = False
     cycle = 0
     stepWaitXP = stepWaitXN = stepWaitYP = stepWaitYN = 0
 
@@ -514,13 +569,13 @@ def start(i2c=None, mpu=None, pots=None, vib=None):
         gyro, accl = average_and_slide(buffer, mpu)
 
         # Movimento no eixo X
-        stepX, evntTriggeredXP, evntTriggeredXN = check_gyro_axis(
-            gy1, threshXP, threshXN, stepX, evntTriggeredXP, evntTriggeredXN, vib, invert=config.INVERT_X
+        stepX, evntTriggeredXP, evntTriggeredXN, wait2Zero, cycle = check_gyro_axis(
+            gy1, threshXP, threshXN, stepX, evntTriggeredXP, evntTriggeredXN, vib, wait2Zero, cycle, invert=config.INVERT_X
         )
 
         # Movimento no eixo Y
-        stepY, evntTriggeredYP, evntTriggeredYN = check_gyro_axis(
-            gy2, threshP, threshN, stepY, evntTriggeredYP, evntTriggeredYN, vib, invert=config.INVERT_Y
+        stepY, evntTriggeredYP, evntTriggeredYN, wait2Zero, cycle = check_gyro_axis(
+            gy2, threshP, threshN, stepY, evntTriggeredYP, evntTriggeredYN, vib, wait2Zero, cycle, invert=config.INVERT_Y
         )
 
         # Controle de repetição automática
@@ -533,23 +588,18 @@ def start(i2c=None, mpu=None, pots=None, vib=None):
         stepWaitYN, stepY = check_step_wait(evntTriggeredYN, stepWaitYN, stepY, invY * (1 if gy1 == 0 else -1), vib)
 
         # Leitura dos potenciômetros
-        pval = [pot.read() - maxCalibratePots[i] for i, pot in enumerate([pot1, pot2, pot3, pot4, pot5])]
-        log(f"[POT VALS] {pval}", 2)
-
-        abclevel = [stepX,stepY]
-
-        # Eventos de pots
-        triggerPot, holdclick, wait2Zero, cycle = check_pots(
-            pval, threshPot, triggerPot, abclevel, holdclick, wait2Zero, cycle
-        )
+        abclevel = [stepX, stepY]
+        wait2Zero, cycle = check_pots(pots, abclevel, wait2Zero, cycle)
 
         # Reset se parado
-        if wait2Zero:
+        if wait2Zero and cycle < config.CYCLE_RESET_LIMIT:
             cycle += 1
-        if cycle == config.CYCLE_RESET_LIMIT:
-            stepY = stepX = 0
-            vibrar(vib, 2)
-            log("[RESET] StepX e StepY resetados")
+            if cycle == config.CYCLE_RESET_LIMIT:
+                stepY = stepX = 0
+                vibrar(vib, 2)
+                log("[RESET] StepX e StepY resetados")
+                wait2Zero = False
+                cycle = 0
 
         if num % config.TCLEAR == 0:
             num = 0
@@ -565,7 +615,7 @@ start()
 vibrar(init_vibrator(), 4)
 
 
-=== ARQUIVO: aresp/no_use_r/hidcodes.py ===
+=== ARQUIVO: alesp/no_sue_l/hidcodes.py ===
 
 abc=[
         [
@@ -768,195 +818,23 @@ hidcodes = {
 }
 
 
-=== ARQUIVO: aresp/no_use_r/txt_allfiles.txt ===
-
-=== CONSOLIDAÇÃO DE CÓDIGOS DA PASTA: use ===
-
-
-
-=== ARQUIVO: use/hardware.py ===
-
-from machine import Pin, SoftI2C, TouchPad
-import mpu6050
-
-def init_hardware():
-    i2c = SoftI2C(scl=Pin(22), sda=Pin(21))
-    mpuSensor = mpu6050.accel(i2c)
-
-    pino_vibracao = Pin(33, Pin.OUT)
-
-    pots = [
-        TouchPad(Pin(13)),
-        TouchPad(Pin(12)),
-        TouchPad(Pin(14)),
-        TouchPad(Pin(27)),
-        TouchPad(Pin(4)),
-    ]
-    return pots, mpuSensor, pino_vibracao
-
-
-=== ARQUIVO: use/actions.py ===
-
-import time
-
-def vibrar(pino, n_pulsos, step=None):
-    if not hasattr(pino, 'on') or not hasattr(pino, 'off'):
-        raise TypeError("O parâmetro 'pino' precisa ser um objeto Pin com métodos 'on' e 'off'.")
-    for _ in range(n_pulsos):
-        pino.on()
-        if step == 0:
-            time.sleep_ms(200)
-        else:
-            time.sleep_ms(101)
-        pino.off()
-        time.sleep_ms(70)
-
-def send_charPs(abckey):
-    print(f"TOQUE DETECTADO! Nível: {abckey}")
-
-
-=== ARQUIVO: use/utils.py ===
-
-import time
-
-def media(valores):
-    return sum(valores) / len(valores) if valores else 0
-
-def calibrar_touchpads(pots, amostras=40, delay_ms=70):
-    buffers = [[] for _ in pots]
-    for _ in range(amostras):
-        leituras = [p.read() for p in pots]
-        for i, leitura in enumerate(leituras):
-            buffers[i].append(leitura)
-        time.sleep_ms(delay_ms)
-
-    maximos = [max(b) for b in buffers]
-    return maximos
-
-
-=== ARQUIVO: use/sensors.py ===
-
-import time
-from utils import calibrar_touchpads
-from actions import vibrar, send_charPs
-
-def check_sensor(value, thresh_pos, state, name):
-    if value < thresh_pos and not state["trigger"]:
-        state["trigger"] = True
-        print(f"[{name}] Toque detectado! Valor: {value}")
-        if state["action"]:
-            state["action"](state)  # Acho que você quis executar a ação aqui
-    elif value >= thresh_pos and state["trigger"]:
-        state["trigger"] = False
-    return state
-
-def start_sensors(pots, mpuSensor, pino_vibracao, tsleep, tclear, samples):
-    import actions
-    actions.pino_vibracao = pino_vibracao
-
-    print("Calibrando touchpads...")
-    maxCalibratePots = calibrar_touchpads(pots)
-    thresholds = [m - 100 for m in maxCalibratePots]
-
-    sensors = []
-    for i, pot in enumerate(pots):
-        sensors.append({
-            "name": f"pot{i+1}",
-            "read": lambda p=pot: p.read(),
-            "thresh_pos": thresholds[i],
-            "trigger": False,
-            "action": lambda s, i=i: send_charPs(f"Pot {i+1}")  # Corrigido para captura correta do i
-        })
-
-    vibrar(pino_vibracao, 2)  # Passando o pino corretamente
-    print("Sistema iniciado. Toque para testar...")
-
-    while True:
-        for sensor in sensors:
-            val = sensor["read"]()
-            sensor.update(check_sensor(val, sensor["thresh_pos"], sensor, sensor["name"]))
-        time.sleep_ms(tsleep)
-
-
-=== ARQUIVO: use/mpu6050.py ===
-
-import machine
-
-class accel():
-    def __init__(self, i2c, addr=0x68):
-        self.iic = i2c
-        self.addr = addr
-        self.iic.start()
-        self.iic.writeto(self.addr, bytearray([107, 0]))
-        self.iic.stop()
-
-    def get_raw_values(self):
-        self.iic.start()
-        a = self.iic.readfrom_mem(self.addr, 0x3B, 14)
-        self.iic.stop()
-        return a
-
-    def get_ints(self):
-        b = self.get_raw_values()
-        c = []
-        for i in b:
-            c.append(i)
-        return c
-
-    def bytes_toint(self, firstbyte, secondbyte):
-        if not firstbyte & 0x80:
-            return firstbyte << 8 | secondbyte
-        return - (((firstbyte ^ 255) << 8) | (secondbyte ^ 255) + 1)
-
-    def get_values(self):
-        raw_ints = self.get_raw_values()
-        vals = {}
-        vals["AcX"] = self.bytes_toint(raw_ints[0], raw_ints[1])
-        vals["AcY"] = self.bytes_toint(raw_ints[2], raw_ints[3])
-        vals["AcZ"] = self.bytes_toint(raw_ints[4], raw_ints[5])
-        vals["Tmp"] = self.bytes_toint(raw_ints[6], raw_ints[7]) / 340.00 + 36.53
-        vals["GyX"] = self.bytes_toint(raw_ints[8], raw_ints[9])
-        vals["GyY"] = self.bytes_toint(raw_ints[10], raw_ints[11])
-        vals["GyZ"] = self.bytes_toint(raw_ints[12], raw_ints[13])
-        return vals  # returned in range of Int16
-        # -32768 to 32767
-
-    def val_test(self):  # ONLY FOR TESTING! Also, fast reading sometimes crashes IIC
-        from time import sleep
-        while 1:
-            print(self.get_values())
-            sleep(0.05)
-
-
-
-=== ARQUIVO: use/main.py ===
-
-from hardware import init_hardware
-from actions import vibrar
-from sensors import start_sensors
-
-def main():
-    TSLEEP = 50
-    TCLEAR = 10000
-    SAMPLES = 5
-    
-    pots, mpuSensor, pino_vibracao = init_hardware()
-    vibrar(pino_vibracao, 4)  # Passa o pino
-    start_sensors(pots, mpuSensor, pino_vibracao, TSLEEP, TCLEAR, SAMPLES)
-
-
-=== ARQUIVO: aresp/no_use_r/bkpmain.py ===
+=== ARQUIVO: alesp/no_sue_l/bkpmain.py ===
 
 import time
 import math
 import mpu6050
 from machine import Pin, SoftI2C, ADC, TouchPad
+#from hid_services import Keyboard
+import network
+import espnow
 
 print()
 print('*********************************')
 
-def send_charPs(abckey):
-    print(abckey)
+def send_charPs(abckey, stt, peer):
+    msg = '%s;%s' % (abckey,stt)
+    #e.send(peer, msg, True)
+    e.send(peer, msg)
 
 def vibrar(n_pulsos, step=None):
     for _ in range(n_pulsos):
@@ -965,7 +843,7 @@ def vibrar(n_pulsos, step=None):
             time.sleep_ms(200)
         else:
             #time.sleep_ms(70)
-            time.sleep_ms(101)
+            time.sleep_ms(100)        
         #time.sleep_ms(200)
         pino_vibracao.off()
         time.sleep_ms(70)
@@ -1030,7 +908,7 @@ def startlimpot(arrlim,vals):
         arrlim[i] = vals
     return arrlim
 
-def run(tsleep,tclear,samples):
+def run(tsleep,tclear,samples,e,peer):
 
     bufferPot = [[],[],[],[],[]]
     for i in range(40):
@@ -1097,11 +975,13 @@ def run(tsleep,tclear,samples):
     gy1, gy2 = 0, 1 # normal
     #gy1, gy2 = 1, 0 # invertido
 
-    abcR = abc[1]
+    abcR = abc[0]
     abclevel = abcR[0]
 
     vibrar(2)
     while True:
+
+        #host, msg = e.recv()
 
         gyro, accl = media(buffer)
         #print(gyro[0],gyro[1],gyro[2])
@@ -1155,8 +1035,8 @@ def run(tsleep,tclear,samples):
 
         #--------------------------------------------
         if not evntTriggeredYP and not holdclick and gyro[gy2] > threshP:
-            if gy2 == 0: stepY += 1
-            if gy2 == 1: stepY -= 1
+            if gy2 == 0: stepY -= 1
+            if gy2 == 1: stepY += 1
             vibrar(1,stepY)
             evntTriggeredYP = True
             wait2Zero = False
@@ -1167,8 +1047,8 @@ def run(tsleep,tclear,samples):
             wait2Zero = True
 
         if not evntTriggeredYN and not holdclick and gyro[gy2] < threshN:
-            if gy2 == 0: stepY -= 1
-            if gy2 == 1: stepY += 1
+            if gy2 == 0: stepY += 1
+            if gy2 == 1: stepY -= 1
             vibrar(1,stepY)
             evntTriggeredYN = True
             wait2Zero = False
@@ -1181,16 +1061,16 @@ def run(tsleep,tclear,samples):
         if evntTriggeredYP: stepWaitYP += 1
         else: stepWaitYP = 0
         if stepWaitYP >= 5:
-            if gy1 == 0: stepY -= 1
-            if gy1 == 1: stepY += 1
+            if gy1 == 0: stepY += 1
+            if gy1 == 1: stepY -= 1
             stepWaitYP = 0
             vibrar(1,stepY)
 
         if evntTriggeredYN: stepWaitYN += 1
         else: stepWaitYN = 0
         if stepWaitYN >= 5:
-            if gy1 == 0: stepY += 1
-            if gy1 == 1: stepY -= 1
+            if gy1 == 0: stepY -= 1
+            if gy1 == 1: stepY += 1
             stepWaitYN = 0
             vibrar(1,stepY)
         #--------------------------------------------
@@ -1248,13 +1128,16 @@ def run(tsleep,tclear,samples):
                 print(stepY,stepX,'\t',abclevel[i],cycle)
                 #print(stepY,stepX,'\t',abclevel[i],threshPot[i],pval[i],cycle)
 
-                send_charPs(abclevel[i])
+                #send_charPs(abclevel[i], kb)
+                send_charPs(abclevel[i], 1, peer)
                 triggerPot[i] = True
                 holdclick = True
                 wait2Zero = False
                 cycle = 0
 
             elif triggerPot[i] and pval[i] >= threshPot[i]:
+                #send_charRl(kb)
+                send_charPs(abclevel[i], 0, peer)
                 triggerPot[i] = False
                 holdclick = False
                 wait2Zero = True
@@ -1263,6 +1146,9 @@ def run(tsleep,tclear,samples):
             #   print(triggerPot[i])
         
         #--------------------------------------------
+        #if msg:
+        #    print(msg)
+
 
         if wait2Zero: cycle += 1
         if cycle == 20:
@@ -1275,16 +1161,41 @@ def run(tsleep,tclear,samples):
         num+=1
         time.sleep_ms(tsleep)
 
+'''
+def advertising(kb):
+    print('\n.......................start_advertising')
+    kb.start_advertising()
+    while True:
+        if kb.get_state() == 3:
+            print('tf2kb connected!')
+            kb.stop_advertising()
+            break
+        time.sleep_ms(1000)
+        print('...')
+'''
 
 #---------------------------------------------------------------
+print('\n.......................')
+#kb = Keyboard("tf2kb")
+#kb.set_state_change_callback(None)
+#kb.start()
 
+#advertising(kb)
+#kb.get_state()
+#1 si kb.get_state() DEVICE_IDLE = desconectado
+#2 si kb.get_state() DEVICE_ADVERTISING = disponibilidade
+#3 si kb.get_state() DEVICE_CONNECTED = conectaado
+
+#---------------------------------------------------------------
+print('\n.......................')
+#if kb.get_state() == 3:
 
 from hidcodes import hidcodes, abc 
 
 i2c = SoftI2C(scl=Pin(22), sda=Pin(21))
 mpuSensor = mpu6050.accel(i2c)
 
-pino_vibracao = Pin(33, Pin.OUT)
+pino_vibracao = Pin(32, Pin.OUT)
 
 vibrar(4)
 
@@ -1303,11 +1214,20 @@ pot4.atten(ADC.ATTN_11DB)
 #pot5.atten(ADC.ATTN_11DB)
 '''
 
-pot1 = TouchPad(Pin(13)) #0
-pot2 = TouchPad(Pin(12)) #1
-pot3 = TouchPad(Pin(14)) #2
-pot4 = TouchPad(Pin(27)) #3
-pot5 = TouchPad(Pin(4)) #4
+pot5 = TouchPad(Pin(33)) #
+pot4 = TouchPad(Pin(13)) #
+pot3 = TouchPad(Pin(15)) #
+pot2 = TouchPad(Pin(04)) #
+pot1 = TouchPad(Pin(27)) #
+
+# ESPNOW - A WLAN interface must be active to send()/recv()
+sta = network.WLAN(network.STA_IF)
+sta.active(True)
+#sta.disconnect()   # Because ESP8266 auto-connects to last Access Point
+e = espnow.ESPNow()
+e.active(True)
+peer = b'\xbb\xbb\xbb\xbb\xbb\xbb' # MAC address of peer's wifi interface
+e.add_peer(peer) # Must add_peer() before send()
 
 #---------------------------------------------------------------
 TSLEEP=50
@@ -1315,7 +1235,7 @@ TCLEAR=10000
 #TCLEAR=10000
 SAMPLES = 5 
 
-run(TSLEEP,TCLEAR,SAMPLES)
+run(TSLEEP,TCLEAR,SAMPLES,e,peer)
 
 
 
@@ -1326,313 +1246,61 @@ run(TSLEEP,TCLEAR,SAMPLES)
 
 
 
+=== ARQUIVO: alesp/no_sue_l/boot.py ===
+
+# This file is executed on every boot (including wake-boot from deepsleep)
+#import esp
+#esp.osdebug(None)
+#import webrepl
+#webrepl.start()
 
 
+=== ARQUIVO: alesp/no_sue_l/mpu6050.py ===
 
-=== ARQUIVO: aresp/no_use_r/webrepl_cfg.py ===
-
-PASS = '105474'
-
-
-=== ARQUIVO: aresp/no_use_r/boot.py ===
-
-import webrepl
-'''
-import network
-import time
-
-print("\nBoot...")
-station = network.WLAN(network.STA_IF)
-
-red = [
-    ["r2d2rep", "3e4r5t6y7u"],
-    ["wff5", "3e4r5t6y7u"],
-    ["reno12", "3e4r5t6y7u"],
-    ["R2D2", "3e4r5t6y7u"],
-    ["wfesp32a", "5t6y7u8i9o"]
-]
-
-for i in red:
-    station.active(True)
-    print(f'Connecting to WiFi {i[0]}...')
-    station.connect(i[0], i[1])
-    time.sleep_ms(10000)
-
-    if station.isconnected():
-        print(f'\nConnected to {i[0]} with success.')
-        print(f'Config: {station.ifconfig()}')
-        time.sleep_ms(3000)
-        break
-    else:
-        station.active(False)
-    
-if not station.isconnected():
-    print('xxxxxx Error WiFi Connected xxxxxx')
-    station.active(False)
-'''
-print("\n*****************************")
-webrepl.start()
+import machine
 
 
-=== ARQUIVO: aresp/no_use_r/bkpmain_otimizada.py ===
+class accel():
+    def __init__(self, i2c, addr=0x68):
+        self.iic = i2c
+        self.addr = addr
+        self.iic.start()
+        self.iic.writeto(self.addr, bytearray([107, 0]))
+        self.iic.stop()
 
-import time
-from machine import Pin, SoftI2C, TouchPad
-import mpu6050
+    def get_raw_values(self):
+        self.iic.start()
+        a = self.iic.readfrom_mem(self.addr, 0x3B, 14)
+        self.iic.stop()
+        return a
 
-# ==== Inicialização de Hardware ====
+    def get_ints(self):
+        b = self.get_raw_values()
+        c = []
+        for i in b:
+            c.append(i)
+        return c
 
-# Configura o barramento I2C nos pinos do ESP32
-i2c = SoftI2C(scl=Pin(22), sda=Pin(21))
-# Inicializa o sensor MPU6050
-mpuSensor = mpu6050.accel(i2c)
-# Pino que controla o motor vibrador
-pino_vibracao = Pin(33, Pin.OUT)
+    def bytes_toint(self, firstbyte, secondbyte):
+        if not firstbyte & 0x80:
+            return firstbyte << 8 | secondbyte
+        return - (((firstbyte ^ 255) << 8) | (secondbyte ^ 255) + 1)
 
-# Inicialização dos sensores táteis (TouchPads)
-pot1 = TouchPad(Pin(13))
-pot2 = TouchPad(Pin(12))
-pot3 = TouchPad(Pin(14))
-pot4 = TouchPad(Pin(27))
-pot5 = TouchPad(Pin(4))
-# Lista para fácil iteração
-pots = [pot1, pot2, pot3, pot4, pot5]
+    def get_values(self):
+        raw_ints = self.get_raw_values()
+        vals = {}
+        vals["AcX"] = self.bytes_toint(raw_ints[0], raw_ints[1])
+        vals["AcY"] = self.bytes_toint(raw_ints[2], raw_ints[3])
+        vals["AcZ"] = self.bytes_toint(raw_ints[4], raw_ints[5])
+        vals["Tmp"] = self.bytes_toint(raw_ints[6], raw_ints[7]) / 340.00 + 36.53
+        vals["GyX"] = self.bytes_toint(raw_ints[8], raw_ints[9])
+        vals["GyY"] = self.bytes_toint(raw_ints[10], raw_ints[11])
+        vals["GyZ"] = self.bytes_toint(raw_ints[12], raw_ints[13])
+        return vals  # returned in range of Int16
+        # -32768 to 32767
 
-# ==== Funções auxiliares ====
-
-def vibrar(n_pulsos, step=None):
-    """Faz o motor vibrar n_pulsos vezes. Pulso mais longo se step==0."""
-    for _ in range(n_pulsos):
-        pino_vibracao.on()
-        if step == 0:
-            time.sleep_ms(200)
-        else:
-            time.sleep_ms(101)
-        pino_vibracao.off()
-        time.sleep_ms(70)
-
-def getGyro(buffer):
-    """Lê dados crus do MPU6050 e armazena no buffer."""
-    mpuData = mpuSensor.get_values()
-    buffer[0].append(mpuData['GyX'])
-    buffer[1].append(mpuData['GyY'])
-    buffer[2].append(mpuData['GyZ'])
-    buffer[3].append(mpuData['AcX'])
-    buffer[4].append(mpuData['AcY'])
-    buffer[5].append(mpuData['AcZ'])
-    return buffer
-
-def media(buffer):
-    """Calcula a média das leituras no buffer e remove a mais antiga."""
-    getGyro(buffer)
-    # Médias para giroscópio (primeiros 3) e acelerômetro (últimos 3)
-    gyro = [sum(buffer[i]) / len(buffer[i]) for i in range(3)]
-    accl = [sum(buffer[i]) / len(buffer[i]) for i in range(3, 6)]
-    # Remove a leitura mais antiga
-    for i in range(6):
-        buffer[i].pop(0)
-    return gyro, accl
-
-def calcCalibrate(bufferPot):
-    """Calcula o valor máximo registrado para cada touchpad."""
-    return [max(potList) for potList in bufferPot]
-
-def getPots(bufferPot, pval):
-    """Adiciona leitura atual dos touchpads ao buffer."""
-    for i in range(5):
-        bufferPot[i].append(pval[i])
-    return bufferPot
-
-def check_sensor(value, thresh_pos, thresh_neg,
-                 state, holdclick):
-    """Verifica se o valor do sensor ultrapassa os limites
-       e executa ações associadas."""
-    step = state["step"]
-    tp = state["trigger_pos"]
-    tn = state["trigger_neg"]
-    swp = state["stepWait_pos"]
-    swn = state["stepWait_neg"]
-    wait2Zero = state["wait2Zero"]
-    cycle = state["cycle"]
-
-    # Evento: valor acima do limiar positivo
-    if not tp and not holdclick and value > thresh_pos:
-        step += state["dir_pos"]
-        if state["action_pos"]:
-            state["action_pos"](step)
-        tp = True
-        wait2Zero = False
-        cycle = 0
-    elif tp and value <= thresh_pos:
-        tp = False
-        wait2Zero = True
-
-    # Evento: valor abaixo do limiar negativo
-    if not tn and not holdclick and value < thresh_neg:
-        step += state["dir_neg"]
-        if state["action_neg"]:
-            state["action_neg"](step)
-        tn = True
-        wait2Zero = False
-        cycle = 0
-    elif tn and value >= thresh_neg:
-        tn = False
-        wait2Zero = True
-
-    # Incremento repetitivo enquanto mantido no limiar positivo
-    if tp:
-        swp += 1
-    else:
-        swp = 0
-    if swp >= 5:
-        step += state["dir_pos"]
-        swp = 0
-        if state["action_pos"]:
-            state["action_pos"](step)
-
-    # Incremento repetitivo enquanto mantido no limiar negativo
-    if tn:
-        swn += 1
-    else:
-        swn = 0
-    if swn >= 5:
-        step += state["dir_neg"]
-        swn = 0
-        if state["action_neg"]:
-            state["action_neg"](step)
-
-    # Atualiza o estado do sensor
-    state.update(step=step,
-                 trigger_pos=tp,
-                 trigger_neg=tn,
-                 stepWait_pos=swp,
-                 stepWait_neg=swn,
-                 wait2Zero=wait2Zero,
-                 cycle=cycle)
-    return state
-
-def start(tsleep, tclear, samples):
-    """Função principal que calibra, configura e lê sensores em loop."""
-    # Calibração inicial dos touchpads
-    bufferPot = [[] for _ in range(5)]
-    for _ in range(40):
-        pval = [pot.read() for pot in pots]
-        getPots(bufferPot, pval)
-        time.sleep_ms(70)
-    maxCalibratePots = calcCalibrate(bufferPot)
-
-    # Coleta inicial de dados do giroscópio
-    buffer = [[] for _ in range(6)]
-    for _ in range(samples - 1):
-        getGyro(buffer)
-        time.sleep_ms(70)
-
-    # Definição de limiares
-    poragora = 14000
-    thresPercent = 0.1
-    threshXP = poragora - (poragora * thresPercent)
-    threshXN = -poragora + (poragora * thresPercent)
-    threshYP = poragora - (poragora * thresPercent)
-    threshYN = -poragora + (poragora * thresPercent)
-    threshPot = [-120] * 5
-
-    # Vibra para indicar início
-    vibrar(2)
-
-    # Lista de sensores monitorados
-    sensors = [
-        {   # Giroscópio X
-            "name": "gyroX",
-            "read": lambda: media(buffer)[0][0],
-            "thresh_pos": threshXP,
-            "thresh_neg": threshXN,
-            "dir_pos": 1, "dir_neg": -1,
-            "step": 0,
-            "trigger_pos": False, "trigger_neg": False,
-            "stepWait_pos": 0, "stepWait_neg": 0,
-            "wait2Zero": True, "cycle": 0,
-            "action_pos": lambda s: vibrar(1),
-            "action_neg": lambda s: vibrar(1)
-        },
-        {   # Giroscópio Y
-            "name": "gyroY",
-            "read": lambda: media(buffer)[0][1],
-            "thresh_pos": threshYP,
-            "thresh_neg": threshYN,
-            "dir_pos": 1, "dir_neg": -1,
-            "step": 0,
-            "trigger_pos": False, "trigger_neg": False,
-            "stepWait_pos": 0, "stepWait_neg": 0,
-            "wait2Zero": True, "cycle": 0,
-            "action_pos": lambda s: vibrar(1),
-            "action_neg": lambda s: vibrar(1)
-        }
-    ]
-
-    # Adiciona os touchpads à lista de sensores
-    for i, pot in enumerate(pots):
-        sensors.append({
-            "name": f"pot{i+1}",
-            "read": (lambda p=pot, m=maxCalibratePots[i]: p.read() - m),
-            "thresh_pos": threshPot[i],
-            "thresh_neg": -9999,
-            "dir_pos": 0, "dir_neg": 0,
-            "step": 0,
-            "trigger_pos": False, "trigger_neg": False,
-            "stepWait_pos": 0, "stepWait_neg": 0,
-            "wait2Zero": True, "cycle": 0,
-            "action_pos": lambda _, lvl=None: send_charPs(lvl) if lvl else None,
-            "action_neg": None
-        })
-
-    # Loop principal
-    while True:
-        stepX = sensors[0]["step"]
-        stepY = sensors[1]["step"]
-
-        # Determina nível ABC baseado em stepX/Y
-        if -1 <= stepX <= 1 and -2 <= stepY <= 2:
-            abclevel = [stepX + 1, 2 - stepY]
-        else:
-            abclevel = None
-
-        # Processa todos os sensores
-        for sensor in sensors:
-            val = sensor["read"]()
-            if "pot" in sensor["name"]:
-                sensor.update(check_sensor(
-                    val, sensor["thresh_pos"], sensor["thresh_neg"],
-                    sensor, holdclick=False
-                ))
-                # Ajusta action_pos para enviar nível atual
-                if sensor["action_pos"]:
-                    sensor["action_pos"] = (
-                        lambda lvl=abclevel: lambda s: send_charPs(lvl) if lvl else None
-                    )()
-            else:
-                sensor.update(check_sensor(
-                    val, sensor["thresh_pos"], sensor["thresh_neg"],
-                    sensor, holdclick=False
-                ))
-
-        # Reseta contadores se ambos giros voltarem ao zero por tempo suficiente
-        if all(s["wait2Zero"] for s in sensors[:2]):
-            for s in sensors[:2]:
-                s["cycle"] += 1
-            if any(s["cycle"] == 20 for s in sensors[:2]):
-                sensors[0]["step"] = sensors[1]["step"] = 0
-                vibrar(2)
-
-        time.sleep_ms(tsleep)
-
-def send_charPs(abckey):
-    """Envia ou imprime comando baseado no valor abckey."""
-    print("send_charPs called with:", abckey)
-
-def run():
-    """Inicia o sistema com vibração de sinalização."""
-    vibrar(4)
-    TSLEEP = 50
-    TCLEAR = 10000
-    SAMPLES = 5
-    start(TSLEEP, TCLEAR, SAMPLES)
+    def val_test(self):  # ONLY FOR TESTING! Also, fast reading sometimes crashes IIC
+        from time import sleep
+        while 1:
+            print(self.get_values())
+            sleep(0.05)

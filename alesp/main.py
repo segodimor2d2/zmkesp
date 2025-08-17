@@ -150,8 +150,9 @@ def start(i2c=None, mpu=None, pots=None, vib=None):
     if i2c is None: i2c = init_i2c()
     if mpu is None: mpu = init_mpu(i2c)
     if vib is None: vib = init_vibrator()
+
     if pots is None: pots = init_pots()
-    pot1, pot2, pot3, pot4, pot5 = pots
+    num_pots = len(pots)   # agora detecta sozinho
 
     # Calibração de pots
     calibrate_pots(pots)
@@ -167,8 +168,8 @@ def start(i2c=None, mpu=None, pots=None, vib=None):
     # Variáveis de estado
     num = 0
     holdclick = False
-    triggerPot = [False] * 5
-    threshPot = config.THRESH_POT
+    triggerPot = [False] * num_pots
+    threshPot  = config.THRESH_POT[:num_pots]
 
     # Thresholds giroscópio
     threshP  = config.PORAGORA - (config.PORAGORA * config.THRES_PERCENT)

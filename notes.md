@@ -11,6 +11,20 @@
 - pensar no mouse
 
 
+# ESP
+mpremote fs ls
+mpremote connect /dev/ttyUSB0 
+mpremote connect /dev/ttyUSB0 cp esp/config.py :config.py
+mpremote connect /dev/ttyUSB0 cp esp/main.py :main.py
+mpremote connect /dev/ttyUSB0 cp esp/actions.py :actions.py
+mpremote connect /dev/ttyUSB0 cp esp/dicctozmk.py :dicctozmk.py
+mpremote connect /dev/ttyUSB0 cp esp/hw.py :hw.py
+mpremote connect /dev/ttyUSB0 cp esp/pots.py :pots.py
+mpremote connect /dev/ttyUSB0 cp esp/gyro.py :gyro.py
+mpremote connect /dev/ttyUSB0 cp esp/mpu6050.py :mpu6050.py
+
+
+
 # ALESP L
 mpremote fs ls
 mpremote connect /dev/ttyUSB0 
@@ -953,6 +967,121 @@ Changes to be committed:
 
 
 
+---
 
+
+
+Beleza 🚀
+
+Hoje o seu código ainda está “engessado” em **5 pots fixos** (`pot1, pot2, pot3, pot4, pot5` e `INDEX_MAP_POTS` fixo).
+Se você quiser deixar **dinâmico**, precisa que **o número de sensores venha automaticamente da lista de pinos configurada em `config.py`**.
+
+Vou mostrar as mudanças principais (sem quebrar sua lógica atual):
+
+---
+
+### 🔹 1. `config.py`
+
+Hoje você tem isso:
+
+```python
+PINOS_R = 13,12,14,27,4
+INDEX_MAP_R = 0,1,2,3,4
+PINOS_VIB_R = 26
+
+PINOS_L = 12,13,14,27,4
+INDEX_MAP_L = 0,1,2,4,3
+PINOS_VIB_L = 26
+```
+
+✅ Deixe o número de pots **variável**, ou seja:
+
+* `PINOS_R` e `PINOS_L` podem ter qualquer quantidade.
+* `INDEX_MAP_R` e `INDEX_MAP_L` devem ter o **mesmo tamanho**.
+
+Exemplo (se quiser 7 pots no lado direito):
+
+```python
+PINOS_R = (13, 12, 14, 27, 4, 32, 33)
+INDEX_MAP_R = (0, 1, 2, 3, 4, 5, 6)
+```
+
+---
+
+### 🔹 2. `main.py`
+
+Hoje o `start()` tem isso fixo:
+
+```python
+if pots is None: pots = init_pots()
+pot1, pot2, pot3, pot4, pot5 = pots
+```
+
+⚡ Troque para **dinâmico**:
+
+```python
+if pots is None:
+    pots = init_pots()
+
+num_pots = len(pots)   # agora detecta sozinho
+```
+
+E embaixo onde você fixa arrays de 5, troque para `num_pots`.
+Por exemplo, no `start()`:
+
+```python
+triggerPot = [False] * num_pots
+threshPot  = config.THRESH_POT[:num_pots]
+```
+
+E na calibração já está pronto pra lidar com qualquer número (`len(pots)` já é usado 👍).
+
+---
+
+### 🔹 3. `check_pots`
+
+Hoje está perfeito, porque ele já faz:
+
+```python
+for i, pot in enumerate(pots):
+    val = pot.read()
+    ...
+```
+
+Ou seja, se você colocar 7 pinos, ele vai iterar em 7 direto.
+Só precisa garantir que:
+
+* `INDEX_MAP_POTS` tenha o mesmo tamanho que `pots`.
+
+---
+
+### 🔹 4. `start()` → reset de variáveis
+
+Atualmente você faz:
+
+```python
+triggerPot = [False] * 5
+```
+
+Troque pra:
+
+```python
+triggerPot = [False] * num_pots
+```
+
+---
+
+### 🔹 5. Resumo
+
+Depois do ajuste, o fluxo fica assim:
+
+* Define `PINOS_R` / `PINOS_L` em `config.py` (quantos quiser).
+* O programa descobre o tamanho (`num_pots = len(pots)`).
+* Arrays (`triggerPot`, `baseline`, `press_thresh`, etc.) ficam automáticos.
+* `check_pots()` já funciona em loop dinâmico.
+
+---
+
+👉 Quer que eu já te entregue a versão ajustada do **`main.py`** com tudo dinâmico (sem nenhum número fixo de pots), ou prefere que eu faça só um patch pequeno mostrando exatamente as linhas pra mudar?
 
 

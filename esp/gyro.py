@@ -1,3 +1,5 @@
+from printlogs import log
+
 def append_gyro(buffer, mpuSensor):
     """Adiciona uma leitura ao buffer (6 listas)"""
     if mpuSensor is None:
@@ -6,7 +8,7 @@ def append_gyro(buffer, mpuSensor):
     try:
         mpuData = mpuSensor.get_values()
     except Exception as e:
-        print("MPU read error:", e)
+        log("MPU read error:", e, 0)
         return buffer
 
     keys = ['GyX','GyY','GyZ','AcX','AcY','AcZ']

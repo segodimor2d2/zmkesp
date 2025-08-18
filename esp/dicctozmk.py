@@ -1,4 +1,4 @@
-
+from printlogs import log
 
 # --- Mapas de tradução (lado esquerdo e lado direito) ---
 
@@ -83,11 +83,11 @@ MAPR = {
 }
 
 def potsgyrotozmk(abclevel, mapped_i, status, side):
-    print(abclevel, mapped_i, status, side)
     """
     Traduz (abclevel, gx, gy, status) -> (row, col, status)
     side: 0 = left, 1 = right
     """
+    log(f'{mapped_i}, {abclevel}, {status}, {side}', 0)
     mapping = MAPL if side == 0 else MAPR
     key = (mapped_i, abclevel[0], abclevel[1])
     if key not in mapping:

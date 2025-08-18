@@ -27,7 +27,7 @@ POT_CALIBRATION_DELAY_MS  = 70   # Delay entre leituras (ms)
 # ============================================================
 # CONFIGURAÇÕES DO GIROSCÓPIO
 # ============================================================
-PORAGORA       = 14000   # 8000 (sensível) | 20000 (menos sensível)
+LIMGYRO       = 14000   # 8000 (sensível) | 20000 (menos sensível)
 THRES_PERCENT  = 0.1     # 0.05 (5%) | 0.2 (20%)
 GY1, GY2       = 1, 0    # Ordem dos eixos: X depois Y
 INVERT_X       = True    # Inverter sentido do eixo X
@@ -300,18 +300,33 @@ def potsgyrotozmk(abclevel, mapped_i, status, side):
 
 === ARQUIVO: esp/pots.py ===
 
-def add_pot_samples(bufferPot, pval):
-    """bufferPot: list de listas; pval: lista com leituras atuais"""
-    for i, v in enumerate(pval):
-        bufferPot[i].append(v)
-    return bufferPot
+import os
+import ujson
+import config
 
-def calc_calibrate(bufferPot):
-    """Retorna lista com max por pot (ou 0 se vazio)"""
-    maxCalc = []
-    for potList in bufferPot:
-        maxCalc.append(max(potList) if potList else 0)
-    return maxCalc
+def save_calibration(baseline, press_thresh, release_thresh):
+    try:
+        calib_data = {
+            'baseline': baseline,
+            'press_thresh': press_thresh,
+            'release_thresh': release_thresh
+        }
+        with open(config.CALIB_FILE, 'w') as f:
+            ujson.dump(calib_data, f)
+        print("Calibração salva com sucesso!")
+    except Exception as e:
+        print("Erro ao salvar calibração:", e)
+
+def load_calibration():
+    try:
+        if config.CALIB_FILE in os.listdir():
+            with open(config.CALIB_FILE, 'r') as f:
+                calib_data = ujson.load(f)
+            print("Calibração carregada do arquivo")
+            return calib_data['baseline'], calib_data['press_thresh'], calib_data['release_thresh']
+    except Exception as e:
+        print("Erro ao carregar calibração:", e)
+    return None, None, None
 
 
 === ARQUIVO: esp/gyro.py ===
@@ -407,7 +422,7 @@ import ujson
 import os
 from hw import init_i2c, init_mpu, init_vibrator, init_pots
 from actions import vibrar, send_charPs
-from pots import add_pot_samples, calc_calibrate
+from pots import load_calibration, save_calibration
 from gyro import append_gyro, average_and_slide
 from dicctozmk import potsgyrotozmk
 
@@ -446,30 +461,6 @@ def log(*args, **kwargs):
         return
     
     print(*args, **kwargs)
-
-def save_calibration(baseline, press_thresh, release_thresh):
-    try:
-        calib_data = {
-            'baseline': baseline,
-            'press_thresh': press_thresh,
-            'release_thresh': release_thresh
-        }
-        with open(config.CALIB_FILE, 'w') as f:
-            ujson.dump(calib_data, f)
-        print("Calibração salva com sucesso!")
-    except Exception as e:
-        print("Erro ao salvar calibração:", e)
-
-def load_calibration():
-    try:
-        if config.CALIB_FILE in os.listdir():
-            with open(config.CALIB_FILE, 'r') as f:
-                calib_data = ujson.load(f)
-            print("Calibração carregada do arquivo")
-            return calib_data['baseline'], calib_data['press_thresh'], calib_data['release_thresh']
-    except Exception as e:
-        print("Erro ao carregar calibração:", e)
-    return None, None, None
 
 # -----------------------------
 # Funções auxiliares
@@ -615,10 +606,10 @@ def start(i2c=None, mpu=None, pots=None, vib=None, force_calib=False):
     triggerPot = [False] * num_pots
 
     # Thresholds giroscópio
-    threshP  = config.PORAGORA - (config.PORAGORA * config.THRES_PERCENT)
-    threshN  = -config.PORAGORA + (config.PORAGORA * config.THRES_PERCENT)
-    threshXP = config.PORAGORA - (config.PORAGORA * config.THRES_PERCENT)
-    threshXN = -config.PORAGORA + (config.PORAGORA * config.THRES_PERCENT)
+    threshP  = config.LIMGYRO - (config.LIMGYRO * config.THRES_PERCENT)
+    threshN  = -config.LIMGYRO + (config.LIMGYRO * config.THRES_PERCENT)
+    threshXP = config.LIMGYRO - (config.LIMGYRO * config.THRES_PERCENT)
+    threshXN = -config.LIMGYRO + (config.LIMGYRO * config.THRES_PERCENT)
 
     stepX = stepY = 0
     evntTriggeredXP = evntTriggeredXN = False

@@ -58,6 +58,20 @@ mpremote connect /dev/ttyUSB0 cp esp/hw.py :hw.py
 mpremote connect /dev/ttyUSB0 cp esp/pots.py :pots.py
 mpremote connect /dev/ttyUSB0 cp esp/gyro.py :gyro.py
 mpremote connect /dev/ttyUSB0 cp esp/mpu6050.py :mpu6050.py
+mpremote connect /dev/ttyUSB0 cp esp/printlogs.py :printlogs.py
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

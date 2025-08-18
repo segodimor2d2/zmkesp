@@ -5,6 +5,7 @@ import ujson
 import os
 from hw import init_i2c, init_mpu, init_vibrator, init_pots
 from actions import vibrar, send_charPs
+from printlogs import log
 from pots import load_calibration, save_calibration
 from gyro import append_gyro, average_and_slide
 from dicctozmk import potsgyrotozmk
@@ -26,24 +27,6 @@ pot_counter     = []
 triggerPot      = []
 pval            = []
 
-# -----------------------------
-# Função de log centralizada
-# -----------------------------
-def log(*args, **kwargs):
-    level = None  # Sem nível por padrão
-    if len(args) > 1 and isinstance(args[1], int) and args[1] >= 0:
-        level = args[1]
-        args = (args[0],) + args[2:]  # Remove o level dos args
-    
-    debug_level = getattr(config, 'DEBUG', None)
-    
-    if debug_level is not None and level is not None and level != debug_level:
-        return
-    
-    if debug_level is not None and level is None:
-        return
-    
-    print(*args, **kwargs)
 
 # -----------------------------
 # Funções auxiliares
@@ -60,14 +43,14 @@ def calibrate_pots(pots, force_new_calib=False):
             baseline = loaded_baseline
             press_thresh = loaded_press
             release_thresh = loaded_release
-            print("Calibração carregada do arquivo")
+            log("Calibração carregada do arquivo", 1)
         else:
-            print("Calibração inválida/no arquivo, fazendo nova calibração")
+            log("Calibração inválida/no arquivo, fazendo nova calibração", 1)
             force_new_calib = True
     
     # Se forçado ou se não encontrou calibração válida
     if force_new_calib:
-        print("Calibrando... não toque nos sensores.")
+        log("Calibrando... não toque nos sensores.", 1)
         baseline = [0] * num_pots
         press_thresh = [0] * num_pots
         release_thresh = [0] * num_pots
@@ -83,23 +66,23 @@ def calibrate_pots(pots, force_new_calib=False):
         
         # Salva a nova calibração
         save_calibration(baseline, press_thresh, release_thresh)
-        print("Nova calibração concluída e salva!")
+        log("Nova calibração concluída e salva!", 1)
 
     # Inicializa variáveis de estado
     pot_counter = [0] * num_pots
     triggerPot = [False] * num_pots
     pval = [0] * num_pots
 
-    print("Baseline:       ", baseline)
-    print("Press thresh:   ", press_thresh)
-    print("Release thresh: ", release_thresh)
+    log("Baseline:       ", baseline, 1)
+    log("Press thresh:   ", press_thresh, 1)
+    log("Release thresh: ", release_thresh, 1)
 
 def check_gyro_axis(axis_index, pos_thresh, neg_thresh, step, event_pos, event_neg, vib, wait2Zero, cycle, invert=False):
     """Verifica giroscópio em um eixo e atualiza estado."""
     if not event_pos and gyro[axis_index] > pos_thresh:
         step += -1 if invert else 1
         vibrar(vib, 1, step)
-        log(f"[GYRO] Eixo {axis_index} POS -> step={step}")
+        log(f"[GYRO] Eixo {axis_index} POS -> step={step}", 2)
         event_pos = True
         wait2Zero = True
         cycle = 0
@@ -109,7 +92,7 @@ def check_gyro_axis(axis_index, pos_thresh, neg_thresh, step, event_pos, event_n
     if not event_neg and gyro[axis_index] < neg_thresh:
         step += 1 if invert else -1
         vibrar(vib, 1, step)
-        log(f"[GYRO] Eixo {axis_index} NEG -> step={step}")
+        log(f"[GYRO] Eixo {axis_index} NEG -> step={step}", 2)
         event_neg = True
         wait2Zero = True
         cycle = 0
@@ -124,7 +107,7 @@ def check_step_wait(event_triggered, step_wait, step, delta, vib):
     if step_wait >= config.STEP_WAIT_LIMIT:
         step += delta
         vibrar(vib, 1, step)
-        log(f"[STEP_WAIT] step={step} delta={delta}")
+        log(f"[STEP_WAIT] step={step} delta={delta}", 2)
         step_wait = 0
     return step_wait, step
 
@@ -140,7 +123,7 @@ def check_pots(pots, abclevel, wait2Zero, cycle):
             pot_counter[i] += 1
             if pot_counter[i] >= DEBOUNCE_COUNT:
                 send_charPs(potsgyrotozmk(abclevel, mapped_i, 1, config.THIS_IS))
-                log(f"[POT{mapped_i}] Pressionado | val={val} | abclevel={abclevel}", 2)
+                log(f"[POT{mapped_i}] Pressionado | val={val} | abclevel={abclevel}", 3)
                 triggerPot[i] = True
                 pot_counter[i] = 0
                 wait2Zero = False
@@ -150,7 +133,7 @@ def check_pots(pots, abclevel, wait2Zero, cycle):
             pot_counter[i] += 1
             if pot_counter[i] >= DEBOUNCE_COUNT:
                 send_charPs(potsgyrotozmk(abclevel, mapped_i, 0, config.THIS_IS))
-                log(f"[POT{mapped_i}] Liberado | val={val} | abclevel={abclevel}", 2)
+                log(f"[POT{mapped_i}] Liberado | val={val} | abclevel={abclevel}", 3)
                 triggerPot[i] = False
                 pot_counter[i] = 0
                 wait2Zero = True
@@ -239,7 +222,7 @@ def start(i2c=None, mpu=None, pots=None, vib=None, force_calib=False):
             if cycle == config.CYCLE_RESET_LIMIT:
                 stepY = stepX = 0
                 vibrar(vib, 2)
-                log("[RESET] StepX e StepY resetados")
+                log("[RESET] StepX e StepY resetados", 2)
                 wait2Zero = False
                 cycle = 0
 

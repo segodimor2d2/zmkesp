@@ -1,6 +1,7 @@
 from machine import Pin, SoftI2C, TouchPad
 import time
 import config
+from printlogs import log
 
 if config.THIS_IS == 1:
     pinos = config.PINOS_R
@@ -20,7 +21,7 @@ def init_mpu(i2c):
         mpu = mpu6050.MPU6050(i2c)
         return mpu
     except Exception as e:
-        print("init_mpu erro:", e)
+        log("init_mpu erro:", e, 0)
         return None
 
 def init_vibrator(pin_no=(pinos_vib)):
@@ -34,10 +35,3 @@ def init_vibrator(pin_no=(pinos_vib)):
 def init_pots(pins=(pinos)):
     return [TouchPad(Pin(p)) for p in pins]
 
-# teste rápido:
-if __name__ == "__main__":
-    i2c = init_i2c()
-    mpu = init_mpu(i2c)
-    vib = init_vibrator()
-    pots = init_pots()
-    print("hw init done, mpu:", bool(mpu), "pots:", [type(p) for p in pots])

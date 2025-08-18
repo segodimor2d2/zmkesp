@@ -1,3 +1,5 @@
+import config
+from actions import vibrar
 from printlogs import log
 
 def append_gyro(buffer, mpuSensor):
@@ -29,3 +31,38 @@ def average_and_slide(buffer, mpuSensor):
         if lst:
             lst.pop(0)
     return gyro, accl
+
+def check_gyro_axis(gyro, axis_index, pos_thresh, neg_thresh, step, event_pos, event_neg, vib, wait2Zero, cycle, invert=False):
+    """Verifica giroscópio em um eixo e atualiza estado."""
+    if not event_pos and gyro[axis_index] > pos_thresh:
+        step += -1 if invert else 1
+        vibrar(vib, 1, step)
+        log(f"[GYRO] Eixo {axis_index} POS -> step={step}", 2)
+        event_pos = True
+        wait2Zero = True
+        cycle = 0
+    elif event_pos and gyro[axis_index] <= pos_thresh:
+        event_pos = False
+
+    if not event_neg and gyro[axis_index] < neg_thresh:
+        step += 1 if invert else -1
+        vibrar(vib, 1, step)
+        log(f"[GYRO] Eixo {axis_index} NEG -> step={step}", 2)
+        event_neg = True
+        wait2Zero = True
+        cycle = 0
+    elif event_neg and gyro[axis_index] >= neg_thresh:
+        event_neg = False
+
+    return step, event_pos, event_neg, wait2Zero, cycle
+
+def check_step_wait(event_triggered, step_wait, step, delta, vib):
+    """Controle de espera para repetição automática."""
+    step_wait = step_wait + 1 if event_triggered else 0
+    if step_wait >= config.STEP_WAIT_LIMIT:
+        step += delta
+        vibrar(vib, 1, step)
+        log(f"[STEP_WAIT] step={step} delta={delta}", 2)
+        step_wait = 0
+    return step_wait, step
+

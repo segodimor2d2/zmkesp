@@ -21,7 +21,7 @@ POT_CALIBRATION_DELAY_MS  = 70   # Delay entre leituras (ms)
 # ============================================================
 # CONFIGURAÇÕES DO GIROSCÓPIO
 # ============================================================
-PORAGORA       = 14000   # 8000 (sensível) | 20000 (menos sensível)
+LIMGYRO       = 14000   # 8000 (sensível) | 20000 (menos sensível)
 THRES_PERCENT  = 0.1     # 0.05 (5%) | 0.2 (20%)
 GY1, GY2       = 1, 0    # Ordem dos eixos: X depois Y
 INVERT_X       = True    # Inverter sentido do eixo X

@@ -48,8 +48,10 @@ start(force_calib=True)
 mpremote fs ls
 
 mpremote connect /dev/ttyUSB0 
+
 mpremote connect /dev/ttyUSB0 cp esp/config.py :config.py
 mpremote connect /dev/ttyUSB0 cp esp/main.py :main.py
+
 mpremote connect /dev/ttyUSB0 cp esp/actions.py :actions.py
 mpremote connect /dev/ttyUSB0 cp esp/dicctozmk.py :dicctozmk.py
 mpremote connect /dev/ttyUSB0 cp esp/hw.py :hw.py

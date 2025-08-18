@@ -1,12 +1,27 @@
-def add_pot_samples(bufferPot, pval):
-    """bufferPot: list de listas; pval: lista com leituras atuais"""
-    for i, v in enumerate(pval):
-        bufferPot[i].append(v)
-    return bufferPot
+import os
+import ujson
+import config
 
-def calc_calibrate(bufferPot):
-    """Retorna lista com max por pot (ou 0 se vazio)"""
-    maxCalc = []
-    for potList in bufferPot:
-        maxCalc.append(max(potList) if potList else 0)
-    return maxCalc
+def save_calibration(baseline, press_thresh, release_thresh):
+    try:
+        calib_data = {
+            'baseline': baseline,
+            'press_thresh': press_thresh,
+            'release_thresh': release_thresh
+        }
+        with open(config.CALIB_FILE, 'w') as f:
+            ujson.dump(calib_data, f)
+        print("Calibração salva com sucesso!")
+    except Exception as e:
+        print("Erro ao salvar calibração:", e)
+
+def load_calibration():
+    try:
+        if config.CALIB_FILE in os.listdir():
+            with open(config.CALIB_FILE, 'r') as f:
+                calib_data = ujson.load(f)
+            print("Calibração carregada do arquivo")
+            return calib_data['baseline'], calib_data['press_thresh'], calib_data['release_thresh']
+    except Exception as e:
+        print("Erro ao carregar calibração:", e)
+    return None, None, None

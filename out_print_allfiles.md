@@ -10,6 +10,7 @@ import ubinascii
 # ============================================================
 # CONFIGURAÇÕES DE TOUCH
 # ============================================================
+CALIB_FILE = "calib.json"
 CALIB_SAMPLES   = 100   # Amostras por canal
 PRESS_OFFSET    = 50    # Quanto abaixo do baseline aciona
 RELEASE_OFFSET  = 30    # Quanto abaixo do baseline libera
@@ -51,13 +52,13 @@ SAMPLES = 5       # Amostras iniciais do giroscópio
 # ============================================================
 # PINAGEM (ESQUERDA E DIREITA)
 # ============================================================
-PINOS_R      = (13, 12, 14, 27, 4, 32)
-INDEX_MAP_R  = (0, 1, 2, 3, 4, 5)
-PINOS_VIB_R  = 26
+PINOS_R = 13,12,14,27,4,33
+INDEX_MAP_R = 0,1,2,3,4,5
+PINOS_VIB_R = 26
 
-PINOS_L      = (13, 12, 14, 27, 4, 32)
-INDEX_MAP_L  = (0, 1, 2, 4, 3, 5)   # Ordem diferente do lado R
-PINOS_VIB_L  = 26
+PINOS_L = 12,13,14,27,4,33
+INDEX_MAP_L = 0,1,2,4,3,5
+PINOS_VIB_L = 26
 
 # ============================================================
 # IDENTIFICAÇÃO DO CHIP / DEFINIÇÃO DO LADO
@@ -402,6 +403,8 @@ class MPU6050():
 import time
 import math
 import config
+import ujson
+import os
 from hw import init_i2c, init_mpu, init_vibrator, init_pots
 from actions import vibrar, send_charPs
 from pots import add_pot_samples, calc_calibrate
@@ -444,29 +447,74 @@ def log(*args, **kwargs):
     
     print(*args, **kwargs)
 
+def save_calibration(baseline, press_thresh, release_thresh):
+    try:
+        calib_data = {
+            'baseline': baseline,
+            'press_thresh': press_thresh,
+            'release_thresh': release_thresh
+        }
+        with open(config.CALIB_FILE, 'w') as f:
+            ujson.dump(calib_data, f)
+        print("Calibração salva com sucesso!")
+    except Exception as e:
+        print("Erro ao salvar calibração:", e)
+
+def load_calibration():
+    try:
+        if config.CALIB_FILE in os.listdir():
+            with open(config.CALIB_FILE, 'r') as f:
+                calib_data = ujson.load(f)
+            print("Calibração carregada do arquivo")
+            return calib_data['baseline'], calib_data['press_thresh'], calib_data['release_thresh']
+    except Exception as e:
+        print("Erro ao carregar calibração:", e)
+    return None, None, None
+
 # -----------------------------
 # Funções auxiliares
 # -----------------------------
-def calibrate_pots(pots):
+def calibrate_pots(pots, force_new_calib=False):
     global baseline, press_thresh, release_thresh, pot_counter, triggerPot, pval
-
+    
     num_pots = len(pots)
-    baseline        = [0] * num_pots
-    press_thresh    = [0] * num_pots
-    release_thresh  = [0] * num_pots
-    pot_counter     = [0] * num_pots
-    triggerPot      = [False] * num_pots
-    pval            = [0] * num_pots
+    
+    # Tenta carregar calibração existente apenas se não for forçada
+    if not force_new_calib:
+        loaded_baseline, loaded_press, loaded_release = load_calibration()
+        if loaded_baseline is not None and len(loaded_baseline) == num_pots:
+            baseline = loaded_baseline
+            press_thresh = loaded_press
+            release_thresh = loaded_release
+            print("Calibração carregada do arquivo")
+        else:
+            print("Calibração inválida/no arquivo, fazendo nova calibração")
+            force_new_calib = True
+    
+    # Se forçado ou se não encontrou calibração válida
+    if force_new_calib:
+        print("Calibrando... não toque nos sensores.")
+        baseline = [0] * num_pots
+        press_thresh = [0] * num_pots
+        release_thresh = [0] * num_pots
+        
+        for i in range(num_pots):
+            soma = 0
+            for _ in range(CALIB_SAMPLES):
+                soma += pots[i].read()
+                time.sleep_ms(5)
+            baseline[i] = soma / CALIB_SAMPLES
+            press_thresh[i] = baseline[i] - PRESS_OFFSET
+            release_thresh[i] = baseline[i] - RELEASE_OFFSET
+        
+        # Salva a nova calibração
+        save_calibration(baseline, press_thresh, release_thresh)
+        print("Nova calibração concluída e salva!")
 
-    print("Calibrando... não toque nos sensores.")
-    for i in range(num_pots):
-        soma = 0
-        for _ in range(CALIB_SAMPLES):
-            soma += pots[i].read()
-            time.sleep_ms(5)
-        baseline[i]       = soma / CALIB_SAMPLES
-        press_thresh[i]   = baseline[i] - PRESS_OFFSET
-        release_thresh[i] = baseline[i] - RELEASE_OFFSET
+    # Inicializa variáveis de estado
+    pot_counter = [0] * num_pots
+    triggerPot = [False] * num_pots
+    pval = [0] * num_pots
 
     print("Baseline:       ", baseline)
     print("Press thresh:   ", press_thresh)
@@ -541,7 +589,7 @@ def check_pots(pots, abclevel, wait2Zero, cycle):
 # -----------------------------
 # Função principal
 # -----------------------------
-def start(i2c=None, mpu=None, pots=None, vib=None):
+def start(i2c=None, mpu=None, pots=None, vib=None, force_calib=False):
     # Inicializa hardware se não passado
     if i2c is None: i2c = init_i2c()
     if mpu is None: mpu = init_mpu(i2c)
@@ -551,7 +599,7 @@ def start(i2c=None, mpu=None, pots=None, vib=None):
     num_pots = len(pots)   # agora detecta sozinho
 
     # Calibração de pots
-    calibrate_pots(pots)
+    calibrate_pots(pots, force_calib)
 
     # Prepara buffer do gyro
     buffer = [[] for _ in range(6)]

@@ -4,6 +4,7 @@ import ubinascii
 # ============================================================
 # CONFIGURAÇÕES DE TOUCH
 # ============================================================
+CALIB_FILE = "calib.json"
 CALIB_SAMPLES   = 100   # Amostras por canal
 PRESS_OFFSET    = 50    # Quanto abaixo do baseline aciona
 RELEASE_OFFSET  = 30    # Quanto abaixo do baseline libera

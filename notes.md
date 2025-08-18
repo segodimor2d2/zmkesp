@@ -39,8 +39,14 @@ https://www.mercadolivre.com.br/20-placa-de-fenolite-cobreado-10x30-cm-p-pcb-pci
 
 38/2=19.0$ dividir 2m 2 20x30
 
+
+
+
+start(force_calib=True)
+
 # ESP
 mpremote fs ls
+
 mpremote connect /dev/ttyUSB0 
 mpremote connect /dev/ttyUSB0 cp esp/config.py :config.py
 mpremote connect /dev/ttyUSB0 cp esp/main.py :main.py
@@ -1216,3 +1222,70 @@ while True:
 Se sim, já matou a charada — esses dois **quase sempre disparam juntos**.
 
 Quer que eu te mostre como remapear para outros pinos touch mais isolados?
+
+
+
+---
+
+
+import ujson
+import os
+
+# Adicione estas funções no início do arquivo main.py
+def save_calibration(baseline, press_thresh, release_thresh):
+    try:
+        calib_data = {
+            'baseline': baseline,
+            'press_thresh': press_thresh,
+            'release_thresh': release_thresh
+        }
+        with open(config.CALIB_FILE, 'w') as f:
+            ujson.dump(calib_data, f)
+        print("Calibração salva com sucesso!")
+    except Exception as e:
+        print("Erro ao salvar calibração:", e)
+
+def load_calibration():
+    try:
+        if config.CALIB_FILE in os.listdir():
+            with open(config.CALIB_FILE, 'r') as f:
+                calib_data = ujson.load(f)
+            print("Calibração carregada do arquivo")
+            return calib_data['baseline'], calib_data['press_thresh'], calib_data['release_thresh']
+    except Exception as e:
+        print("Erro ao carregar calibração:", e)
+    return None, None, None
+
+# Modifique a função calibrate_pots para tentar carregar a calibração primeiro
+def calibrate_pots(pots):
+    global baseline, press_thresh, release_thresh, pot_counter, triggerPot, pval
+
+    num_pots = len(pots)
+    baseline, press_thresh, release_thresh = load_calibration()
+    
+    # Se não encontrou calibração salva, faz uma nova
+    if baseline is None:
+        print("Calibrando... não toque nos sensores.")
+        baseline = [0] * num_pots
+        press_thresh = [0] * num_pots
+        release_thresh = [0] * num_pots
+        
+        for i in range(num_pots):
+            soma = 0
+            for _ in range(CALIB_SAMPLES):
+                soma += pots[i].read()
+                time.sleep_ms(5)
+            baseline[i] = soma / CALIB_SAMPLES
+            press_thresh[i] = baseline[i] - PRESS_OFFSET
+            release_thresh[i] = baseline[i] - RELEASE_OFFSET
+        
+        # Salva a nova calibração
+        save_calibration(baseline, press_thresh, release_thresh)
+
+    pot_counter = [0] * num_pots
+    triggerPot = [False] * num_pots
+    pval = [0] * num_pots
+
+    print("Baseline:       ", baseline)
+    print("Press thresh:   ", press_thresh)
+    print("Release thresh: ", release_thresh)

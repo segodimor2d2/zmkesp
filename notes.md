@@ -10,6 +10,34 @@
 - mudar eixos do giro e reviçar espaço
 - pensar no mouse
 
+valor_se_verdadeiro if condicao else valor_se_falso
+
+crimpar
+YEFYM YE 013B
+YE-013BR Micro Connector Crimping Tool,
+
+# corne
+135mm x 95mm 
+150mm x 100mm
+10 x 15
+10 x 30 30$
+
+100mm x 50mm
+50mm x 50mm
+
+200 400
+100 200 
+10 20 - 72$
+20 30 
+
+177/20=8.85$
+https://www.mercadolivre.com.br/20-placa-de-fenolite-cobreado-10x30-cm-p-pcb-pci/up/MLBU732249071#polycard_client=search-nordic&searchVariation=MLBU732249071&wid=MLB1762542422&position=26&search_layout=stack&type=product&tracking_id=c71262d7-9ec4-4961-b1c9-729cd8982f5a&sid=search
+
+106/10=10.6$
+
+10x15
+
+38/2=19.0$ dividir 2m 2 20x30
 
 # ESP
 mpremote fs ls
@@ -1085,3 +1113,106 @@ Depois do ajuste, o fluxo fica assim:
 👉 Quer que eu já te entregue a versão ajustada do **`main.py`** com tudo dinâmico (sem nenhum número fixo de pots), ou prefere que eu faça só um patch pequeno mostrando exatamente as linhas pra mudar?
 
 
+
+eu ainda estou disparando o pot 5 e 6 ao encostar neles mas os outros são independentes:
+
+
+
+---
+
+
+
+Valeu por compartilhar o código completo 👍
+
+Pelo que descreveu, **quando você toca no pot 5 ou no 6 eles disparam juntos**, diferente dos outros que funcionam separados. Isso geralmente acontece por **dois motivos principais** no ESP32:
+
+---
+
+### 🔎 Possíveis causas
+
+1. **Pinos de touch compartilhados / interferência elétrica**
+   Nem todos os pinos do ESP32 têm touchpads independentes. Alguns compartilham a mesma linha interna ou estão fisicamente muito próximos na matriz de sensores → isso causa "acoplamento" e faz parecer que dois sensores foram acionados juntos.
+
+   Exemplo: `GPIO32` e `GPIO33` muitas vezes apresentam esse problema, dependendo da placa.
+
+2. **Mapeamento de índices diferente entre L e R**
+   No seu `config.py` você tem:
+
+   ```python
+   PINOS_R = (13, 12, 14, 27, 4, 32, 33)
+   INDEX_MAP_R = (0, 1, 2, 3, 4, 5, 6)
+
+   PINOS_L = (13, 12, 14, 27, 4, 32, 33)
+   INDEX_MAP_L = (0, 1, 2, 4, 3, 5, 6)
+   ```
+
+   👉 Note que no lado **L** você **inverteu os índices 3 e 4** (`... 2, 4, 3, 5, 6`).
+   Se o código espera que `pot[5]` seja um pino mas o `INDEX_MAP` aponta para outro, pode estar enviando eventos juntos.
+
+3. **Thresholds iguais para todos**
+   Você está usando:
+
+   ```python
+   THRESH_POT = [-120] * 5
+   ```
+
+   mas seus `PINOS` têm **7 entradas** (`(13, 12, 14, 27, 4, 32, 33)`).
+   Isso pode gerar inconsistência quando `check_pots()` tenta ler os 7 mas só tem thresholds para 5 → pode estar mascarando o problema.
+
+---
+
+### ✅ Como diagnosticar
+
+Sugiro rodar um teste de debug só para os pots:
+
+```python
+from hw import init_pots
+import time
+
+pots = init_pots()
+while True:
+    vals = [p.read() for p in pots]
+    print(vals)
+    time.sleep(0.2)
+```
+
+👉 Toque só no pot 5, veja se o valor do pot 6 também varia.
+
+* Se sim → é **hardware/ESP32** (acoplamento entre touchpads).
+* Se não → é **software/mapeamento** (INDEX\_MAP ou thresholds).
+
+---
+
+### 🚀 Possíveis soluções
+
+* **Se for hardware (interferência):**
+
+  * Tente mudar para outros GPIOs que tenham touch (ex: `GPIO2, 15` etc., dependendo da sua placa).
+  * A lista completa de touch disponíveis no ESP32:
+
+    ```
+    T0 → GPIO4
+    T1 → GPIO0
+    T2 → GPIO2
+    T3 → GPIO15
+    T4 → GPIO13
+    T5 → GPIO12
+    T6 → GPIO14
+    T7 → GPIO27
+    T8 → GPIO33
+    T9 → GPIO32
+    ```
+
+    Evite usar `GPIO32/33` juntos, porque eles costumam interferir.
+
+* **Se for software (INDEX\_MAP):**
+
+  * Confirme que `INDEX_MAP_L` e `INDEX_MAP_R` estão coerentes com sua montagem física.
+  * Ajuste o mapeamento para que cada pino corresponda ao pot certo.
+
+---
+
+👉 Pergunta: você sabe se os pots 5 e 6 estão ligados em `GPIO32` e `GPIO33`?
+Se sim, já matou a charada — esses dois **quase sempre disparam juntos**.
+
+Quer que eu te mostre como remapear para outros pinos touch mais isolados?

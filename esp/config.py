@@ -1,60 +1,85 @@
-# -----------------------------
-# CONFIGURAÇÕES DO SISTEMA
-# -----------------------------
+import machine
+import ubinascii
 
-# Pinos dos touchpads
-THIS_IS = 1 # 0=L, 1=R
+# ============================================================
+# CONFIGURAÇÕES DE TOUCH
+# ============================================================
+CALIB_SAMPLES   = 100   # Amostras por canal
+PRESS_OFFSET    = 50    # Quanto abaixo do baseline aciona
+RELEASE_OFFSET  = 30    # Quanto abaixo do baseline libera
+DEBOUNCE_COUNT  = 3     # Leituras consecutivas para confirmar toque
 
-# Potenciômetros
-## Thresholds individuais
-THRESH_POT = [-120] * 5 # -50 (muito sensível) e -200 (pouco sensível)
-POT_CALIBRATION_SAMPLES = 40 # 20 (rápido) e 100 (preciso)
-POT_CALIBRATION_DELAY_MS = 70 # 0ms e 100ms. 70ms permite leituras estáveis
 
-# Giroscópio
-## Limite base para thresholds
-PORAGORA = 14000        # 8000 (mais sensível) e 20000 (menos sensível)
-# Percentual usado para criar thresholds
-THRES_PERCENT = 0.1     # 0.05 (5%) e 0.2 (20%). 0.1 (10%)
+# ============================================================
+# CONFIGURAÇÕES DOS POTENCIÔMETROS
+# ============================================================
+POT_CALIBRATION_SAMPLES   = 40   # 20 (rápido) | 100 (preciso)
+POT_CALIBRATION_DELAY_MS  = 70   # Delay entre leituras (ms)
 
-# Controle de passos automáticos
-STEP_WAIT_LIMIT = 5     # Quantos ciclos esperar antes de repetir passo
 
-# Reset
-CYCLE_RESET_LIMIT = 20  # Quantos ciclos parado até resetar stepX/stepY
+# ============================================================
+# CONFIGURAÇÕES DO GIROSCÓPIO
+# ============================================================
+PORAGORA       = 14000   # 8000 (sensível) | 20000 (menos sensível)
+THRES_PERCENT  = 0.1     # 0.05 (5%) | 0.2 (20%)
+GY1, GY2       = 1, 0    # Ordem dos eixos: X depois Y
+INVERT_X       = True    # Inverter sentido do eixo X
+INVERT_Y       = True    # Inverter sentido do eixo Y
 
-# Loop principal
-TSLEEP = 50             # Delay entre loops (ms)
-TCLEAR = 10000          # Intervalo para reset de contador
-SAMPLES = 5             # Amostras iniciais do giroscópio
 
-# Ordem dos eixos do giroscópio
-GY1, GY2 = 1, 0         # Eixo X primeiro, depois Y
+# ============================================================
+# CONTROLE DE PASSOS / RESET
+# ============================================================
+STEP_WAIT_LIMIT   = 5     # Ciclos antes de repetir passo
+CYCLE_RESET_LIMIT = 20    # Ciclos parado até resetar stepX/stepY
 
-# Inverter sentido do eixo X e/ou Y
-INVERT_X = True         # True re(+) ar(-) False o contrario
-INVERT_Y = True         # True re(+) ar(-) False o contrario
 
-PINOS_R = 13,12,14,27,4
-INDEX_MAP_R = 0,1,2,3,4
+# ============================================================
+# LOOP PRINCIPAL
+# ============================================================
+TSLEEP  = 50      # Delay entre loops (ms)
+TCLEAR  = 10000   # Intervalo para reset de contador
+SAMPLES = 5       # Amostras iniciais do giroscópio
+
+
+# ============================================================
+# PINAGEM (ESQUERDA E DIREITA)
+# ============================================================
+PINOS_R = 13,12,14,27,4,33
+INDEX_MAP_R = 0,1,2,3,4,5
 PINOS_VIB_R = 26
 
-PINOS_L = 12,13,14,27,4
-INDEX_MAP_L = 0,1,2,4,3
+PINOS_L = 12,13,14,27,4,33
+INDEX_MAP_L = 0,1,2,4,3,5
 PINOS_VIB_L = 26
 
+# ============================================================
+# IDENTIFICAÇÃO DO CHIP / DEFINIÇÃO DO LADO
+# ============================================================
+chip_id = ubinascii.hexlify(machine.unique_id()).decode()
+print("Chip ID:", chip_id)  # Exemplo: '240ac4083456'
 
-# -----------------------------
+# IDs conhecidos dos dois lados
+alesp = '083af27f9c38'
+aresp = '78e36d170944'
+
+# Define se este chip é o lado L (0) ou R (1)
+THIS_IS = 0 if chip_id == alesp else 1
+print("THIS_IS:", THIS_IS)
+
+# INDEX MAP final (depende do lado detectado)
+INDEX_MAP_POTS = list(INDEX_MAP_L if THIS_IS == 0 else INDEX_MAP_R)
+
+
+# ============================================================
 # DEBUG
-# -----------------------------
+# ============================================================
 DEBUG = 0
 """
 | Você Quer...                  | Configuração        | Comportamento          |
 |-------------------------------|---------------------|------------------------|
-| Só logs de nível X            | `DEBUG = X`         | Ignora tudo ≠ X        |
-| Todos os logs                 | `DEBUG = None`      | Mostra tudo            |
-| Logs sem nível                | `DEBUG = -1`        | Mostra só os sem nível |
-| Múltiplos níveis (ex: 0,1,2)  | `DEBUG = [0, 1, 2]` | Mostra só esses níveis |
+| Só logs de nível X            | DEBUG = X           | Ignora tudo ≠ X        |
+| Todos os logs                 | DEBUG = None        | Mostra tudo            |
+| Logs sem nível                | DEBUG = -1          | Mostra só os sem nível |
+| Múltiplos níveis (ex: 0,1,2)  | DEBUG = [0, 1, 2]   | Mostra só esses níveis |
 """
-
-

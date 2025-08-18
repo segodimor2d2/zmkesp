@@ -7,13 +7,14 @@ from pots import add_pot_samples, calc_calibrate
 from gyro import append_gyro, average_and_slide
 from dicctozmk import potsgyrotozmk
 
-INDEX_MAP_POTS = list(config.INDEX_MAP_L if config.THIS_IS == 0 else config.INDEX_MAP_R)
-
-# ===== CONFIGS TOUCH =====
-CALIB_SAMPLES   = 100   # Amostras por canal
-PRESS_OFFSET    = 50    # Quanto abaixo do baseline aciona
-RELEASE_OFFSET  = 30    # Quanto abaixo do baseline libera
-DEBOUNCE_COUNT  = 3     # Leituras consecutivas para confirmar toque
+# -----------------------------
+# CONFIG TOUCH
+# -----------------------------
+CALIB_SAMPLES   = config.CALIB_SAMPLES
+PRESS_OFFSET    = config.PRESS_OFFSET
+RELEASE_OFFSET  = config.RELEASE_OFFSET
+DEBOUNCE_COUNT  = config.DEBOUNCE_COUNT
+INDEX_MAP_POTS  = config.INDEX_MAP_POTS
 
 # ===== VARIÁVEIS GLOBAIS =====
 baseline        = []
@@ -163,7 +164,6 @@ def start(i2c=None, mpu=None, pots=None, vib=None):
     num = 0
     holdclick = False
     triggerPot = [False] * num_pots
-    threshPot  = config.THRESH_POT[:num_pots]
 
     # Thresholds giroscópio
     threshP  = config.PORAGORA - (config.PORAGORA * config.THRES_PERCENT)

@@ -31,16 +31,12 @@ SAMPLES = 5             # Amostras iniciais do giroscópio
 # Ordem dos eixos do giroscópio
 GY1, GY2 = 1, 0         # Eixo X primeiro, depois Y
 
-# Inverter sentido do eixo X e/ou Y
-INVERT_X = False         # True re(+) ar(-) False o contrario
-INVERT_Y = True         # True re(+) ar(-) False o contrario
-
-PINOS_R = (13, 12, 14, 27, 4, 32, 33)
-INDEX_MAP_R = (0, 1, 2, 3, 4, 5, 6)
+PINOS_R = 13,12,14,27,4
+INDEX_MAP_R = 0,1,2,3,4
 PINOS_VIB_R = 26
 
-PINOS_L = (13, 12, 14, 27, 4, 32, 33)
-INDEX_MAP_L = (0, 1, 2, 4, 3, 5, 6)
+PINOS_L = 12,13,14,27,4
+INDEX_MAP_L = 0,1,2,4,3
 PINOS_VIB_L = 26
 
 

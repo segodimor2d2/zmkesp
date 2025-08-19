@@ -48,6 +48,13 @@ TSLEEP  = 50      # Delay entre loops (ms)
 TCLEAR  = 10000   # Intervalo para reset de contador
 SAMPLES = 5       # Amostras iniciais do giroscópio
 
+# ============================================================
+# Motor Vib 
+# ============================================================
+VIBRAR_LIGADO = 150     # 101 default
+VIBRAR_DESLIGADO = 70   # 70 default
+VIBRAR_LONGO = 250      # 200 para step == 0
+VIBRAR_ALERTA = 300     # 300 para step == 1
 
 # ============================================================
 # PINAGEM (ESQUERDA E DIREITA)
@@ -97,6 +104,7 @@ DEBUG = 0
 from machine import Pin, UART
 import time
 from printlogs import log
+from config import VIBRAR_LIGADO, VIBRAR_DESLIGADO, VIBRAR_LONGO, VIBRAR_ALERTA
 
 # UART - ajuste TX e RX conforme o seu hardware
 uart = UART(1, baudrate=115200, tx=17, rx=16)
@@ -122,10 +130,12 @@ def send_charPs(zmkcodes):
         log('packet', packet, 4)
         uart.write(packet)
 
+
 def tstpot(row, col, delay=0.1):
     send_charPs([row, col, True])
     time.sleep(delay)
     send_charPs([row, col, False])
+
 
 def vibrar(pino_vibracao, n_pulsos, step=None):
     if pino_vibracao is None:
@@ -135,20 +145,21 @@ def vibrar(pino_vibracao, n_pulsos, step=None):
         try:
             pino_vibracao.on()
         except Exception:
-            # alguns firmwares usam value(1)/value(0)
             try: pino_vibracao.value(1)
             except: pass
-        if step == 0:
-            time.sleep_ms(200)
-        else:
-            time.sleep_ms(101)
+        
+        # Usando as variáveis de configuração
+        if step == 0: time.sleep_ms(VIBRAR_LONGO)
+        if step == 1: time.sleep_ms(VIBRAR_ALERTA)
+        else: time.sleep_ms(VIBRAR_LIGADO)
+        
         try:
             pino_vibracao.off()
         except Exception:
             try: pino_vibracao.value(0)
             except: pass
-        time.sleep_ms(70)
-
+        
+        time.sleep_ms(VIBRAR_DESLIGADO)
 
 
 === ARQUIVO: esp/hw.py ===
@@ -318,6 +329,7 @@ def potsgyrotozmk(abclevel, mapped_i, status, side):
 
 === ARQUIVO: esp/pots.py ===
 
+import time
 import os
 import ujson
 import config
@@ -413,7 +425,7 @@ def calibrate_pots(pots, force_new_calib=False):
 
 
 def check_pots(pots, abclevel, wait2Zero, cycle):
-    global pval, triggerPot, pot_counter, press_thresh, release_thresh
+    global pval, triggerPot, pot_counter, press_thresh, release_thresh, res_check_pots
     
     for i, pot in enumerate(pots):
         if i >= len(pval):
@@ -429,8 +441,9 @@ def check_pots(pots, abclevel, wait2Zero, cycle):
             if pot_counter[i] >= config.DEBOUNCE_COUNT:
                 from actions import send_charPs
                 from dicctozmk import potsgyrotozmk
-                send_charPs(potsgyrotozmk(abclevel, mapped_i, 1, config.THIS_IS))
-                log(f"[POT{mapped_i}] Pressionado | val={val} | abclevel={abclevel}", 3)
+                # send_charPs(potsgyrotozmk(abclevel, mapped_i, 1, config.THIS_IS))
+                # log(f"[POT{mapped_i}] Pressionado | val={val} | abclevel={abclevel}", 3)
+                res_check_pots=[abclevel, mapped_i, 1, config.THIS_IS]
                 triggerPot[i] = True
                 pot_counter[i] = 0
                 wait2Zero = False
@@ -441,8 +454,9 @@ def check_pots(pots, abclevel, wait2Zero, cycle):
             if pot_counter[i] >= config.DEBOUNCE_COUNT:
                 from actions import send_charPs
                 from dicctozmk import potsgyrotozmk
-                send_charPs(potsgyrotozmk(abclevel, mapped_i, 0, config.THIS_IS))
-                log(f"[POT{mapped_i}] Liberado | val={val} | abclevel={abclevel}", 3)
+                # send_charPs(potsgyrotozmk(abclevel, mapped_i, 0, config.THIS_IS))
+                # log(f"[POT{mapped_i}] Liberado | val={val} | abclevel={abclevel}", 3)
+                res_check_pots=[abclevel, mapped_i, 0, config.THIS_IS]
                 triggerPot[i] = False
                 pot_counter[i] = 0
                 wait2Zero = True
@@ -450,12 +464,13 @@ def check_pots(pots, abclevel, wait2Zero, cycle):
         else:
             pot_counter[i] = 0
 
-    return wait2Zero, cycle
+    return res_check_pots, wait2Zero, cycle
 
 
 === ARQUIVO: esp/gyro.py ===
 
 import config
+from actions import vibrar
 from printlogs import log
 
 def append_gyro(buffer, mpuSensor):
@@ -613,6 +628,7 @@ def start(i2c=None, mpu=None, pots=None, vib=None, force_calib=False):
     evntTriggeredXP = evntTriggeredXN = False
     evntTriggeredYP = evntTriggeredYN = False
     wait2Zero = False
+    res_check_pots = []
     cycle = 0
     stepWaitXP = stepWaitXN = stepWaitYP = stepWaitYN = 0
 
@@ -651,7 +667,9 @@ def start(i2c=None, mpu=None, pots=None, vib=None, force_calib=False):
 
         # Leitura dos potenciômetros
         abclevel = [stepX, stepY]
-        wait2Zero, cycle = check_pots(pots, abclevel, wait2Zero, cycle)
+        res_check_pots, wait2Zero, cycle = check_pots(pots, abclevel, wait2Zero, cycle)
+        tozmk = potsgyrotozmk(res_check_pots)
+        send_charPs(tozmk)
 
         # Reset se parado
         if wait2Zero and cycle < config.CYCLE_RESET_LIMIT:

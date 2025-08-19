@@ -1,13 +1,14 @@
 from machine import Pin, UART
 import time
 from printlogs import log
+from config import VIBRAR_LIGADO, VIBRAR_DESLIGADO, VIBRAR_LONGO, VIBRAR_ALERTA
 
 # UART - ajuste TX e RX conforme o seu hardware
 uart = UART(1, baudrate=115200, tx=17, rx=16)
 
 def send_charPs(zmkcodes):
     if zmkcodes is not None:
-        log('send_charPs', zmkcodes, 1)
+        log('send_charPs', zmkcodes, 4)
         row = zmkcodes[0]
         col = zmkcodes[1]
 
@@ -23,13 +24,15 @@ def send_charPs(zmkcodes):
 
         checksum = event_type ^ row ^ col
         packet = bytes([0xAA, event_type, row, col, checksum])
-        log('packet', packet, 4)
+        log('packet', packet, 5)
         uart.write(packet)
+
 
 def tstpot(row, col, delay=0.1):
     send_charPs([row, col, True])
     time.sleep(delay)
     send_charPs([row, col, False])
+
 
 def vibrar(pino_vibracao, n_pulsos, step=None):
     if pino_vibracao is None:
@@ -39,17 +42,18 @@ def vibrar(pino_vibracao, n_pulsos, step=None):
         try:
             pino_vibracao.on()
         except Exception:
-            # alguns firmwares usam value(1)/value(0)
             try: pino_vibracao.value(1)
             except: pass
-        if step == 0:
-            time.sleep_ms(200)
-        else:
-            time.sleep_ms(101)
+        
+        # Usando as variáveis de configuração
+        if step == 0: time.sleep_ms(VIBRAR_LONGO)
+        if step == 1: time.sleep_ms(VIBRAR_ALERTA)
+        else: time.sleep_ms(VIBRAR_LIGADO)
+        
         try:
             pino_vibracao.off()
         except Exception:
             try: pino_vibracao.value(0)
             except: pass
-        time.sleep_ms(70)
-
+        
+        time.sleep_ms(VIBRAR_DESLIGADO)

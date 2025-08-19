@@ -42,6 +42,13 @@ TSLEEP  = 50      # Delay entre loops (ms)
 TCLEAR  = 10000   # Intervalo para reset de contador
 SAMPLES = 5       # Amostras iniciais do giroscópio
 
+# ============================================================
+# Motor Vib 
+# ============================================================
+VIBRAR_LIGADO = 150     # 101 default
+VIBRAR_DESLIGADO = 70   # 70 default
+VIBRAR_LONGO = 250      # 200 para step == 0
+VIBRAR_ALERTA = 300     # 300 para step == 1
 
 # ============================================================
 # PINAGEM (ESQUERDA E DIREITA)
@@ -83,4 +90,11 @@ DEBUG = 0
 | Todos os logs                 | DEBUG = None        | Mostra tudo            |
 | Logs sem nível                | DEBUG = -1          | Mostra só os sem nível |
 | Múltiplos níveis (ex: 0,1,2)  | DEBUG = [0, 1, 2]   | Mostra só esses níveis |
+
+
+tstpot(row, col, delay=0.1)
+tstpot(row, col)
+
+start(force_calib=True)
+
 """

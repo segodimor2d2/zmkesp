@@ -3,6 +3,8 @@ import config
 from hw import init_i2c, init_mpu, init_vibrator, init_pots
 from actions import vibrar
 from printlogs import log
+from actions import send_charPs
+from dicctozmk import potsgyrotozmk
 from pots import init_pot_globals, calibrate_pots, check_pots
 from gyro import append_gyro, average_and_slide, check_gyro_axis, check_step_wait
 
@@ -34,6 +36,7 @@ def start(i2c=None, mpu=None, pots=None, vib=None, force_calib=False):
     evntTriggeredXP = evntTriggeredXN = False
     evntTriggeredYP = evntTriggeredYN = False
     wait2Zero = False
+    res_check_pots = None
     cycle = 0
     stepWaitXP = stepWaitXN = stepWaitYP = stepWaitYN = 0
 
@@ -72,7 +75,14 @@ def start(i2c=None, mpu=None, pots=None, vib=None, force_calib=False):
 
         # Leitura dos potenciômetros
         abclevel = [stepX, stepY]
-        wait2Zero, cycle = check_pots(pots, abclevel, wait2Zero, cycle)
+        res_check_pots, wait2Zero, cycle = check_pots(pots, abclevel, wait2Zero, cycle)
+
+        # Verifica se há resultado antes de processar
+        if res_check_pots is not None:
+            log(f'potsgyrotozmk {res_check_pots}', 0)
+            tozmk = potsgyrotozmk(*res_check_pots)
+            # log(f'send_charPs {tozmk}', 0)
+            send_charPs(tozmk)
 
         # Reset se parado
         if wait2Zero and cycle < config.CYCLE_RESET_LIMIT:

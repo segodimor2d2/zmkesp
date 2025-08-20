@@ -1,13 +1,42 @@
 
 
-- mudar conexão da bateria no nRF52840
-- acrescentar um cabo touch
+```python
+accel = read_accel_x()
+
+if not ativo and accel > thresh_on:
+    ativo = True
+
+elif ativo and accel < thresh_off:
+    ativo = False
+
+if ativo:
+    # calcula velocidade proporcional à força
+    velocidade = k * (accel - thresh_off)
+    mover_mouse(velocidade)
+else:
+    mover_mouse(0)
+```
+
+
+mpremote fs cp :arquivo_no_esp ./arquivo_no_pc
+mpremote fs cp :calib.json ./calib.json
+
+
+
+
+
+
+- ligar e desligar envio de eventos de kb
+- gesto iniciar calibração
+- usar dados do acelerômetro para o mouse
+- refactorizar o código
+
+
 - ver a parte de ter um conetor
 - reviçar a questão do buffer porque trava
 - testar tirar o chunks
 - ver a parte da tecla press 
 - ver logs no nRF52840
-- mudar eixos do giro e reviçar espaço
 - pensar no mouse
 
 valor_se_verdadeiro if condicao else valor_se_falso
@@ -1305,3 +1334,645 @@ def calibrate_pots(pots):
     print("Baseline:       ", baseline)
     print("Press thresh:   ", press_thresh)
     print("Release thresh: ", release_thresh)
+
+---
+
+$$$$
+
+estou pensando em usar event detection by threshold crossing with hysteresis
+para detectar eventos de um eixo do acelerômetro mas apos eu reconhecer que esta ativo,
+eu gostaria calcular a força até parar, minha ideia é usar esses dados para controlar
+o movimento de um mouse.
+
+o que acha da ideia, teria alguma sugestão para fazer algo similar ou te outra ideia que posso ma ajudar a conseguir isso?
+
+
+Muito boa a sua linha de raciocínio 👌
+O que você está descrevendo é **usar o threshold + histerese só para detectar o início/fim do movimento**, mas **usar os valores contínuos do acelerômetro (a “força”) para controlar a intensidade do movimento enquanto durar o evento**.
+
+---
+
+### 📌 Como isso poderia funcionar:
+
+1. **Detecção de início/fim (discreto):**
+
+   * Use o **event detection by threshold crossing with hysteresis** para saber se o eixo está em movimento ou parado.
+   * Exemplo: `ativo = True` quando |accel| > 0.2 g, e `ativo = False` quando |accel| < 0.1 g.
+
+2. **Cálculo da “força” (contínuo):**
+
+   * Enquanto `ativo == True`, você não só mantém o evento ligado, mas também lê o valor do acelerômetro continuamente.
+   * Esse valor pode ser usado como **ganho de velocidade** → quanto maior a inclinação/aceleração, mais rápido o mouse se move.
+
+3. **Controle do movimento do mouse:**
+
+   * Mapeie a força para pixels/segundo.
+   * Use uma função de escala (linear ou não) para transformar aceleração em deslocamento suave.
+   * Exemplo:
+
+     ```python
+     velocidade = k * (accel - limiar)  # k = fator de sensibilidade
+     ```
+   * Se quiser mais suavidade, pode usar **média móvel** ou **filtro exponencial** (low-pass filter).
+
+---
+
+### 🔧 Sugestões de melhoria:
+
+* **Filtro antes da detecção:**
+  O acelerômetro é barulhento → use uma média móvel (moving average) ou filtro passa-baixa antes de aplicar o threshold.
+
+* **Dead zone (zona morta):**
+  Pequenos movimentos involuntários podem causar drift → defina uma faixa (ex: ±0.05 g) que conta como “zero”.
+
+* **Integração parcial:**
+  Se você quiser que o movimento acumule (tipo empurrar mais forte = mais deslocamento), pode integrar a aceleração ao longo do tempo para simular velocidade.
+  Mas cuidado → integração de acelerômetro puro dá **drift** rápido.
+
+* **Controle híbrido (bom para mouse):**
+
+  * Threshold detecta início/fim (discreto).
+  * Enquanto ativo, usa o valor de aceleração filtrado como velocidade (contínuo).
+  * Isso dá controle intuitivo tipo “empurrar mais = cursor anda mais rápido”.
+
+---
+
+### 🚀 Exemplo simples em pseudocódigo:
+
+```python
+accel = read_accel_x()
+
+if not ativo and accel > thresh_on:
+    ativo = True
+
+elif ativo and accel < thresh_off:
+    ativo = False
+
+if ativo:
+    # calcula velocidade proporcional à força
+    velocidade = k * (accel - thresh_off)
+    mover_mouse(velocidade)
+else:
+    mover_mouse(0)
+```
+
+---
+
+👉 Isso já dá um comportamento bem próximo do que você descreveu.
+Se quiser algo ainda mais sofisticado, dá pra pensar em **detecção de gestos** (ex: pico rápido = clique, movimento contínuo = arrastar).
+
+---
+
+Quer que eu te monte um **exemplo em Python com dados simulados** mostrando o cursor sendo controlado pela força do acelerômetro (com threshold + histerese + velocidade contínua)?
+
+
+
+---
+
+# como ficaria o algoritmo para detecção de gestos
+# (ex: pico rápido = clique, movimento contínuo = arrastar)?
+
+
+Boa! ⚡ Esse já é o **nível acima do threshold simples** → você passa de "detecção de evento contínuo" para "classificação de gestos" a partir do sinal.
+
+Vou te mostrar a ideia de forma **genérica** para acelerômetro/giroscópio, depois a gente pode afinar pro seu caso (mouse).
+
+---
+
+## 📌 Ideia geral de **Gesture Detection** com sensores:
+
+1. **Pré-processamento:**
+
+   * Filtrar o sinal (média móvel / low-pass) para reduzir ruído.
+   * Normalizar ou compensar o offset.
+
+2. **Detecção de evento inicial (threshold + histerese):**
+
+   * Um pico ou mudança rápida acima do limiar ativa a captura do gesto.
+   * Enquanto o movimento dura, você guarda os valores numa "janela" de amostras.
+
+3. **Classificação do gesto:**
+
+   * Se o movimento foi **rápido, curto, com pico alto** → classificar como "clique".
+   * Se foi **mais longo, sustentado** → classificar como "arrastar".
+   * Outros gestos (duplo pico, mudança de direção, etc.) podem ser reconhecidos do mesmo jeito.
+
+---
+
+## 🚀 Exemplo em Python (simplificado)
+
+Aqui simulo leituras do acelerômetro num eixo (`accel_x`):
+
+```python
+import random
+import time
+
+# thresholds
+thresh_on = 0.3    # inicia gesto quando aceleração > 0.3g
+thresh_off = 0.1   # termina gesto quando aceleração < 0.1g
+
+ativo = False
+janela = []   # armazena amostras do gesto
+
+def classificar_gesto(amostras):
+    duracao = len(amostras)
+    pico = max(abs(x) for x in amostras)
+    
+    if pico > 1.5 and duracao < 10:
+        return "CLIQUE"
+    elif pico > 0.5 and duracao >= 10:
+        return "ARRASTAR"
+    else:
+        return "DESCONHECIDO"
+
+for t in range(50):  # simula 50 leituras
+    # simulando dados: picos e movimentos aleatórios
+    accel_x = random.uniform(-0.2, 2.0)
+    print(f"[{t}] Aceleração = {accel_x:.2f}")
+    
+    if not ativo and abs(accel_x) > thresh_on:
+        ativo = True
+        janela = [accel_x]
+    
+    elif ativo:
+        janela.append(accel_x)
+        if abs(accel_x) < thresh_off:
+            # gesto terminou → classificar
+            gesto = classificar_gesto(janela)
+            print(f" >>> GESTO DETECTADO: {gesto}")
+            ativo = False
+            janela = []
+    
+    time.sleep(0.1)
+```
+
+---
+
+## 📊 Como funciona
+
+* **Clique:**
+  Um pico rápido (valor alto, duração curta).
+* **Arrastar:**
+  Movimento contínuo (pico não tão alto, mas duração longa).
+* Você pode criar outros gestos → por exemplo:
+
+  * **Duplo pico** = duplo clique.
+  * **Mudança de sinal rápido** = swipe.
+  * **Padrão de oscilação** = scroll.
+
+---
+
+## 💡 Sugestões extras
+
+* Usar **janelas deslizantes** com `deque` em vez de listas, para limitar a memória.
+* Se quiser robustez, pode calcular **features do sinal**:
+
+  * pico máximo
+  * RMS (energia do gesto)
+  * duração
+  * área sob a curva (integral da aceleração)
+* Isso te dá um "perfil do gesto" e pode ser classificado com regras simples ou até um modelo ML (tipo SVM, k-NN).
+
+---
+
+👉 Quer que eu adapte esse exemplo para **controlar o mouse** (ex: "clique" = botão do mouse, "arrastar" = segurar e mover) usando `pynput` ou `pyautogui`?
+
+
+
+
+
+---
+
+# me explica como se pode calcular thresh_on e thresh_off de uma sinal que eu não conheço,
+# tipo eu não sei qual é o limiar de histerese e como calcular o limiar de histerese,
+# eu preciso algo bem otimizado e que não consuma tanto para poder rodar,
+# o codigo é para micropython em um esp32,
+# eu preciso algo otimizado mesmo o que me recomenda fazer?
+
+
+Perfeito! Vamos com calma e de forma prática. Você quer calcular **`thresh_on`** e **`thresh_off`** para um sinal desconhecido, basicamente para criar uma **histerese**, mas de forma otimizada para MicroPython no ESP32. Vou detalhar uma abordagem eficiente.
+
+
+### 1️⃣ Conceito básico
+
+Para sinais digitais analógicos “flutuantes” (como touchpads ou sensores de potenciómetro), a histerese evita que o sinal fique alternando rapidamente entre ligado e desligado perto do limiar. Ela é definida por:
+
+* **`thresh_on`**: nível acima do qual o evento é considerado **ativo**.
+* **`thresh_off`**: nível abaixo do qual o evento é considerado **inativo**.
+
+**Exemplo gráfico:**
+
+```
+Sinal
+ ^
+ |        _______
+ |       /       \
+ |      /         \
+ |_____/           \______
+       thresh_off   thresh_on
+```
+
+A diferença entre `thresh_on` e `thresh_off` é a **histerese**.
+
+---
+
+### 2️⃣ Estratégia otimizada
+
+Você quer algo **leve**, que rode bem em MicroPython.
+A ideia é **medir o sinal por alguns instantes**
+e calcular uma faixa automática.
+
+**Passo a passo:**
+
+#### a) Amostrar o sinal
+
+Use um buffer pequeno (10–20 valores é suficiente para ESP32).
+Exemplo:
+
+```python
+import machine, time
+
+adc = machine.ADC(machine.Pin(32))  # exemplo
+adc.atten(machine.ADC.ATTN_11DB)    # faixa 0-3.3V
+
+samples = []
+for _ in range(20):
+    samples.append(adc.read())
+    time.sleep_ms(5)
+```
+
+#### b) Calcular média ou baseline
+
+```python
+baseline = sum(samples) / len(samples)
+```
+
+#### c) Calcular desvio típico ou amplitude aproximada
+
+Você pode usar o **desvio absoluto médio**, que é mais rápido que desvio padrão:
+
+```python
+mad = sum(abs(x - baseline) for x in samples) / len(samples)
+```
+
+#### d) Definir `thresh_on` e `thresh_off`
+
+* `thresh_on = baseline + k * mad`
+* `thresh_off = baseline - k * mad`
+
+O `k` é um fator que você ajusta (por exemplo, `k = 1.5`).
+
+```python
+k = 1.5
+thresh_on = baseline + k * mad
+thresh_off = baseline - k * mad
+```
+
+> Simples, rápido e não exige biblioteca matemática pesada.
+
+---
+
+### 3️⃣ Observações de otimização
+
+1. **Buffer pequeno**: 10–20 amostras já é suficiente, não precisa guardar muitas.
+2. **Evitar sqrt**: não use desvio padrão (`sqrt`) se quiser máxima performance, MAD funciona bem.
+3. **Amostragem curta**: se for touch ou sensor rápido, 5–10 ms entre amostras já captura variações.
+4. **Recalibrar periodicamente**: se o sinal variar com temperatura ou drift, você pode recalibrar de vez em quando.
+
+---
+
+### 4️⃣ Exemplo completo otimizado
+
+```python
+import machine, time
+
+adc = machine.ADC(machine.Pin(32))
+adc.atten(machine.ADC.ATTN_11DB)
+
+def calc_hysteresis(samples_count=20, k=1.5):
+    samples = [adc.read() for _ in range(samples_count)]
+    baseline = sum(samples) / samples_count
+    mad = sum(abs(x - baseline) for x in samples) / samples_count
+    thresh_on = baseline + k * mad
+    thresh_off = baseline - k * mad
+    return thresh_on, thresh_off
+
+th_on, th_off = calc_hysteresis()
+print("thresh_on:", th_on, "thresh_off:", th_off)
+```
+
+* Pouquíssimo custo computacional.
+* Fácil de ajustar o `k`.
+* Funciona mesmo se o sinal tiver ruído ou amplitude variável.
+
+---
+
+Se você quiser, posso te mostrar uma **versão ainda mais otimizada**, que **não precisa nem de listas**, usando apenas **uma média em tempo real** para calcular `thresh_on` e `thresh_off` — perfeita para rodar em **loops rápidos do ESP32**.
+
+Quer que eu faça essa versão?
+
+
+---
+
+Ótima pergunta! Quando você **não conhece o sinal nem seus limites**, a saída é **estimar o “fundo/ruído”** e usar isso para derivar `thresh_on` (liga) e `thresh_off` (desliga), criando uma *zona morta* (histerese) que evite repiques.
+
+Abaixo estão 4 jeitos práticos—do mais simples ao mais robusto—e um exemplo em Python.
+
+---
+
+# 1) Receita rápida (média + desvio-padrão)
+
+1. Colete um trecho “em repouso” (ou o mais calmo possível) por alguns segundos.
+2. Calcule média `μ` e desvio-padrão `σ`.
+3. Defina:
+
+   * `thresh_on = μ + k_on * σ`
+   * `thresh_off = μ + k_off * σ` com `k_off < k_on` (ex.: `k_on=3`, `k_off=1.5`)
+4. Para sinais bipolares (±), aplique nos módulos `|x|` ou crie pares de limiares para +/−.
+
+Funciona bem quando o ruído é aproximadamente gaussiano.
+
+---
+
+# 2) Receita robusta (MAD — resistente a outliers)
+
+1. Use uma janela de dados “normais”.
+2. Calcule mediana `m` e **MAD** = mediana(|x − m|).
+3. Converta para um “σ robusto”: `σ̂ = 1.4826 * MAD`.
+4. Limiares:
+
+   * `thresh_on = m + k_on * σ̂`
+   * `thresh_off = m + k_off * σ̂`
+
+O MAD segura melhor quando há picos esporádicos.
+
+---
+
+# 3) Receita por percentis (sem suposições de distribuição)
+
+Use percentis da janela:
+
+* `thresh_on = P95` (ou P97/P99)
+* `thresh_off = P80` (ou P70)
+  A diferença entre on/off cria a histerese. Excelente para ajustar “onde começa” vs “onde termina” sem depender de σ.
+
+---
+
+# 4) Adaptativo online (acompanha drift)
+
+Quando o offset do sensor muda com o tempo, atualize a referência continuamente com **médias exponenciais**:
+
+* Média exponencial (EMA):
+  `μ_t = (1−α) μ_{t−1} + α x_t`
+* Variância exponencial (EWVar) aproximada:
+  `v_t = (1−α) v_{t−1} + α (x_t − μ_t)^2` → `σ_t = sqrt(v_t)`
+* Limiares:
+
+  * `thresh_on_t  = μ_t + k_on  * σ_t`
+  * `thresh_off_t = μ_t + k_off * σ_t`
+
+Use `α` pequeno (ex.: 0.01–0.05) para suavizar; atualize apenas quando o sistema **não estiver em evento** (para não “puxar” a média durante o gesto).
+
+---
+
+## Dicas específicas para acelerômetro/giroscópio
+
+* **Remova a gravidade**: use magnitude horizontal ou aplique um passa-alta para “tirar” o componente DC (gravidade) no acelerômetro.
+* **Trabalhe com magnitude**: `a_mag = sqrt(ax^2 + ay^2 + az^2)` (ou eixo específico, se for o objetivo).
+* **Debounce mínimo**: exija que o valor fique além do limiar por *N* amostras antes de ligar/desligar.
+* **Duração mínima**: ignore eventos muito curtos (ex.: < 30–50 ms).
+* **Janela móvel**: para percentis/MAD, mantenha uma janela deslizante (ex.: 1–3 s).
+
+---
+
+## Exemplo simples em Python (adaptativo + histerese)
+
+```python
+from collections import deque
+import math
+
+# hiperparâmetros
+alpha = 0.02          # EMA (0.01–0.05)
+k_on, k_off = 3.0, 1.5
+debounce_on = 3       # amostras acima de on para ativar
+debounce_off = 3      # amostras abaixo de off para desativar
+
+# estado
+mu = 0.0
+var = 0.0
+event_active = False
+cnt_on = 0
+cnt_off = 0
+
+# janela robusta opcional para inicialização
+init_win = deque(maxlen=200)  # ~2 s se amostra a 100 Hz
+
+def update_stats(x, mu, var):
+    # EMA da média e da variância (estilo EWVar)
+    mu_new = (1 - alpha) * mu + alpha * x
+    var_new = (1 - alpha) * var + alpha * (x - mu_new) ** 2
+    return mu_new, var_new
+
+def process_sample(ax, ay, az):
+    global mu, var, event_active, cnt_on, cnt_off
+
+    # exemplo: usar magnitude menos 1g para remover gravidade
+    a_mag = math.sqrt(ax*ax + ay*ay + az*az) - 1.0
+
+    # durante repouso inicial, preencha janela
+    if len(init_win) < init_win.maxlen and not event_active:
+        init_win.append(a_mag)
+        if len(init_win) == init_win.maxlen:
+            # inicialização robusta (mediana/MAD)
+            data = sorted(init_win)
+            m = data[len(data)//2]
+            mad = sorted(abs(x - m) for x in data)[len(data)//2]
+            sigma_hat = 1.4826 * mad if mad > 1e-9 else 1e-6
+            mu = m
+            var = sigma_hat**2
+        return None
+
+    sigma = max(var, 1e-12) ** 0.5
+    thresh_on  = mu + k_on  * sigma
+    thresh_off = mu + k_off * sigma
+
+    # detecção com debounce e histerese
+    if not event_active:
+        if a_mag > thresh_on:
+            cnt_on += 1
+            if cnt_on >= debounce_on:
+                event_active = True
+                cnt_on = 0
+                # (ex.: iniciar clique/arrastar ou começar a integrar força)
+                return ("ON", a_mag, thresh_on, thresh_off)
+        else:
+            cnt_on = 0
+            # atualize estatísticas só fora de evento
+            mu, var = update_stats(a_mag, mu, var)
+    else:
+        if a_mag < thresh_off:
+            cnt_off += 1
+            if cnt_off >= debounce_off:
+                event_active = False
+                cnt_off = 0
+                # (ex.: soltar clique/terminar gesto)
+                return ("OFF", a_mag, thresh_on, thresh_off)
+        else:
+            cnt_off = 0
+        # opcional: mesmo ativo, atualize lentamente (ou não atualize)
+        # mu, var = update_stats(a_mag, mu, var)
+
+    return None
+```
+
+**Como usar:** chame `process_sample(ax, ay, az)` a cada amostra.
+
+* Retorna `("ON", …)` quando o evento liga; `("OFF", …)` quando desliga.
+* Enquanto ativo, você pode mapear `a_mag` (ou a componente do eixo) para **velocidade do mouse** (linear, log, ou com curva S), mantendo o threshold só para start/stop.
+
+---
+
+## Valores de partida (bons chutes)
+
+* `alpha = 0.02` (100 Hz → meia-vida \~3/α ≈ 150 amostras ≈ 1.5 s)
+* `k_on = 3.0`, `k_off = 1.5`
+* `debounce_on = debounce_off = 3–5`
+* Janela inicial de 1–3 s para estimar m/MAD
+
+---
+
+Se quiser, te ajudo a **plugar isso** no seu pipeline atual (giroscópio/acelerômetro), já com o mapeamento de “força → velocidade do mouse” e as curvas mais agradáveis (ex.: *softplus* ou *tanh*).
+
+
+
+---
+
+# eu preciso algo bem otimiçado e que não consuma tanto para poder rodar
+# isso no microypthn em um esp32 aj junto com outros codigos
+# emtão preciso algo otimizado mesmo o que me recomenda fazer?
+
+
+Show 👌 agora ficou claro o cenário: **ESP32 + MicroPython + pouco recurso**.
+Isso muda bastante o jogo, porque temos que cortar gordura: nada de `deque`, nada de cálculo pesado tipo `MAD` em janelas grandes, nem floating point demais (apesar do ESP32 ter FPU, fica caro em tempo + energia).
+
+---
+
+## 🎯 Regras de ouro pra rodar leve no ESP32
+
+1. **Use valores inteiros sempre que possível**
+   – Evite `math.sqrt`, `pow`, `abs` em floats.
+   – Trabalhe no **quadrado da magnitude** (`ax²+ay²+az²`) em vez de `sqrt(...)`.
+   – Só normalize se realmente necessário.
+
+2. **Média exponencial simples (EMA) no lugar de estatísticas complexas**
+   – É só uma subtração, multiplicação e soma → baratíssimo.
+   – Substitui bem a média/variância adaptativa.
+   – Fórmula:
+
+   ```python
+   mu = mu + alpha * (x - mu)
+   ```
+
+   – `alpha` pequeno (0.01–0.05).
+
+3. **Threshold fixo ou semi-fixo**
+   – Inicialize em repouso → pegue alguns samples e calcule uma média simples.
+   – Depois defina `thresh_on = mu + delta_on`, `thresh_off = mu + delta_off`.
+   – Isso evita calcular σ (desvio padrão) a cada loop.
+
+4. **Debounce com contadores inteiros**
+   – Só mude o estado se N amostras consecutivas passarem do limite.
+   – Exemplo: `cnt_on >= 3` ativa, `cnt_off >= 3` desativa.
+   – Isso elimina 90% dos falsos eventos sem custo extra.
+
+---
+
+## 🚀 Algoritmo minimalista para MicroPython
+
+```python
+# Configuração
+ALPHA = 0.02          # fator de suavização EMA
+DELTA_ON = 200        # delta para ativar
+DELTA_OFF = 100       # delta para desativar
+DEBOUNCE = 3          # amostras necessárias
+
+# Estado
+mu = 0
+ativo = False
+cnt_on = 0
+cnt_off = 0
+
+def process_sample(ax, ay, az):
+    global mu, ativo, cnt_on, cnt_off
+
+    # usa quadrado da magnitude (evita sqrt)
+    a2 = ax*ax + ay*ay + az*az
+
+    # atualiza média (somente se não estiver ativo)
+    if not ativo:
+        mu = mu + int(ALPHA * (a2 - mu))
+
+    # thresholds relativos à média
+    thresh_on  = mu + DELTA_ON
+    thresh_off = mu + DELTA_OFF
+
+    if not ativo:
+        if a2 > thresh_on:
+            cnt_on += 1
+            if cnt_on >= DEBOUNCE:
+                ativo = True
+                cnt_on = 0
+                return "ON"
+        else:
+            cnt_on = 0
+    else:
+        if a2 < thresh_off:
+            cnt_off += 1
+            if cnt_off >= DEBOUNCE:
+                ativo = False
+                cnt_off = 0
+                return "OFF"
+        else:
+            cnt_off = 0
+
+    return None
+```
+
+---
+
+## 🔧 Ajustes para performance
+
+* Se usar só **um eixo** (`ax`), simplifica ainda mais → só use `x*x`.
+* Pode trocar `int(ALPHA * ...)` por um **shift bitwise** se `ALPHA` for tipo `1/16`.
+  Ex.: `mu += (a2 - mu) >> 4` (super rápido, sem floats).
+* `DELTA_ON` e `DELTA_OFF` devem ser ajustados empiricamente: grave alguns segundos em repouso e veja o valor médio.
+
+---
+
+## 📊 Fluxo sugerido
+
+1. **Inicialização em repouso**
+   – Capture uns 200 samples → defina `mu = média`.
+   – Isso vira a "baseline".
+
+2. **Loop principal**
+   – Calcule `a2` ou `ax*ax`.
+   – Chame `process_sample(...)`.
+   – Se retornar `"ON"`, começa a integrar/usar valor como velocidade do mouse.
+   – Se `"OFF"`, zera movimento.
+
+3. **Mapeamento para mouse**
+   – Enquanto ativo, use `a2 - mu` (ou `ax`) escalonado → define a velocidade.
+   – Multiplique por um ganho ajustável (`k`).
+
+---
+
+👉 Assim você tem:
+
+* **Threshold com histerese** (liga/desliga).
+* **Baratíssimo em CPU/RAM** (inteiros, aritmética simples).
+* Fácil de calibrar.
+
+---
+
+Quer que eu te mostre a versão **super low-cost usando só shift bits (sem float nenhum)**, que é a mais rápida possível pro ESP32?

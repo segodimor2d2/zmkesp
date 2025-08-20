@@ -21,6 +21,7 @@ POT_CALIBRATION_DELAY_MS  = 70   # Delay entre leituras (ms)
 # ============================================================
 # CONFIGURAÇÕES DO GIROSCÓPIO
 # ============================================================
+SAMPLES = 5       # Amostras iniciais do giroscópio
 LIMGYRO       = 14000   # 8000 (sensível) | 20000 (menos sensível)
 THRES_PERCENT  = 0.1     # 0.05 (5%) | 0.2 (20%)
 GY1, GY2       = 1, 0    # Ordem dos eixos: X depois Y
@@ -40,7 +41,6 @@ CYCLE_RESET_LIMIT = 20    # Ciclos parado até resetar stepX/stepY
 # ============================================================
 TSLEEP  = 50      # Delay entre loops (ms)
 TCLEAR  = 10000   # Intervalo para reset de contador
-SAMPLES = 5       # Amostras iniciais do giroscópio
 
 # ============================================================
 # Motor Vib 

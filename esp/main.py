@@ -1,9 +1,8 @@
 import time
 import config
 from hw import init_i2c, init_mpu, init_vibrator, init_pots
-from actions import vibrar
+from actions import vibrar, send_charPs
 from printlogs import log
-from actions import send_charPs
 from dicctozmk import potsgyrotozmk
 from pots import init_pot_globals, calibrate_pots, check_pots
 from gyro import append_gyro, average_and_slide, check_gyro_axis, check_step_wait
@@ -13,14 +12,13 @@ def start(i2c=None, mpu=None, pots=None, vib=None, force_calib=False):
     if i2c is None: i2c = init_i2c()
     if mpu is None: mpu = init_mpu(i2c)
     if vib is None: vib = init_vibrator()
-
     if pots is None: pots = init_pots()
     
     # Inicializa variáveis globais dos potenciômetros
     init_pot_globals(len(pots))
     
     # Calibração de pots
-    calibrate_pots(pots, force_calib)
+    calibrate_pots(pots, vib, force_calib)
 
     # Prepara buffer do gyro
     buffer = [[] for _ in range(6)]
@@ -41,10 +39,10 @@ def start(i2c=None, mpu=None, pots=None, vib=None, force_calib=False):
     stepWaitXP = stepWaitXN = stepWaitYP = stepWaitYN = 0
 
     # Thresholds giroscópio
-    threshP  = config.LIMGYRO - (config.LIMGYRO * config.THRES_PERCENT)
-    threshN  = -config.LIMGYRO + (config.LIMGYRO * config.THRES_PERCENT)
     threshXP = config.LIMGYRO - (config.LIMGYRO * config.THRES_PERCENT)
     threshXN = -config.LIMGYRO + (config.LIMGYRO * config.THRES_PERCENT)
+    threshYP = config.LIMGYRO - (config.LIMGYRO * config.THRES_PERCENT)
+    threshYN = -config.LIMGYRO + (config.LIMGYRO * config.THRES_PERCENT)
 
     gy1, gy2 = config.GY1, config.GY2
 
@@ -61,7 +59,7 @@ def start(i2c=None, mpu=None, pots=None, vib=None, force_calib=False):
 
         # Movimento no eixo Y
         stepY, evntTriggeredYP, evntTriggeredYN, wait2Zero, cycle = check_gyro_axis(
-            gyro, gy2, threshP, threshN, stepY, evntTriggeredYP, evntTriggeredYN, vib, wait2Zero, cycle, invert=config.INVERT_Y
+            gyro, gy2, threshYP, threshYN, stepY, evntTriggeredYP, evntTriggeredYN, vib, wait2Zero, cycle, invert=config.INVERT_Y
         )
 
         # Controle de repetição automática

@@ -3,6 +3,7 @@ import os
 import ujson
 import config
 from printlogs import log
+from actions import vibrar
 
 # Variáveis globais
 baseline = []
@@ -46,7 +47,7 @@ def load_calibration():
     return None, None, None
 
 
-def calibrate_pots(pots, force_new_calib=False):
+def calibrate_pots(pots, vib=None, force_new_calib=False):
     global baseline, press_thresh, release_thresh, pot_counter, triggerPot, pval
     
     num_pots = len(pots)
@@ -58,14 +59,15 @@ def calibrate_pots(pots, force_new_calib=False):
             baseline = loaded_baseline
             press_thresh = loaded_press
             release_thresh = loaded_release
-            log("Calibração carregada do arquivo", 1)
+            log("Calibração carregada do arquivo", 0)
         else:
-            log("Calibração inválida/no arquivo, fazendo nova calibração", 1)
+            log("Calibração inválida/no arquivo, fazendo nova calibração", 0)
             force_new_calib = True
     
     # Se forçado ou se não encontrou calibração válida
     if force_new_calib:
-        log("Calibrando... não toque nos sensores.", 1)
+        vibrar(vib, 4)
+        log("Calibrando... não toque nos sensores.", 0)
         baseline = [0] * num_pots
         press_thresh = [0] * num_pots
         release_thresh = [0] * num_pots
@@ -81,16 +83,17 @@ def calibrate_pots(pots, force_new_calib=False):
         
         # Salva a nova calibração
         save_calibration()
-        log("Nova calibração concluída e salva!", 1)
+        log("Nova calibração concluída e salva!", 0)
+        vibrar(vib, 4)
 
     # Inicializa variáveis de estado
     pot_counter = [0] * num_pots
     triggerPot = [False] * num_pots
     pval = [0] * num_pots
 
-    log("Baseline:       ", baseline, 1)
-    log("Press thresh:   ", press_thresh, 1)
-    log("Release thresh: ", release_thresh, 1)
+    log("Baseline:       ", baseline, 0)
+    log("Press thresh:   ", press_thresh, 0)
+    log("Release thresh: ", release_thresh, 0)
 
 
 def check_pots(pots, abclevel, wait2Zero, cycle):

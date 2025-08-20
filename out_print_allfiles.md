@@ -27,6 +27,7 @@ POT_CALIBRATION_DELAY_MS  = 70   # Delay entre leituras (ms)
 # ============================================================
 # CONFIGURAÇÕES DO GIROSCÓPIO
 # ============================================================
+SAMPLES = 5       # Amostras iniciais do giroscópio
 LIMGYRO       = 14000   # 8000 (sensível) | 20000 (menos sensível)
 THRES_PERCENT  = 0.1     # 0.05 (5%) | 0.2 (20%)
 GY1, GY2       = 1, 0    # Ordem dos eixos: X depois Y
@@ -46,7 +47,6 @@ CYCLE_RESET_LIMIT = 20    # Ciclos parado até resetar stepX/stepY
 # ============================================================
 TSLEEP  = 50      # Delay entre loops (ms)
 TCLEAR  = 10000   # Intervalo para reset de contador
-SAMPLES = 5       # Amostras iniciais do giroscópio
 
 # ============================================================
 # Motor Vib 
@@ -96,6 +96,13 @@ DEBUG = 0
 | Todos os logs                 | DEBUG = None        | Mostra tudo            |
 | Logs sem nível                | DEBUG = -1          | Mostra só os sem nível |
 | Múltiplos níveis (ex: 0,1,2)  | DEBUG = [0, 1, 2]   | Mostra só esses níveis |
+
+
+tstpot(row, col, delay=0.1)
+tstpot(row, col)
+
+start(force_calib=True)
+
 """
 
 
@@ -111,7 +118,7 @@ uart = UART(1, baudrate=115200, tx=17, rx=16)
 
 def send_charPs(zmkcodes):
     if zmkcodes is not None:
-        log('send_charPs', zmkcodes, 1)
+        log('send_charPs', zmkcodes, 4)
         row = zmkcodes[0]
         col = zmkcodes[1]
 
@@ -127,7 +134,7 @@ def send_charPs(zmkcodes):
 
         checksum = event_type ^ row ^ col
         packet = bytes([0xAA, event_type, row, col, checksum])
-        log('packet', packet, 4)
+        log('packet', packet, 5)
         uart.write(packet)
 
 
@@ -226,6 +233,11 @@ def log(*args, **kwargs):
     print(*args, **kwargs)
 
 
+=== ARQUIVO: esp/calib.json ===
+
+{"baseline": [534.05, 500.12, 537.18, 700.06, 574.67, 519.35], "release_thresh": [504.05, 470.12, 507.18, 670.06, 544.67, 489.349984], "press_thresh": [484.05, 450.12, 487.18, 650.06, 524.67, 469.349984]}
+
+
 === ARQUIVO: esp/dicctozmk.py ===
 
 from printlogs import log
@@ -317,7 +329,7 @@ def potsgyrotozmk(abclevel, mapped_i, status, side):
     Traduz (abclevel, gx, gy, status) -> (row, col, status)
     side: 0 = left, 1 = right
     """
-    log(f'{mapped_i}, {abclevel}, {status}, {side}', 0)
+    log(f'{mapped_i}, {abclevel}, {status}, {side}', 4)
     mapping = MAPL if side == 0 else MAPR
     key = (mapped_i, abclevel[0], abclevel[1])
     if key not in mapping:
@@ -389,14 +401,15 @@ def calibrate_pots(pots, force_new_calib=False):
             baseline = loaded_baseline
             press_thresh = loaded_press
             release_thresh = loaded_release
-            log("Calibração carregada do arquivo", 1)
+            log("Calibração carregada do arquivo", 0)
         else:
-            log("Calibração inválida/no arquivo, fazendo nova calibração", 1)
+            log("Calibração inválida/no arquivo, fazendo nova calibração", 0)
             force_new_calib = True
     
     # Se forçado ou se não encontrou calibração válida
     if force_new_calib:
-        log("Calibrando... não toque nos sensores.", 1)
+        vibrar(vib, 4)
+        log("Calibrando... não toque nos sensores.", 0)
         baseline = [0] * num_pots
         press_thresh = [0] * num_pots
         release_thresh = [0] * num_pots
@@ -412,21 +425,24 @@ def calibrate_pots(pots, force_new_calib=False):
         
         # Salva a nova calibração
         save_calibration()
-        log("Nova calibração concluída e salva!", 1)
+        log("Nova calibração concluída e salva!", 0)
+        vibrar(vib, 4)
 
     # Inicializa variáveis de estado
     pot_counter = [0] * num_pots
     triggerPot = [False] * num_pots
     pval = [0] * num_pots
 
-    log("Baseline:       ", baseline, 1)
-    log("Press thresh:   ", press_thresh, 1)
-    log("Release thresh: ", release_thresh, 1)
+    log("Baseline:       ", baseline, 0)
+    log("Press thresh:   ", press_thresh, 0)
+    log("Release thresh: ", release_thresh, 0)
 
 
 def check_pots(pots, abclevel, wait2Zero, cycle):
-    global pval, triggerPot, pot_counter, press_thresh, release_thresh, res_check_pots
-    
+    global pval, triggerPot, pot_counter, press_thresh, release_thresh
+
+    local_res_check_pots = None
+
     for i, pot in enumerate(pots):
         if i >= len(pval):
             log(f"Erro: Índice {i} fora dos limites (max {len(pval)})", 0)
@@ -439,11 +455,9 @@ def check_pots(pots, abclevel, wait2Zero, cycle):
         if not triggerPot[i] and val < press_thresh[i]:
             pot_counter[i] += 1
             if pot_counter[i] >= config.DEBOUNCE_COUNT:
-                from actions import send_charPs
-                from dicctozmk import potsgyrotozmk
                 # send_charPs(potsgyrotozmk(abclevel, mapped_i, 1, config.THIS_IS))
                 # log(f"[POT{mapped_i}] Pressionado | val={val} | abclevel={abclevel}", 3)
-                res_check_pots=[abclevel, mapped_i, 1, config.THIS_IS]
+                local_res_check_pots=[abclevel, mapped_i, 1, config.THIS_IS]
                 triggerPot[i] = True
                 pot_counter[i] = 0
                 wait2Zero = False
@@ -452,11 +466,9 @@ def check_pots(pots, abclevel, wait2Zero, cycle):
         elif triggerPot[i] and val > release_thresh[i]:
             pot_counter[i] += 1
             if pot_counter[i] >= config.DEBOUNCE_COUNT:
-                from actions import send_charPs
-                from dicctozmk import potsgyrotozmk
                 # send_charPs(potsgyrotozmk(abclevel, mapped_i, 0, config.THIS_IS))
                 # log(f"[POT{mapped_i}] Liberado | val={val} | abclevel={abclevel}", 3)
-                res_check_pots=[abclevel, mapped_i, 0, config.THIS_IS]
+                local_res_check_pots=[abclevel, mapped_i, 0, config.THIS_IS]
                 triggerPot[i] = False
                 pot_counter[i] = 0
                 wait2Zero = True
@@ -464,7 +476,7 @@ def check_pots(pots, abclevel, wait2Zero, cycle):
         else:
             pot_counter[i] = 0
 
-    return res_check_pots, wait2Zero, cycle
+    return local_res_check_pots, wait2Zero, cycle
 
 
 === ARQUIVO: esp/gyro.py ===
@@ -597,6 +609,8 @@ import config
 from hw import init_i2c, init_mpu, init_vibrator, init_pots
 from actions import vibrar
 from printlogs import log
+from actions import send_charPs
+from dicctozmk import potsgyrotozmk
 from pots import init_pot_globals, calibrate_pots, check_pots
 from gyro import append_gyro, average_and_slide, check_gyro_axis, check_step_wait
 
@@ -605,7 +619,6 @@ def start(i2c=None, mpu=None, pots=None, vib=None, force_calib=False):
     if i2c is None: i2c = init_i2c()
     if mpu is None: mpu = init_mpu(i2c)
     if vib is None: vib = init_vibrator()
-
     if pots is None: pots = init_pots()
     
     # Inicializa variáveis globais dos potenciômetros
@@ -628,15 +641,15 @@ def start(i2c=None, mpu=None, pots=None, vib=None, force_calib=False):
     evntTriggeredXP = evntTriggeredXN = False
     evntTriggeredYP = evntTriggeredYN = False
     wait2Zero = False
-    res_check_pots = []
+    res_check_pots = None
     cycle = 0
     stepWaitXP = stepWaitXN = stepWaitYP = stepWaitYN = 0
 
     # Thresholds giroscópio
-    threshP  = config.LIMGYRO - (config.LIMGYRO * config.THRES_PERCENT)
-    threshN  = -config.LIMGYRO + (config.LIMGYRO * config.THRES_PERCENT)
     threshXP = config.LIMGYRO - (config.LIMGYRO * config.THRES_PERCENT)
     threshXN = -config.LIMGYRO + (config.LIMGYRO * config.THRES_PERCENT)
+    threshYP = config.LIMGYRO - (config.LIMGYRO * config.THRES_PERCENT)
+    threshYN = -config.LIMGYRO + (config.LIMGYRO * config.THRES_PERCENT)
 
     gy1, gy2 = config.GY1, config.GY2
 
@@ -653,7 +666,7 @@ def start(i2c=None, mpu=None, pots=None, vib=None, force_calib=False):
 
         # Movimento no eixo Y
         stepY, evntTriggeredYP, evntTriggeredYN, wait2Zero, cycle = check_gyro_axis(
-            gyro, gy2, threshP, threshN, stepY, evntTriggeredYP, evntTriggeredYN, vib, wait2Zero, cycle, invert=config.INVERT_Y
+            gyro, gy2, threshYP, threshYN, stepY, evntTriggeredYP, evntTriggeredYN, vib, wait2Zero, cycle, invert=config.INVERT_Y
         )
 
         # Controle de repetição automática
@@ -668,8 +681,13 @@ def start(i2c=None, mpu=None, pots=None, vib=None, force_calib=False):
         # Leitura dos potenciômetros
         abclevel = [stepX, stepY]
         res_check_pots, wait2Zero, cycle = check_pots(pots, abclevel, wait2Zero, cycle)
-        tozmk = potsgyrotozmk(res_check_pots)
-        send_charPs(tozmk)
+
+        # Verifica se há resultado antes de processar
+        if res_check_pots is not None:
+            log(f'potsgyrotozmk {res_check_pots}', 0)
+            tozmk = potsgyrotozmk(*res_check_pots)
+            # log(f'send_charPs {tozmk}', 0)
+            send_charPs(tozmk)
 
         # Reset se parado
         if wait2Zero and cycle < config.CYCLE_RESET_LIMIT:

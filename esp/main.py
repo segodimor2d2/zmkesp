@@ -4,7 +4,7 @@ from hw import init_i2c, init_mpu, init_vibrator, init_pots
 from actions import vibrar, send_charPs
 from printlogs import log
 from dicctozmk import potsgyrotozmk
-from pots import init_pot_globals, calibrate_pots, check_pots
+from pots import calibrate_pots, check_pots
 from gyro import append_gyro, average_and_slide, check_gyro_axis, check_step_wait
 
 def start(i2c=None, mpu=None, pots=None, vib=None, force_calib=False):
@@ -13,13 +13,20 @@ def start(i2c=None, mpu=None, pots=None, vib=None, force_calib=False):
     if mpu is None: mpu = init_mpu(i2c)
     if vib is None: vib = init_vibrator()
     if pots is None: pots = init_pots()
-    
-    # Inicializa variáveis globais dos potenciômetros
-    init_pot_globals(len(pots))
-    
-    # Calibração de pots
-    calibrate_pots(pots, vib, force_calib)
 
+    num_pots = len(pots)
+
+    # Inicializa listas locais pots
+    baseline = [0] * num_pots
+    press_thresh = [0] * num_pots
+    release_thresh = [0] * num_pots
+    pot_counter = [0] * num_pots
+    triggerPot = [False] * num_pots
+    pval = [0] * num_pots
+
+    # Calibração de pots
+    calibrate_pots(pots, baseline, press_thresh, release_thresh, pot_counter, triggerPot, pval, vib, force_calib)
+    
     # Prepara buffer do gyro
     buffer = [[] for _ in range(6)]
     for _ in range(config.SAMPLES - 1):
@@ -73,7 +80,11 @@ def start(i2c=None, mpu=None, pots=None, vib=None, force_calib=False):
 
         # Leitura dos potenciômetros
         abclevel = [stepX, stepY]
-        res_check_pots, wait2Zero, cycle = check_pots(pots, abclevel, wait2Zero, cycle)
+
+        res_check_pots, wait2Zero, cycle = check_pots(
+            pots, abclevel, wait2Zero, cycle,
+            pval, triggerPot, pot_counter, press_thresh, release_thresh
+        )
 
         # Verifica se há resultado antes de processar
         if res_check_pots is not None:
@@ -98,5 +109,5 @@ def start(i2c=None, mpu=None, pots=None, vib=None, force_calib=False):
         time.sleep_ms(config.TSLEEP)
 
 if __name__ == "__main__":
-    start(force_calib=True)  # Força nova calibração na inicialização
+    start(force_calib=False)  # Força nova calibração na inicialização
     vibrar(init_vibrator(), 4)

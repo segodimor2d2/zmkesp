@@ -346,6 +346,7 @@ import os
 import ujson
 import config
 from printlogs import log
+from actions import vibrar
 
 # Variáveis globais
 baseline = []
@@ -389,7 +390,7 @@ def load_calibration():
     return None, None, None
 
 
-def calibrate_pots(pots, force_new_calib=False):
+def calibrate_pots(pots, vib=None, force_new_calib=False):
     global baseline, press_thresh, release_thresh, pot_counter, triggerPot, pval
     
     num_pots = len(pots)
@@ -607,9 +608,8 @@ class MPU6050():
 import time
 import config
 from hw import init_i2c, init_mpu, init_vibrator, init_pots
-from actions import vibrar
+from actions import vibrar, send_charPs
 from printlogs import log
-from actions import send_charPs
 from dicctozmk import potsgyrotozmk
 from pots import init_pot_globals, calibrate_pots, check_pots
 from gyro import append_gyro, average_and_slide, check_gyro_axis, check_step_wait
@@ -625,7 +625,7 @@ def start(i2c=None, mpu=None, pots=None, vib=None, force_calib=False):
     init_pot_globals(len(pots))
     
     # Calibração de pots
-    calibrate_pots(pots, force_calib)
+    calibrate_pots(pots, vib, force_calib)
 
     # Prepara buffer do gyro
     buffer = [[] for _ in range(6)]

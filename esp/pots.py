@@ -29,6 +29,57 @@ def load_calibration():
         log(f"Erro ao carregar calibração: {e}", 0)
     return None, None, None
 
+
+def calc_pots_hysteresis(pots, force_new_calib=False):
+
+    """
+    k: multiplicador para ajustar sensibilidade.
+    alpha: fator de suavização para baseline (0.1 = mais rápido para se adaptar).
+    """
+    k = config.SENSIBILIDADE # ex: 3 
+    alpha = config.SUAVIZACAO # ex: 0.1
+    num_pots = len(pots)
+    samples_count = config.SAMPLES_HYSTERESIS   # ex: 100
+    interval_ms = config.TIMEMS_SAMPLES         # ex: 70
+
+    # inicializa baseline com primeira leitura
+    baseline = [pots[i].read() for i in range(num_pots)]
+    soma_dev = [0] * num_pots
+
+    for _ in range(samples_count):
+        for i in range(num_pots):
+            val = pots[i].read()
+            # atualiza baseline suavizado (EMA)
+            baseline[i] = (1 - alpha) * baseline[i] + alpha * val
+            # acumula desvio em relação ao baseline atual
+            soma_dev[i] += abs(val - baseline[i])
+        time.sleep_ms(interval_ms)
+
+    mad = [s / samples_count for s in soma_dev]
+
+    pots_thresh_on  = [baseline[i] - k * mad[i] for i in range(num_pots)]
+    pots_thresh_off = [baseline[i] - (k/2) * mad[i] for i in range(num_pots)]
+
+    return pots_thresh_on, pots_thresh_off
+
+    # if not force_new_calib:
+    #     pass
+    #     # loaded_baseline, loaded_press, loaded_release = load_calibration()
+    #     # if loaded_baseline is not None and len(loaded_baseline) == num_pots:
+    #     #     baseline[:] = loaded_baseline
+    #     #     press_thresh[:] = loaded_press
+    #     #     release_thresh[:] = loaded_release
+    #     #     log("Calibração carregada do arquivo", 0)
+    #     # else:
+    #     #     log("Calibração inválida/no arquivo, fazendo nova calibração", 0)
+    #     #     force_new_calib = True
+    # if force_new_calib:
+    #     log("calibrate_samples... não toque nos sensores.", 0)
+
+
+
+
+
 def calibrate_pots(pots, baseline, press_thresh, release_thresh, pot_counter, triggerPot, pval, vib=None, force_new_calib=False):
     num_pots = len(pots)
     

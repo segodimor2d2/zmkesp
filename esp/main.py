@@ -4,7 +4,7 @@ from hw import init_i2c, init_mpu, init_vibrator, init_pots
 from actions import vibrar, send_charPs
 from printlogs import log
 from dicctozmk import potsgyrotozmk
-from pots import calibrate_pots, check_pots
+from pots import calibrate_pots, check_pots, calc_pots_hysteresis
 from gyro import append_gyro, average_and_slide, check_gyro_axis, check_step_wait
 
 def start(i2c=None, mpu=None, pots=None, vib=None, force_calib=False):
@@ -14,9 +14,18 @@ def start(i2c=None, mpu=None, pots=None, vib=None, force_calib=False):
     if vib is None: vib = init_vibrator()
     if pots is None: pots = init_pots()
 
-    num_pots = len(pots)
+    # Calibração de tudo
+    # - coletar todos os Samples Pots/Gyro/Accel
+    # - achar calc_hysteresis de tudo
+    # - salvar return thresh_on, thresh_off de tudo
+
+    pots_thresh_on, pots_thresh_off = calc_pots_hysteresis(pots, force_new_calib=True)
+    print("Thresholds on:", pots_thresh_on)
+    print("Thresholds off:", pots_thresh_off)
 
     # Inicializa listas locais pots
+    num_pots = len(pots)
+    # ---
     baseline = [0] * num_pots
     press_thresh = [0] * num_pots
     release_thresh = [0] * num_pots
@@ -25,14 +34,17 @@ def start(i2c=None, mpu=None, pots=None, vib=None, force_calib=False):
     pval = [0] * num_pots
 
     # Calibração de pots
-    calibrate_pots(pots, baseline, press_thresh, release_thresh, pot_counter, triggerPot, pval, vib, force_calib)
+    # calibrate_pots(pots, baseline, press_thresh, release_thresh, pot_counter, triggerPot, pval, vib, force_calib)
     
+    """Coleta Samples do config.SAMLPES para Giro e Accel"""
     # Prepara buffer do gyro
     buffer = [[] for _ in range(6)]
     for _ in range(config.SAMPLES - 1):
         append_gyro(buffer, mpu)
         time.sleep_ms(70)
     
+    """Suavisa a Curva do Gyro e Accel calculando madia=average"""
+    # """Lê mais um valor, calcula média e remove o mais antigo (sliding window)"""
     gyro, accl = average_and_slide(buffer, mpu)
 
     # Variáveis de estado
@@ -45,6 +57,7 @@ def start(i2c=None, mpu=None, pots=None, vib=None, force_calib=False):
     cycle = 0
     stepWaitXP = stepWaitXN = stepWaitYP = stepWaitYN = 0
 
+    """Deberia calcular ou chmar os thresholds giroscópio"""
     # Thresholds giroscópio
     threshXP = config.LIMGYRO - (config.LIMGYRO * config.THRES_PERCENT)
     threshXN = -config.LIMGYRO + (config.LIMGYRO * config.THRES_PERCENT)
@@ -57,6 +70,7 @@ def start(i2c=None, mpu=None, pots=None, vib=None, force_calib=False):
 
     # Loop principal
     while True:
+        # """Lê mais um valor, calcula média e remove o mais antigo (sliding window)"""
         gyro, accl = average_and_slide(buffer, mpu)
 
         # Movimento no eixo X
@@ -81,9 +95,16 @@ def start(i2c=None, mpu=None, pots=None, vib=None, force_calib=False):
         # Leitura dos potenciômetros
         abclevel = [stepX, stepY]
 
+        # print(f'pots_thresh_on {pots_thresh_on}')
+        # print(f'press_thresh {press_thresh}')
+        # print(pots_thresh_on, pots_thresh_off)
+        # print(press_thresh, release_thresh)
+
         res_check_pots, wait2Zero, cycle = check_pots(
             pots, abclevel, wait2Zero, cycle,
-            pval, triggerPot, pot_counter, press_thresh, release_thresh
+            pval, triggerPot, pot_counter,
+            # press_thresh, release_thresh
+            pots_thresh_on, pots_thresh_off
         )
 
         # Verifica se há resultado antes de processar
@@ -92,6 +113,7 @@ def start(i2c=None, mpu=None, pots=None, vib=None, force_calib=False):
             tozmk = potsgyrotozmk(*res_check_pots)
             # log(f'send_charPs {tozmk}', 0)
             send_charPs(tozmk)
+            pass
 
         # Reset se parado
         if wait2Zero and cycle < config.CYCLE_RESET_LIMIT:

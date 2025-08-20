@@ -1,14 +1,20 @@
 import machine
 import ubinascii
 
+
 # ============================================================
 # CONFIGURAÇÕES DE TOUCH
 # ============================================================
+SAMPLES_HYSTERESIS = 100
+TIMEMS_SAMPLES = 70
+SENSIBILIDADE = 3
+SUAVIZACAO = 0.1
+DEBOUNCE_COUNT  = 2     # Leituras consecutivas para confirmar toque
+
 CALIB_FILE = "calib.json"
 CALIB_SAMPLES   = 100   # Amostras por canal
 PRESS_OFFSET    = 50    # Quanto abaixo do baseline aciona
 RELEASE_OFFSET  = 30    # Quanto abaixo do baseline libera
-DEBOUNCE_COUNT  = 3     # Leituras consecutivas para confirmar toque
 
 
 # ============================================================

@@ -1,4 +1,23 @@
+$$$$
 
+
+```python
+import machine, time
+
+adc = machine.ADC(machine.Pin(32))
+adc.atten(machine.ADC.ATTN_11DB)
+
+def calc_hysteresis(samples_count=20, k=1.5):
+    samples = [adc.read() for _ in range(samples_count)]
+    baseline = sum(samples) / samples_count
+    mad = sum(abs(x - baseline) for x in samples) / samples_count
+    thresh_on = baseline + k * mad
+    thresh_off = baseline - k * mad
+    return thresh_on, thresh_off
+
+th_on, th_off = calc_hysteresis()
+print("thresh_on:", th_on, "thresh_off:", th_off)
+```
 
 ```python
 accel = read_accel_x()
@@ -69,7 +88,7 @@ https://www.mercadolivre.com.br/20-placa-de-fenolite-cobreado-10x30-cm-p-pcb-pci
 38/2=19.0$ dividir 2m 2 20x30
 
 
-
+$$$$
 
 start(force_calib=True)
 
@@ -1976,3 +1995,428 @@ def process_sample(ax, ay, az):
 ---
 
 Quer que eu te mostre a versão **super low-cost usando só shift bits (sem float nenhum)**, que é a mais rápida possível pro ESP32?
+
+
+
+----
+
+
+Boa! 👌 Você já começou bem o esqueleto.
+Vamos organizar e fechar a função `calc_hysteresis` para que ela:
+
+1. Leia **100 amostras** de cada sensor (`pots[i].read()`), com intervalo de **70ms**.
+2. Calcule **baseline** e **MAD** (*mean absolute deviation*).
+3. Calcule **thresh\_on** e **thresh\_off** com fator `k`.
+4. Retorne listas com os thresholds para todos os sensores.
+
+---
+
+### 🔹 Versão otimizada para ESP32/MicroPython
+
+```python
+import time
+
+def calc_hysteresis(pots, k=3, vib=None):
+    """
+    Calcula baseline, mad, thresh_on e thresh_off para cada sensor em pots.
+    
+    pots: lista de sensores (cada um tem método .read()).
+    k: multiplicador para ajustar sensibilidade.
+    vib: opcional, pode ser usado para vibrar durante calibração.
+    
+    Retorna:
+        thresh_on, thresh_off (listas com um valor por sensor)
+    """
+    num_pots = len(pots)
+    samples_count = config.SAMPLES_HYSTERESIS  # ex: 100
+    interval_ms = config.TIMEMS_SAMPLES        # ex: 70
+
+    # Buffers para armazenar amostras
+    buffers = [[] for _ in range(num_pots)]
+
+    # Coleta de amostras
+    for _ in range(samples_count):
+        for i in range(num_pots):
+            buffers[i].append(pots[i].read())
+        time.sleep_ms(interval_ms)
+
+    thresh_on = [0] * num_pots
+    thresh_off = [0] * num_pots
+
+    # Cálculo por sensor
+    for i in range(num_pots):
+        samples = buffers[i]
+        baseline = sum(samples) / samples_count
+        mad = sum(abs(x - baseline) for x in samples) / samples_count
+        thresh_on[i] = baseline + k * mad
+        thresh_off[i] = baseline - k * mad
+
+    return thresh_on, thresh_off
+```
+
+---
+
+### 🔹 Explicação
+
+* `buffers[i]` guarda as amostras de cada pot.
+* `baseline`: média das amostras (valor de repouso).
+* `mad`: desvio médio absoluto → mede a variação em torno do baseline.
+* `thresh_on/off`: calculados dinamicamente, mais robustos que usar um offset fixo.
+* `k`: ajusta a sensibilidade (ex.: `k=3` → thresholds mais afastados do baseline).
+
+---
+
+### 🔹 Uso
+
+```python
+thresh_on, thresh_off = calc_hysteresis(pots, k=3)
+print("ON:", thresh_on)
+print("OFF:", thresh_off)
+```
+
+---
+
+👉 Isso já está pronto para rodar em **MicroPython no ESP32**.
+Se você quiser, eu posso enxugar ainda mais para **não usar listas de 100 elementos** (que pode ser pesado na RAM), e calcular `baseline` e `mad` **em tempo real** (streaming), sem guardar todos os samples.
+
+Quer que eu faça essa versão mais **econômica em memória** também?
+
+---
+
+
+Show, boa pedida 🙌
+Se você guardar **100 amostras × 6 sensores**, são **600 leituras na RAM** → isso pesa no ESP32 com MicroPython.
+Mas como você só precisa de **baseline** e **MAD**, dá pra calcular isso **online (streaming)** sem guardar tudo.
+
+---
+
+## 🔹 Ideia da versão “econômica em memória”
+
+1. **Baseline** = média simples
+
+   * Pode calcular incrementalmente:
+
+   ```python
+   baseline = soma / N
+   ```
+
+2. **MAD** = média dos desvios absolutos em relação ao baseline
+
+   * Pra não guardar tudo, fazemos em **duas passadas**:
+
+     * **Passada 1** → acumula soma total → calcula baseline.
+     * **Passada 2** → acumula desvios absolutos → calcula MAD.
+
+Isso só usa alguns acumuladores por sensor, sem listas grandes.
+
+---
+
+## 🔹 Código otimizado
+
+```python
+import time
+
+def calc_hysteresis(pots, k=3):
+    """
+    Calcula thresh_on e thresh_off para sensores em tempo real sem buffers grandes.
+    
+    pots: lista de sensores (cada um tem método .read()).
+    k: multiplicador para ajustar sensibilidade.
+    
+    Retorna:
+        thresh_on, thresh_off (listas com um valor por sensor)
+    """
+    num_pots = len(pots)
+    samples_count = config.SAMPLES_HYSTERESIS  # ex: 100
+    interval_ms = config.TIMEMS_SAMPLES        # ex: 70
+
+    # --- Primeira passada: baseline ---
+    soma = [0] * num_pots
+    for _ in range(samples_count):
+        for i in range(num_pots):
+            soma[i] += pots[i].read()
+        time.sleep_ms(interval_ms)
+
+    baseline = [s / samples_count for s in soma]
+
+    # --- Segunda passada: MAD ---
+    soma_dev = [0] * num_pots
+    for _ in range(samples_count):
+        for i in range(num_pots):
+            val = pots[i].read()
+            soma_dev[i] += abs(val - baseline[i])
+        time.sleep_ms(interval_ms)
+
+    mad = [s / samples_count for s in soma_dev]
+
+    # --- Thresholds ---
+    thresh_on  = [baseline[i] + k * mad[i] for i in range(num_pots)]
+    thresh_off = [baseline[i] - k * mad[i] for i in range(num_pots)]
+
+    return thresh_on, thresh_off
+```
+
+---
+
+## 🔹 Diferenças em relação à versão anterior
+
+* Não há buffer de `samples`.
+* Usa apenas **2 vetores auxiliares** (`soma`, `soma_dev`), tamanho = número de sensores (6).
+* A função demora o dobro do tempo, porque faz **duas passadas** de 100 amostras cada (≈ 14s se `70ms × 200`).
+* Muito mais **econômica em RAM**.
+
+---
+
+## 🔹 Possível otimização extra
+
+Se quiser reduzir para **apenas uma passada**:
+
+* Dá pra usar uma **média móvel** e calcular MAD “online”, mas o resultado fica **aproximado**, porque o baseline vai mudando durante as leituras.
+
+---
+
+👉 Quer que eu escreva também essa versão de **apenas uma passada** (mais rápida, mas aproximada), ou prefere manter a precisão da versão de **duas passadas**?
+
+
+
+---
+
+
+
+Boa 👌, então vamos para a versão **apenas uma passada**.
+
+Aqui a ideia é:
+
+* Enquanto coleta as amostras, vamos atualizando **média (baseline)** com **média móvel exponencial (EMA)**.
+* Ao mesmo tempo, acumulamos os desvios absolutos em relação à média corrente → aproximação do **MAD**.
+* No final, calculamos `thresh_on` e `thresh_off`.
+
+Isso elimina a segunda passada e fica **mais rápido**, mas o MAD não é exato (porque baseline ainda estava “se ajustando” no início).
+
+---
+
+## 🔹 Código versão **streaming (1 passada)**
+
+```python
+import time
+
+def calc_hysteresis(pots, k=3, alpha=0.1):
+    """
+    Calcula thresh_on e thresh_off em uma única passada (streaming).
+    
+    pots: lista de sensores (cada um tem método .read()).
+    k: multiplicador para ajustar sensibilidade.
+    alpha: fator de suavização para baseline (0.1 = mais rápido para se adaptar).
+    
+    Retorna:
+        thresh_on, thresh_off (listas com um valor por sensor)
+    """
+    num_pots = len(pots)
+    samples_count = config.SAMPLES_HYSTERESIS   # ex: 100
+    interval_ms = config.TIMEMS_SAMPLES         # ex: 70
+
+    # inicializa baseline com primeira leitura
+    baseline = [pots[i].read() for i in range(num_pots)]
+    soma_dev = [0] * num_pots
+
+    for _ in range(samples_count):
+        for i in range(num_pots):
+            val = pots[i].read()
+            # atualiza baseline suavizado (EMA)
+            baseline[i] = (1 - alpha) * baseline[i] + alpha * val
+            # acumula desvio em relação ao baseline atual
+            soma_dev[i] += abs(val - baseline[i])
+        time.sleep_ms(interval_ms)
+
+    mad = [s / samples_count for s in soma_dev]
+
+    thresh_on  = [baseline[i] + k * mad[i] for i in range(num_pots)]
+    thresh_off = [baseline[i] - k * mad[i] for i in range(num_pots)]
+
+    return thresh_on, thresh_off
+```
+
+---
+
+## 🔹 Diferenças desta versão
+
+* Apenas **uma passada** (tempo total = `samples_count × interval_ms`, metade da versão de 2 passadas).
+* Usa **EMA** (média móvel exponencial) para se adaptar rápido no começo.
+* O `MAD` é **aproximado**, mas suficiente para uso prático em sensores ruidosos.
+* Uso de memória = **mínimo possível** (`baseline` e `soma_dev`, ambos do tamanho = número de sensores).
+
+---
+
+## 🔹 Parâmetros para ajustar
+
+* `k` → controla sensibilidade (maior = thresholds mais afastados).
+* `alpha` → controla quão rápido o baseline se adapta (ex.: `0.1` adapta rápido, `0.01` mais lento e estável).
+
+---
+
+👉 Quer que eu te monte um **comparativo prático** de quando usar:
+
+* versão **2 passadas (precisa, lenta)**
+* versão **1 passada (rápida, aproximada)**
+  no seu caso de ESP32 + touch?
+
+---
+
+
+```python
+def calc_pots_hysteresis(pots, force_new_calib=False):
+
+    PRESS_OFFSET   = 50  # equivalente antigo
+    RELEASE_OFFSET = 30
+    h = RELEASE_OFFSET / PRESS_OFFSET  # 0.6
+
+    alpha = config.SUAVIZACAO          # suavização do baseline (ex: 0.1)
+    num_pots = len(pots)
+    samples_count = config.SAMPLES_HYSTERESIS
+    interval_ms = config.TIMEMS_SAMPLES
+
+    # limites de MAD para evitar thresholds muito colados
+    MAD_MIN = 5
+    MAD_MAX = 50
+
+    # inicializa baseline com primeira leitura
+    baseline = [pots[i].read() for i in range(num_pots)]
+    soma_dev = [0] * num_pots
+
+    for _ in range(samples_count):
+        for i in range(num_pots):
+            val = pots[i].read()
+            baseline[i] = (1 - alpha) * baseline[i] + alpha * val
+            soma_dev[i] += abs(val - baseline[i])
+        time.sleep_ms(interval_ms)
+
+    mad = [max(MAD_MIN, min(s / samples_count, MAD_MAX)) for s in soma_dev]
+
+    # k por canal para aproximar o PRESS_OFFSET antigo
+    k = [PRESS_OFFSET / m for m in mad]
+
+    pots_thresh_on   = [baseline[i] - k[i] * mad[i] for i in range(num_pots)]
+    pots_thresh_off = [baseline[i] - h * k[i] * mad[i] for i in range(num_pots)]
+
+    log("Baseline:       ", baseline, 0)
+    log("Press thresh:   ", pots_thresh_on, 0)
+    log("Release thresh: ", pots_thresh_off, 0)
+
+    # if not force_new_calib:
+    #     pass
+    #     # loaded_baseline, loaded_press, loaded_release = load_calibration()
+    #     # if loaded_baseline is not None and len(loaded_baseline) == num_pots:
+    #     #     baseline[:] = loaded_baseline
+    #     #     press_thresh[:] = loaded_press
+    #     #     release_thresh[:] = loaded_release
+    #     #     log("Calibração carregada do arquivo", 0)
+    #     # else:
+    #     #     log("Calibração inválida/no arquivo, fazendo nova calibração", 0)
+    #     #     force_new_calib = True
+    # if force_new_calib:
+    #     log("calibrate_samples... não toque nos sensores.", 0)
+
+    return pots_thresh_on, pots_thresh_off
+
+```
+
+
+
+Boa 👍. Do jeito que está, você já usa o **MAD (Mean Absolute Deviation)** para adaptar os thresholds ao ruído. Mas dá pra melhorar a robustez do `press_thresh` / `release_thresh` usando algumas técnicas bem conhecidas em instrumentação de sensores:
+
+---
+
+### 1. Usar **percentis** em vez da média do desvio
+
+O MAD pega a média do desvio, mas se o ruído não for bem comportado (picos ocasionais), ele subestima ou superestima.
+
+👉 Melhor: durante a calibração, guarde todas as leituras de cada pot, depois:
+
+```python
+valores = todas_as_amostras[i]
+baseline[i] = median(valores)
+press_thresh[i]   = np.percentile(valores, 1)   # 1% mais baixo
+release_thresh[i] = np.percentile(valores, 5)   # 5% mais baixo
+```
+
+Assim você garante thresholds **estatisticamente abaixo do baseline**, sem ser influenciado por outliers.
+Em microcontrolador sem NumPy, dá pra ordenar a lista e pegar o índice correspondente.
+
+---
+
+### 2. MAD escalonado (mais robusto)
+
+Hoje você faz:
+
+```python
+mad = soma_dev / samples_count
+```
+
+Mas o **MAD “de verdade”** é:
+
+$$
+MAD = median(|x - median(x)|)
+$$
+
+Esse é muito mais resistente a picos do que a média dos desvios.
+Depois, use:
+
+```python
+press_thresh[i]   = baseline[i] - k * mad[i]
+release_thresh[i] = baseline[i] - h * mad[i]
+```
+
+com `h ≈ 0.6 * k` para simular o seu offset 50/30.
+
+---
+
+### 3. Impor limites mínimos/máximos
+
+Se o MAD for muito pequeno (sensor parado, ruído baixo), o threshold vai ficar colado no baseline. Isso causa falsos positivos.
+👉 Defina:
+
+```python
+MAD_MIN = 5   # por ex.
+MAD_MAX = 30  # se quiser limitar sensibilidade
+mad_eff = min(max(mad[i], MAD_MIN), MAD_MAX)
+```
+
+---
+
+### 4. Aprendizado contínuo do baseline
+
+O baseline que você congela na calibração pode “driftar” (aumentar ou cair lentamente).
+👉 Solução: mesmo em tempo real, vá atualizando o baseline com um EMA **lento**:
+
+```python
+baseline[i] = (1 - beta) * baseline[i] + beta * leitura
+```
+
+com `beta` bem pequeno (tipo 0.001).
+Isso mantém o sistema centrado sem perder a sensibilidade ao toque.
+
+---
+
+### 5. Ajuste dinâmico de `k`
+
+Se você quiser aproximar dos offsets antigos (50/30), pode calcular:
+
+```python
+k[i] = PRESS_OFFSET / mad[i]
+h = RELEASE_OFFSET / PRESS_OFFSET
+```
+
+Assim os thresholds são calibrados automaticamente para “valer” 50 e 30 no MAD médio de cada canal.
+
+---
+
+👉 Resumindo:
+
+* **Percentil ou MAD verdadeiro** para estimar ruído (melhor que média).
+* **Clamp mínimo/máximo** para evitar thresholds colados.
+* **Baseline adaptativo lento** para compensar drift.
+* **Ajuste dinâmico de k** se quiser compatibilidade com os offsets antigos.
+
+---
+
+Quer que eu te escreva uma versão da sua `calc_pots_hysteresis` já com **percentil + MAD mínimo** (mais robusta), pronta pra rodar?

@@ -5,45 +5,25 @@ import ubinascii
 # ============================================================
 # CONFIGURAÇÕES DE TOUCH
 # ============================================================
-
-"""
-k: multiplicador para ajustar sensibilidade.
-alpha: fator de suavização para baseline (0.1 = mais rápido para se adaptar).
-"""
-
-SAMPLES_HYSTERESIS = 100
-TIMEMS_SAMPLES = 70
-K_SENSIBILIDADE = 3
-ALPHA_SUAVIZACAO = 0.1
-DEBOUNCE_COUNT  = 2     # Leituras consecutivas para confirmar toque
-
-# limites de MAD para evitar thresholds muito colados
-MAD_MIN = 5
-MAD_MAX = 50
-
 CALIB_FILE = "calib.json"
-CALIB_SAMPLES   = 100   # Amostras por canal
-PRESS_OFFSET    = 50    # Quanto abaixo do baseline aciona
-RELEASE_OFFSET  = 30    # Quanto abaixo do baseline libera
-
-
-# ============================================================
-# CONFIGURAÇÕES DOS POTENCIÔMETROS
-# ============================================================
-POT_CALIBRATION_SAMPLES   = 40   # 20 (rápido) | 100 (preciso)
-POT_CALIBRATION_DELAY_MS  = 70   # Delay entre leituras (ms)
+MAD_MIN = 5 # limites de MAD para evitar thresholds muito colados
+MAD_MAX = 50 # limites de MAD para evitar thresholds muito colados
+SAMPLES_HYSTERESIS = 100 # amostras para calibrar os pots
+TIMEMS_SAMPLES = 70 # tempo para coleta de amostras
+K_SENSIBILIDADE = 3 # k: multiplicador para ajustar sensibilidade.
+ALPHA_SUAVIZACAO = 0.1 # alpha: fator de suavização para baseline (0.1 = mais rápido para se adaptar).
+DEBOUNCE_COUNT  = 2 # Leituras consecutivas para confirmar toque
 
 
 # ============================================================
 # CONFIGURAÇÕES DO GIROSCÓPIO
 # ============================================================
-SAMPLES = 5       # Amostras iniciais do giroscópio
+SAMPLES = 5       # Amostras para suavisar a curva do giroscópio
 LIMGYRO       = 14000   # 8000 (sensível) | 20000 (menos sensível)
 THRES_PERCENT  = 0.1     # 0.05 (5%) | 0.2 (20%)
 GY1, GY2       = 1, 0    # Ordem dos eixos: X depois Y
 INVERT_X       = True    # Inverter sentido do eixo X
-INVERT_Y       = True    # Inverter sentido do eixo Y
-
+INVERT_Y       = False    # Inverter sentido do eixo Y
 
 # ============================================================
 # CONTROLE DE PASSOS / RESET
@@ -58,6 +38,7 @@ CYCLE_RESET_LIMIT = 20    # Ciclos parado até resetar stepX/stepY
 TSLEEP  = 50      # Delay entre loops (ms)
 TCLEAR  = 10000   # Intervalo para reset de contador
 
+
 # ============================================================
 # Motor Vib 
 # ============================================================
@@ -65,6 +46,7 @@ VIBRAR_LIGADO = 150     # 101 default
 VIBRAR_DESLIGADO = 70   # 70 default
 VIBRAR_LONGO = 250      # 200 para step == 0
 VIBRAR_ALERTA = 300     # 300 para step == 1
+
 
 # ============================================================
 # PINAGEM (ESQUERDA E DIREITA)
@@ -76,6 +58,7 @@ PINOS_VIB_R = 26
 PINOS_L = 12,13,14,27,4,33
 INDEX_MAP_L = 0,1,2,4,3,5
 PINOS_VIB_L = 26
+
 
 # ============================================================
 # IDENTIFICAÇÃO DO CHIP / DEFINIÇÃO DO LADO

@@ -1,6 +1,8 @@
+import time
 import config
 from actions import vibrar
 from printlogs import log
+
 
 def append_gyro(buffer, mpuSensor):
     """Adiciona uma leitura ao buffer (6 listas)"""
@@ -13,17 +15,25 @@ def append_gyro(buffer, mpuSensor):
         log("MPU read error:", e, 0)
         return buffer
 
-    keys = ['GyX','GyY','GyZ','AcX','AcY','AcZ']
+    keys = ['GyX', 'GyY', 'GyZ', 'AcX', 'AcY', 'AcZ']
     for i, k in enumerate(keys):
         buffer[i].append(mpuData.get(k, 0))
     return buffer
 
+
+def initial_buffer(buffer, mpu):
+    for _ in range(config.SAMPLES - 1):
+        append_gyro(buffer, mpu)
+        time.sleep_ms(70)
+    return buffer   # <-- fora do loop agora
+
+
 def average_and_slide(buffer, mpuSensor):
     """Lê mais um valor, calcula média e remove o mais antigo (sliding window)"""
-    append_gyro(buffer, mpuSensor)
+    buffer = append_gyro(buffer, mpuSensor)
     averages = []
     for lst in buffer:
-        averages.append(sum(lst)/len(lst) if lst else 0)
+        averages.append(sum(lst) / len(lst) if lst else 0)
     gyro = averages[:3]
     accl = averages[3:6]
     # remove o mais antigo para manter a janela
@@ -32,8 +42,15 @@ def average_and_slide(buffer, mpuSensor):
             lst.pop(0)
     return gyro, accl
 
-def check_gyro_axis(gyro, axis_index, pos_thresh, neg_thresh, step, event_pos, event_neg, vib, wait2Zero, cycle, invert=False):
+
+def check_gyro_axis(gyro, axis_index,
+                    step, event_pos, event_neg, vib, wait2Zero, cycle, invert=False):
     """Verifica giroscópio em um eixo e atualiza estado."""
+
+    # Thresholds giroscópio
+    pos_thresh = config.LIMGYRO - (config.LIMGYRO * config.THRES_PERCENT)
+    neg_thresh = -config.LIMGYRO + (config.LIMGYRO * config.THRES_PERCENT)
+
     if not event_pos and gyro[axis_index] > pos_thresh:
         step += -1 if invert else 1
         vibrar(vib, 1, step)
@@ -56,6 +73,7 @@ def check_gyro_axis(gyro, axis_index, pos_thresh, neg_thresh, step, event_pos, e
 
     return step, event_pos, event_neg, wait2Zero, cycle
 
+
 def check_step_wait(event_triggered, step_wait, step, delta, vib):
     """Controle de espera para repetição automática."""
     step_wait = step_wait + 1 if event_triggered else 0
@@ -66,3 +84,45 @@ def check_step_wait(event_triggered, step_wait, step, delta, vib):
         step_wait = 0
     return step_wait, step
 
+
+def gyro_principal(
+    gyro, gy1, gy2,
+    stepX, stepY,
+    evntTriggeredXP, evntTriggeredXN,
+    evntTriggeredYP, evntTriggeredYN,
+    stepWaitXP, stepWaitXN, stepWaitYP, stepWaitYN,
+    vib, wait2Zero, cycle
+):
+    # Movimento no eixo X
+    stepX, evntTriggeredXP, evntTriggeredXN, wait2Zero, cycle = check_gyro_axis(
+        gyro, gy1, stepX,
+        evntTriggeredXP,
+        evntTriggeredXN,
+        vib, wait2Zero, cycle, invert=config.INVERT_X
+    )
+
+    # Movimento no eixo Y
+    stepY, evntTriggeredYP, evntTriggeredYN, wait2Zero, cycle = check_gyro_axis(
+        gyro, gy2, stepY,
+        evntTriggeredYP,
+        evntTriggeredYN,
+        vib, wait2Zero, cycle, invert=config.INVERT_Y
+    )
+
+    # Controle de repetição automática
+    invX = -1 if config.INVERT_X else 1
+    invY = -1 if config.INVERT_Y else 1
+
+    stepWaitXP, stepX = check_step_wait(evntTriggeredXP, stepWaitXP, stepX, invX * (1 if gy1 == 0 else -1), vib)
+    stepWaitXN, stepX = check_step_wait(evntTriggeredXN, stepWaitXN, stepX, invX * (-1 if gy1 == 0 else 1), vib)
+    stepWaitYP, stepY = check_step_wait(evntTriggeredYP, stepWaitYP, stepY, invY * (-1 if gy1 == 0 else 1), vib)
+    stepWaitYN, stepY = check_step_wait(evntTriggeredYN, stepWaitYN, stepY, invY * (1 if gy1 == 0 else -1), vib)
+
+
+    return (
+        stepX, stepY,
+        evntTriggeredXP, evntTriggeredXN,
+        evntTriggeredYP, evntTriggeredYN,
+        stepWaitXP, stepWaitXN, stepWaitYP, stepWaitYN,
+        wait2Zero, cycle
+    )

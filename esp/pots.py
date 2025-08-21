@@ -1,14 +1,20 @@
 import config
 from printlogs import log
 
-def check_pots(pots, abclevel, wait2Zero, cycle, pval, triggerPot, pot_counter, press_thresh, release_thresh):
+
+def check_pots(
+    pots, abclevel, pval,
+    wait2Zero, cycle,
+    triggerPot, pot_counter,
+    press_thresh, release_thresh
+):
     local_res_check_pots = None
 
     for i, pot in enumerate(pots):
         if i >= len(pval):
             log(f"Erro: Índice {i} fora dos limites (max {len(pval)})", 0)
             continue
-            
+
         val = pot.read()
         pval[i] = val
         mapped_i = config.INDEX_MAP_POTS[i]

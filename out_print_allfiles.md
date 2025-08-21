@@ -7,33 +7,29 @@
 import machine
 import ubinascii
 
+
 # ============================================================
 # CONFIGURAÇÕES DE TOUCH
 # ============================================================
 CALIB_FILE = "calib.json"
-CALIB_SAMPLES   = 100   # Amostras por canal
-PRESS_OFFSET    = 50    # Quanto abaixo do baseline aciona
-RELEASE_OFFSET  = 30    # Quanto abaixo do baseline libera
-DEBOUNCE_COUNT  = 3     # Leituras consecutivas para confirmar toque
-
-
-# ============================================================
-# CONFIGURAÇÕES DOS POTENCIÔMETROS
-# ============================================================
-POT_CALIBRATION_SAMPLES   = 40   # 20 (rápido) | 100 (preciso)
-POT_CALIBRATION_DELAY_MS  = 70   # Delay entre leituras (ms)
+MAD_MIN = 5 # limites de MAD para evitar thresholds muito colados
+MAD_MAX = 50 # limites de MAD para evitar thresholds muito colados
+SAMPLES_HYSTERESIS = 100 # amostras para calibrar os pots
+TIMEMS_SAMPLES = 70 # tempo para coleta de amostras
+K_SENSIBILIDADE = 3 # k: multiplicador para ajustar sensibilidade.
+ALPHA_SUAVIZACAO = 0.1 # alpha: fator de suavização para baseline (0.1 = mais rápido para se adaptar).
+DEBOUNCE_COUNT  = 2 # Leituras consecutivas para confirmar toque
 
 
 # ============================================================
 # CONFIGURAÇÕES DO GIROSCÓPIO
 # ============================================================
-SAMPLES = 5       # Amostras iniciais do giroscópio
+SAMPLES = 5       # Amostras para suavisar a curva do giroscópio
 LIMGYRO       = 14000   # 8000 (sensível) | 20000 (menos sensível)
 THRES_PERCENT  = 0.1     # 0.05 (5%) | 0.2 (20%)
 GY1, GY2       = 1, 0    # Ordem dos eixos: X depois Y
 INVERT_X       = True    # Inverter sentido do eixo X
-INVERT_Y       = True    # Inverter sentido do eixo Y
-
+INVERT_Y       = False    # Inverter sentido do eixo Y
 
 # ============================================================
 # CONTROLE DE PASSOS / RESET
@@ -48,6 +44,7 @@ CYCLE_RESET_LIMIT = 20    # Ciclos parado até resetar stepX/stepY
 TSLEEP  = 50      # Delay entre loops (ms)
 TCLEAR  = 10000   # Intervalo para reset de contador
 
+
 # ============================================================
 # Motor Vib 
 # ============================================================
@@ -55,6 +52,7 @@ VIBRAR_LIGADO = 150     # 101 default
 VIBRAR_DESLIGADO = 70   # 70 default
 VIBRAR_LONGO = 250      # 200 para step == 0
 VIBRAR_ALERTA = 300     # 300 para step == 1
+
 
 # ============================================================
 # PINAGEM (ESQUERDA E DIREITA)
@@ -66,6 +64,7 @@ PINOS_VIB_R = 26
 PINOS_L = 12,13,14,27,4,33
 INDEX_MAP_L = 0,1,2,4,3,5
 PINOS_VIB_L = 26
+
 
 # ============================================================
 # IDENTIFICAÇÃO DO CHIP / DEFINIÇÃO DO LADO
@@ -206,7 +205,18 @@ def init_vibrator(pin_no=(pinos_vib)):
     return p
 
 def init_pots(pins=(pinos)):
-    return [TouchPad(Pin(p)) for p in pins]
+    pots = [TouchPad(Pin(p)) for p in pins]
+
+    test_pots = [i for i, p in enumerate(pots) if p.read() < 0]
+    print('test_pots',test_pots)
+
+    if len(test_pots) > 0:
+        log("test_pots erro:", test_pots, 0)
+        # sys.exit("encerrando programa.")
+        # raise SystemExit
+        raise KeyboardInterrupt("Parando programa!")
+
+    return pots
 
 
 
@@ -231,6 +241,97 @@ def log(*args, **kwargs):
         return
     
     print(*args, **kwargs)
+
+
+=== ARQUIVO: esp/calibration.py ===
+
+import time
+import os
+import ujson
+import config
+from printlogs import log
+from actions import vibrar
+
+def save_calibration(baseline, press_thresh, release_thresh):
+    try:
+        calib_data = {
+            'baseline': baseline,
+            'press_thresh': press_thresh,
+            'release_thresh': release_thresh
+        }
+        with open(config.CALIB_FILE, 'w') as f:
+            ujson.dump(calib_data, f)
+        log("Calibração salva com sucesso!", 1)
+    except Exception as e:
+        log(f"Erro ao salvar calibração: {e}", 0)
+
+def load_calibration():
+    try:
+        if config.CALIB_FILE in os.listdir():
+            with open(config.CALIB_FILE, 'r') as f:
+                calib_data = ujson.load(f)
+            log("Calibração carregada do arquivo", 1)
+            return calib_data['baseline'], calib_data['press_thresh'], calib_data['release_thresh']
+    except Exception as e:
+        log(f"Erro ao carregar calibração: {e}", 0)
+    return None, None, None
+
+
+def calc_pots_hysteresis(pots, num_pots, vib, force_calib=False):
+
+    baseline = [0] * num_pots
+    pots_thresh_on = [0] * num_pots
+    pots_thresh_off = [0] * num_pots
+
+    if not force_calib:
+        loaded_baseline, loaded_press, loaded_release = load_calibration()
+        if loaded_baseline is not None and len(loaded_baseline) == num_pots:
+            baseline[:] = loaded_baseline
+            pots_thresh_on[:] = loaded_press
+            pots_thresh_off[:] = loaded_release
+            log("Calibração carregada do arquivo", 0)
+
+            return pots_thresh_on, pots_thresh_off
+
+        else:
+            log("Calibração inválida/no arquivo, fazendo nova calibração", 0)
+            force_calib = True
+
+    if force_calib:
+        vibrar(vib, 6)
+        log("calc_pots_hysteresis... nao toque nos sensores.", 0)
+
+        # k: multiplicador para ajustar sensibilidade.
+        k = config.K_SENSIBILIDADE
+        # alpha: fator de suavização para baseline (0.1 = mais rápido para se adaptar).
+        alpha = config.ALPHA_SUAVIZACAO
+
+        samples_count = config.SAMPLES_HYSTERESIS   # ex: 100
+
+        # inicializa baseline com primeira leitura
+        baseline = [pots[i].read() for i in range(num_pots)]
+        soma_dev = [0] * num_pots
+
+        for _ in range(samples_count):
+            for i in range(num_pots):
+                val = pots[i].read()
+                # atualiza baseline suavizado (EMA)
+                baseline[i] = (1 - alpha) * baseline[i] + alpha * val
+                # acumula desvio em relação ao baseline atual
+                soma_dev[i] += abs(val - baseline[i])
+            time.sleep_ms(config.TIMEMS_SAMPLES)
+
+        # mad = [s / samples_count for s in soma_dev]
+        mad = [max(config.MAD_MIN, min(s / samples_count, config.MAD_MAX)) for s in soma_dev]
+
+        pots_thresh_on  = [baseline[i] - k * mad[i] for i in range(num_pots)]
+        pots_thresh_off = [baseline[i] - (k/2) * mad[i] for i in range(num_pots)]
+
+        save_calibration(baseline, pots_thresh_on, pots_thresh_off)
+        log("Nova calibração concluída e salva!", 0)
+        vibrar(vib, 6)
+
+        return pots_thresh_on, pots_thresh_off
 
 
 === ARQUIVO: esp/calib.json ===
@@ -341,114 +442,23 @@ def potsgyrotozmk(abclevel, mapped_i, status, side):
 
 === ARQUIVO: esp/pots.py ===
 
-import time
-import os
-import ujson
 import config
 from printlogs import log
-from actions import vibrar
-
-# Variáveis globais
-baseline = []
-press_thresh = []
-release_thresh = []
-pot_counter = []
-triggerPot = []
-pval = []
-
-def init_pot_globals(num_pots):
-    global baseline, press_thresh, release_thresh, pot_counter, triggerPot, pval
-    baseline = [0] * num_pots
-    press_thresh = [0] * num_pots
-    release_thresh = [0] * num_pots
-    pot_counter = [0] * num_pots
-    triggerPot = [False] * num_pots
-    pval = [0] * num_pots
-
-def save_calibration():
-    try:
-        calib_data = {
-            'baseline': baseline,
-            'press_thresh': press_thresh,
-            'release_thresh': release_thresh
-        }
-        with open(config.CALIB_FILE, 'w') as f:
-            ujson.dump(calib_data, f)
-        log("Calibração salva com sucesso!", 1)
-    except Exception as e:
-        log(f"Erro ao salvar calibração: {e}", 0)
-
-def load_calibration():
-    try:
-        if config.CALIB_FILE in os.listdir():
-            with open(config.CALIB_FILE, 'r') as f:
-                calib_data = ujson.load(f)
-            log("Calibração carregada do arquivo", 1)
-            return calib_data['baseline'], calib_data['press_thresh'], calib_data['release_thresh']
-    except Exception as e:
-        log(f"Erro ao carregar calibração: {e}", 0)
-    return None, None, None
 
 
-def calibrate_pots(pots, vib=None, force_new_calib=False):
-    global baseline, press_thresh, release_thresh, pot_counter, triggerPot, pval
-    
-    num_pots = len(pots)
-    
-    # Tenta carregar calibração existente apenas se não for forçada
-    if not force_new_calib:
-        loaded_baseline, loaded_press, loaded_release = load_calibration()
-        if loaded_baseline is not None and len(loaded_baseline) == num_pots:
-            baseline = loaded_baseline
-            press_thresh = loaded_press
-            release_thresh = loaded_release
-            log("Calibração carregada do arquivo", 0)
-        else:
-            log("Calibração inválida/no arquivo, fazendo nova calibração", 0)
-            force_new_calib = True
-    
-    # Se forçado ou se não encontrou calibração válida
-    if force_new_calib:
-        vibrar(vib, 4)
-        log("Calibrando... não toque nos sensores.", 0)
-        baseline = [0] * num_pots
-        press_thresh = [0] * num_pots
-        release_thresh = [0] * num_pots
-        
-        for i in range(num_pots):
-            soma = 0
-            for _ in range(config.CALIB_SAMPLES):  # Alterado para config.CALIB_SAMPLES
-                soma += pots[i].read()
-                time.sleep_ms(5)
-            baseline[i] = soma / config.CALIB_SAMPLES  # Alterado para config.CALIB_SAMPLES
-            press_thresh[i] = baseline[i] - config.PRESS_OFFSET  # Alterado para config.PRESS_OFFSET
-            release_thresh[i] = baseline[i] - config.RELEASE_OFFSET  # Alterado para config.RELEASE_OFFSET
-        
-        # Salva a nova calibração
-        save_calibration()
-        log("Nova calibração concluída e salva!", 0)
-        vibrar(vib, 4)
-
-    # Inicializa variáveis de estado
-    pot_counter = [0] * num_pots
-    triggerPot = [False] * num_pots
-    pval = [0] * num_pots
-
-    log("Baseline:       ", baseline, 0)
-    log("Press thresh:   ", press_thresh, 0)
-    log("Release thresh: ", release_thresh, 0)
-
-
-def check_pots(pots, abclevel, wait2Zero, cycle):
-    global pval, triggerPot, pot_counter, press_thresh, release_thresh
-
+def check_pots(
+    pots, abclevel, pval,
+    wait2Zero, cycle,
+    triggerPot, pot_counter,
+    press_thresh, release_thresh
+):
     local_res_check_pots = None
 
     for i, pot in enumerate(pots):
         if i >= len(pval):
             log(f"Erro: Índice {i} fora dos limites (max {len(pval)})", 0)
             continue
-            
+
         val = pot.read()
         pval[i] = val
         mapped_i = config.INDEX_MAP_POTS[i]
@@ -456,9 +466,7 @@ def check_pots(pots, abclevel, wait2Zero, cycle):
         if not triggerPot[i] and val < press_thresh[i]:
             pot_counter[i] += 1
             if pot_counter[i] >= config.DEBOUNCE_COUNT:
-                # send_charPs(potsgyrotozmk(abclevel, mapped_i, 1, config.THIS_IS))
-                # log(f"[POT{mapped_i}] Pressionado | val={val} | abclevel={abclevel}", 3)
-                local_res_check_pots=[abclevel, mapped_i, 1, config.THIS_IS]
+                local_res_check_pots = [abclevel, mapped_i, 1, config.THIS_IS]
                 triggerPot[i] = True
                 pot_counter[i] = 0
                 wait2Zero = False
@@ -467,9 +475,7 @@ def check_pots(pots, abclevel, wait2Zero, cycle):
         elif triggerPot[i] and val > release_thresh[i]:
             pot_counter[i] += 1
             if pot_counter[i] >= config.DEBOUNCE_COUNT:
-                # send_charPs(potsgyrotozmk(abclevel, mapped_i, 0, config.THIS_IS))
-                # log(f"[POT{mapped_i}] Liberado | val={val} | abclevel={abclevel}", 3)
-                local_res_check_pots=[abclevel, mapped_i, 0, config.THIS_IS]
+                local_res_check_pots = [abclevel, mapped_i, 0, config.THIS_IS]
                 triggerPot[i] = False
                 pot_counter[i] = 0
                 wait2Zero = True
@@ -482,9 +488,11 @@ def check_pots(pots, abclevel, wait2Zero, cycle):
 
 === ARQUIVO: esp/gyro.py ===
 
+import time
 import config
 from actions import vibrar
 from printlogs import log
+
 
 def append_gyro(buffer, mpuSensor):
     """Adiciona uma leitura ao buffer (6 listas)"""
@@ -497,17 +505,25 @@ def append_gyro(buffer, mpuSensor):
         log("MPU read error:", e, 0)
         return buffer
 
-    keys = ['GyX','GyY','GyZ','AcX','AcY','AcZ']
+    keys = ['GyX', 'GyY', 'GyZ', 'AcX', 'AcY', 'AcZ']
     for i, k in enumerate(keys):
         buffer[i].append(mpuData.get(k, 0))
     return buffer
 
+
+def initial_buffer(buffer, mpu):
+    for _ in range(config.SAMPLES - 1):
+        append_gyro(buffer, mpu)
+        time.sleep_ms(70)
+    return buffer   # <-- fora do loop agora
+
+
 def average_and_slide(buffer, mpuSensor):
     """Lê mais um valor, calcula média e remove o mais antigo (sliding window)"""
-    append_gyro(buffer, mpuSensor)
+    buffer = append_gyro(buffer, mpuSensor)
     averages = []
     for lst in buffer:
-        averages.append(sum(lst)/len(lst) if lst else 0)
+        averages.append(sum(lst) / len(lst) if lst else 0)
     gyro = averages[:3]
     accl = averages[3:6]
     # remove o mais antigo para manter a janela
@@ -516,8 +532,15 @@ def average_and_slide(buffer, mpuSensor):
             lst.pop(0)
     return gyro, accl
 
-def check_gyro_axis(gyro, axis_index, pos_thresh, neg_thresh, step, event_pos, event_neg, vib, wait2Zero, cycle, invert=False):
+
+def check_gyro_axis(gyro, axis_index,
+                    step, event_pos, event_neg, vib, wait2Zero, cycle, invert=False):
     """Verifica giroscópio em um eixo e atualiza estado."""
+
+    # Thresholds giroscópio
+    pos_thresh = config.LIMGYRO - (config.LIMGYRO * config.THRES_PERCENT)
+    neg_thresh = -config.LIMGYRO + (config.LIMGYRO * config.THRES_PERCENT)
+
     if not event_pos and gyro[axis_index] > pos_thresh:
         step += -1 if invert else 1
         vibrar(vib, 1, step)
@@ -540,6 +563,7 @@ def check_gyro_axis(gyro, axis_index, pos_thresh, neg_thresh, step, event_pos, e
 
     return step, event_pos, event_neg, wait2Zero, cycle
 
+
 def check_step_wait(event_triggered, step_wait, step, delta, vib):
     """Controle de espera para repetição automática."""
     step_wait = step_wait + 1 if event_triggered else 0
@@ -550,6 +574,48 @@ def check_step_wait(event_triggered, step_wait, step, delta, vib):
         step_wait = 0
     return step_wait, step
 
+
+def gyro_principal(
+    gyro, gy1, gy2,
+    stepX, stepY,
+    evntTriggeredXP, evntTriggeredXN,
+    evntTriggeredYP, evntTriggeredYN,
+    stepWaitXP, stepWaitXN, stepWaitYP, stepWaitYN,
+    vib, wait2Zero, cycle
+):
+    # Movimento no eixo X
+    stepX, evntTriggeredXP, evntTriggeredXN, wait2Zero, cycle = check_gyro_axis(
+        gyro, gy1, stepX,
+        evntTriggeredXP,
+        evntTriggeredXN,
+        vib, wait2Zero, cycle, invert=config.INVERT_X
+    )
+
+    # Movimento no eixo Y
+    stepY, evntTriggeredYP, evntTriggeredYN, wait2Zero, cycle = check_gyro_axis(
+        gyro, gy2, stepY,
+        evntTriggeredYP,
+        evntTriggeredYN,
+        vib, wait2Zero, cycle, invert=config.INVERT_Y
+    )
+
+    # Controle de repetição automática
+    invX = -1 if config.INVERT_X else 1
+    invY = -1 if config.INVERT_Y else 1
+
+    stepWaitXP, stepX = check_step_wait(evntTriggeredXP, stepWaitXP, stepX, invX * (1 if gy1 == 0 else -1), vib)
+    stepWaitXN, stepX = check_step_wait(evntTriggeredXN, stepWaitXN, stepX, invX * (-1 if gy1 == 0 else 1), vib)
+    stepWaitYP, stepY = check_step_wait(evntTriggeredYP, stepWaitYP, stepY, invY * (-1 if gy1 == 0 else 1), vib)
+    stepWaitYN, stepY = check_step_wait(evntTriggeredYN, stepWaitYN, stepY, invY * (1 if gy1 == 0 else -1), vib)
+
+
+    return (
+        stepX, stepY,
+        evntTriggeredXP, evntTriggeredXN,
+        evntTriggeredYP, evntTriggeredYN,
+        stepWaitXP, stepWaitXN, stepWaitYP, stepWaitYN,
+        wait2Zero, cycle
+    )
 
 
 === ARQUIVO: esp/mpu6050.py ===
@@ -611,8 +677,9 @@ from hw import init_i2c, init_mpu, init_vibrator, init_pots
 from actions import vibrar, send_charPs
 from printlogs import log
 from dicctozmk import potsgyrotozmk
-from pots import init_pot_globals, calibrate_pots, check_pots
-from gyro import append_gyro, average_and_slide, check_gyro_axis, check_step_wait
+from calibration import calc_pots_hysteresis
+from pots import check_pots
+from gyro import initial_buffer, average_and_slide, gyro_principal
 
 def start(i2c=None, mpu=None, pots=None, vib=None, force_calib=False):
     # Inicializa hardware se não passado
@@ -620,36 +687,29 @@ def start(i2c=None, mpu=None, pots=None, vib=None, force_calib=False):
     if mpu is None: mpu = init_mpu(i2c)
     if vib is None: vib = init_vibrator()
     if pots is None: pots = init_pots()
-    
-    # Inicializa variáveis globais dos potenciômetros
-    init_pot_globals(len(pots))
-    
-    # Calibração de pots
-    calibrate_pots(pots, vib, force_calib)
+
+    # Inicializa listas locais pots
+    num_pots = len(pots)
+    pot_counter = [0] * num_pots
+    triggerPot = [False] * num_pots
+    pval = [0] * num_pots
+
+    # Calcula thresholds de histerese
+    pots_thresh_on, pots_thresh_off = calc_pots_hysteresis(pots, num_pots, vib, force_calib)
+    print("Thresholds on:", pots_thresh_on)
+    print("Thresholds off:", pots_thresh_off)
 
     # Prepara buffer do gyro
     buffer = [[] for _ in range(6)]
-    for _ in range(config.SAMPLES - 1):
-        append_gyro(buffer, mpu)
-        time.sleep_ms(70)
-    
+    buffer = initial_buffer(buffer, mpu)
     gyro, accl = average_and_slide(buffer, mpu)
 
     # Variáveis de estado
-    num = 0
-    stepX = stepY = 0
-    evntTriggeredXP = evntTriggeredXN = False
-    evntTriggeredYP = evntTriggeredYN = False
-    wait2Zero = False
-    res_check_pots = None
-    cycle = 0
+    evntTriggeredXP = evntTriggeredXN = evntTriggeredYP = evntTriggeredYN = False
     stepWaitXP = stepWaitXN = stepWaitYP = stepWaitYN = 0
-
-    # Thresholds giroscópio
-    threshXP = config.LIMGYRO - (config.LIMGYRO * config.THRES_PERCENT)
-    threshXN = -config.LIMGYRO + (config.LIMGYRO * config.THRES_PERCENT)
-    threshYP = config.LIMGYRO - (config.LIMGYRO * config.THRES_PERCENT)
-    threshYN = -config.LIMGYRO + (config.LIMGYRO * config.THRES_PERCENT)
+    stepX = stepY = num = cycle = 0
+    res_check_pots = None
+    wait2Zero = False
 
     gy1, gy2 = config.GY1, config.GY2
 
@@ -657,37 +717,43 @@ def start(i2c=None, mpu=None, pots=None, vib=None, force_calib=False):
 
     # Loop principal
     while True:
+        # Lê mais um valor, calcula média e remove o mais antigo (sliding window)
         gyro, accl = average_and_slide(buffer, mpu)
 
-        # Movimento no eixo X
-        stepX, evntTriggeredXP, evntTriggeredXN, wait2Zero, cycle = check_gyro_axis(
-            gyro, gy1, threshXP, threshXN, stepX, evntTriggeredXP, evntTriggeredXN, vib, wait2Zero, cycle, invert=config.INVERT_X
+        (
+            stepX, stepY,
+            evntTriggeredXP, evntTriggeredXN,
+            evntTriggeredYP, evntTriggeredYN,
+            stepWaitXP, stepWaitXN, stepWaitYP, stepWaitYN,
+            wait2Zero, cycle,
+        ) = gyro_principal(
+            gyro, gy1, gy2,
+            stepX, stepY,
+            evntTriggeredXP, evntTriggeredXN,
+            evntTriggeredYP, evntTriggeredYN,
+            stepWaitXP, stepWaitXN, stepWaitYP, stepWaitYN,
+            vib, wait2Zero, cycle,
         )
-
-        # Movimento no eixo Y
-        stepY, evntTriggeredYP, evntTriggeredYN, wait2Zero, cycle = check_gyro_axis(
-            gyro, gy2, threshYP, threshYN, stepY, evntTriggeredYP, evntTriggeredYN, vib, wait2Zero, cycle, invert=config.INVERT_Y
-        )
-
-        # Controle de repetição automática
-        invX = -1 if config.INVERT_X else 1
-        invY = -1 if config.INVERT_Y else 1
-
-        stepWaitXP, stepX = check_step_wait(evntTriggeredXP, stepWaitXP, stepX, invX * (1 if gy1 == 0 else -1), vib)
-        stepWaitXN, stepX = check_step_wait(evntTriggeredXN, stepWaitXN, stepX, invX * (-1 if gy1 == 0 else 1), vib)
-        stepWaitYP, stepY = check_step_wait(evntTriggeredYP, stepWaitYP, stepY, invY * (-1 if gy1 == 0 else 1), vib)
-        stepWaitYN, stepY = check_step_wait(evntTriggeredYN, stepWaitYN, stepY, invY * (1 if gy1 == 0 else -1), vib)
 
         # Leitura dos potenciômetros
         abclevel = [stepX, stepY]
-        res_check_pots, wait2Zero, cycle = check_pots(pots, abclevel, wait2Zero, cycle)
+
+        (
+            res_check_pots, wait2Zero, cycle,
+        ) = check_pots(
+            pots, abclevel, pval,
+            wait2Zero, cycle,
+            triggerPot, pot_counter,
+            pots_thresh_on, pots_thresh_off,
+        )
 
         # Verifica se há resultado antes de processar
         if res_check_pots is not None:
-            log(f'potsgyrotozmk {res_check_pots}', 0)
+            log(f"potsgyrotozmk {res_check_pots}", 0)
             tozmk = potsgyrotozmk(*res_check_pots)
             # log(f'send_charPs {tozmk}', 0)
             send_charPs(tozmk)
+            pass
 
         # Reset se parado
         if wait2Zero and cycle < config.CYCLE_RESET_LIMIT:
@@ -704,6 +770,7 @@ def start(i2c=None, mpu=None, pots=None, vib=None, force_calib=False):
         num += 1
         time.sleep_ms(config.TSLEEP)
 
+
 if __name__ == "__main__":
-    start(force_calib=True)  # Força nova calibração na inicialização
+    start(force_calib=False)
     vibrar(init_vibrator(), 4)

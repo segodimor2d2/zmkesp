@@ -95,9 +95,12 @@ start(force_calib=True)
 # ESP
 mpremote fs ls
 
+mpremote repl
+
+mpremote exec "raise KeyboardInterrupt"
+mpremote kill
 mpremote reset
 mpremote exec "import machine; machine.reset()"
-
 mpremote exec ""
 
 mpremote connect /dev/ttyUSB0 
@@ -105,13 +108,13 @@ mpremote connect /dev/ttyUSB0
 mpremote connect /dev/ttyUSB0 fs cp esp/config.py :config.py
 mpremote connect /dev/ttyUSB0 fs cp esp/main.py :main.py
 
+mpremote connect /dev/ttyUSB0 fs cp esp/gyro.py :gyro.py
+mpremote connect /dev/ttyUSB0 fs cp esp/pots.py :pots.py
 mpremote connect /dev/ttyUSB0 fs cp esp/actions.py :actions.py
 mpremote connect /dev/ttyUSB0 fs cp esp/dicctozmk.py :dicctozmk.py
 mpremote connect /dev/ttyUSB0 fs cp esp/hw.py :hw.py
 mpremote connect /dev/ttyUSB0 fs cp esp/calibration.py :calibration.py
-mpremote connect /dev/ttyUSB0 fs cp esp/pots.py :pots.py
 
-mpremote connect /dev/ttyUSB0 fs cp esp/gyro.py :gyro.py
 mpremote connect /dev/ttyUSB0 fs cp esp/mpu6050.py :mpu6050.py
 mpremote connect /dev/ttyUSB0 fs cp esp/printlogs.py :printlogs.py
 

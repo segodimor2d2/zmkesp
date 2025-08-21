@@ -4,9 +4,9 @@ from hw import init_i2c, init_mpu, init_vibrator, init_pots
 from actions import vibrar, send_charPs
 from printlogs import log
 from dicctozmk import potsgyrotozmk
-from calibration import calibrate_pots, calc_pots_hysteresis
+from calibration import calc_pots_hysteresis
 from pots import check_pots
-from gyro import append_gyro, average_and_slide, check_gyro_axis, check_step_wait
+from gyro import initial_buffer, average_and_slide, gyro_principal
 
 def start(i2c=None, mpu=None, pots=None, vib=None, force_calib=False):
     # Inicializa hardware se não passado
@@ -15,49 +15,28 @@ def start(i2c=None, mpu=None, pots=None, vib=None, force_calib=False):
     if vib is None: vib = init_vibrator()
     if pots is None: pots = init_pots()
 
-    # Calibração de tudo
-    # - coletar todos os Samples Pots/Gyro/Accel
-    # - achar calc_hysteresis de tudo
-    # - salvar return thresh_on, thresh_off de tudo
-
     # Inicializa listas locais pots
     num_pots = len(pots)
     pot_counter = [0] * num_pots
     triggerPot = [False] * num_pots
     pval = [0] * num_pots
 
+    # Calcula thresholds de histerese
     pots_thresh_on, pots_thresh_off = calc_pots_hysteresis(pots, num_pots, vib, force_calib)
-
     print("Thresholds on:", pots_thresh_on)
     print("Thresholds off:", pots_thresh_off)
 
-    """Coleta Samples do config.SAMLPES para Giro e Accel"""
     # Prepara buffer do gyro
     buffer = [[] for _ in range(6)]
-    for _ in range(config.SAMPLES - 1):
-        append_gyro(buffer, mpu)
-        time.sleep_ms(70)
-    
-    """Suavisa a Curva do Gyro e Accel calculando madia=average"""
-    # """Lê mais um valor, calcula média e remove o mais antigo (sliding window)"""
+    buffer = initial_buffer(buffer, mpu)
     gyro, accl = average_and_slide(buffer, mpu)
 
     # Variáveis de estado
-    num = 0
-    stepX = stepY = 0
-    evntTriggeredXP = evntTriggeredXN = False
-    evntTriggeredYP = evntTriggeredYN = False
-    wait2Zero = False
-    res_check_pots = None
-    cycle = 0
+    evntTriggeredXP = evntTriggeredXN = evntTriggeredYP = evntTriggeredYN = False
     stepWaitXP = stepWaitXN = stepWaitYP = stepWaitYN = 0
-
-    """Deberia calcular ou chmar os thresholds giroscópio"""
-    # Thresholds giroscópio
-    threshXP = config.LIMGYRO - (config.LIMGYRO * config.THRES_PERCENT)
-    threshXN = -config.LIMGYRO + (config.LIMGYRO * config.THRES_PERCENT)
-    threshYP = config.LIMGYRO - (config.LIMGYRO * config.THRES_PERCENT)
-    threshYN = -config.LIMGYRO + (config.LIMGYRO * config.THRES_PERCENT)
+    stepX = stepY = num = cycle = 0
+    res_check_pots = None
+    wait2Zero = False
 
     gy1, gy2 = config.GY1, config.GY2
 
@@ -65,49 +44,42 @@ def start(i2c=None, mpu=None, pots=None, vib=None, force_calib=False):
 
     # Loop principal
     while True:
-        # """Lê mais um valor, calcula média e remove o mais antigo (sliding window)"""
+        # Lê mais um valor, calcula média e remove o mais antigo (sliding window)
         gyro, accl = average_and_slide(buffer, mpu)
 
-        # Movimento no eixo X
-        stepX, evntTriggeredXP, evntTriggeredXN, wait2Zero, cycle = check_gyro_axis(
-            gyro, gy1, threshXP, threshXN, stepX, evntTriggeredXP, evntTriggeredXN, vib, wait2Zero, cycle, invert=config.INVERT_X
+        (
+            stepX, stepY,
+            evntTriggeredXP, evntTriggeredXN,
+            evntTriggeredYP, evntTriggeredYN,
+            stepWaitXP, stepWaitXN, stepWaitYP, stepWaitYN,
+            wait2Zero, cycle,
+        ) = gyro_principal(
+            gyro, gy1, gy2,
+            stepX, stepY,
+            evntTriggeredXP, evntTriggeredXN,
+            evntTriggeredYP, evntTriggeredYN,
+            stepWaitXP, stepWaitXN, stepWaitYP, stepWaitYN,
+            vib, wait2Zero, cycle,
         )
-
-        # Movimento no eixo Y
-        stepY, evntTriggeredYP, evntTriggeredYN, wait2Zero, cycle = check_gyro_axis(
-            gyro, gy2, threshYP, threshYN, stepY, evntTriggeredYP, evntTriggeredYN, vib, wait2Zero, cycle, invert=config.INVERT_Y
-        )
-
-        # Controle de repetição automática
-        invX = -1 if config.INVERT_X else 1
-        invY = -1 if config.INVERT_Y else 1
-
-        stepWaitXP, stepX = check_step_wait(evntTriggeredXP, stepWaitXP, stepX, invX * (1 if gy1 == 0 else -1), vib)
-        stepWaitXN, stepX = check_step_wait(evntTriggeredXN, stepWaitXN, stepX, invX * (-1 if gy1 == 0 else 1), vib)
-        stepWaitYP, stepY = check_step_wait(evntTriggeredYP, stepWaitYP, stepY, invY * (-1 if gy1 == 0 else 1), vib)
-        stepWaitYN, stepY = check_step_wait(evntTriggeredYN, stepWaitYN, stepY, invY * (1 if gy1 == 0 else -1), vib)
 
         # Leitura dos potenciômetros
         abclevel = [stepX, stepY]
 
-        # print(f'pots_thresh_on {pots_thresh_on}')
-        # print(f'press_thresh {press_thresh}')
-        # print(pots_thresh_on, pots_thresh_off)
-        # print(press_thresh, release_thresh)
-
-        res_check_pots, wait2Zero, cycle = check_pots(
-            pots, abclevel, wait2Zero, cycle,
-            pval, triggerPot, pot_counter,
-            # press_thresh, release_thresh
-            pots_thresh_on, pots_thresh_off
+        (
+            res_check_pots, wait2Zero, cycle,
+        ) = check_pots(
+            pots, abclevel, pval,
+            wait2Zero, cycle,
+            triggerPot, pot_counter,
+            pots_thresh_on, pots_thresh_off,
         )
 
         # Verifica se há resultado antes de processar
         if res_check_pots is not None:
-            log(f'potsgyrotozmk {res_check_pots}', 0)
+            log(f"potsgyrotozmk {res_check_pots}", 0)
             tozmk = potsgyrotozmk(*res_check_pots)
             # log(f'send_charPs {tozmk}', 0)
-            # send_charPs(tozmk)
+            send_charPs(tozmk)
             pass
 
         # Reset se parado
@@ -125,6 +97,7 @@ def start(i2c=None, mpu=None, pots=None, vib=None, force_calib=False):
         num += 1
         time.sleep_ms(config.TSLEEP)
 
+
 if __name__ == "__main__":
-    start(force_calib=False)  # Força nova calibração na inicialização
+    start(force_calib=False)
     vibrar(init_vibrator(), 4)

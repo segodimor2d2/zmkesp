@@ -95,18 +95,24 @@ start(force_calib=True)
 # ESP
 mpremote fs ls
 
+mpremote reset
+mpremote exec "import machine; machine.reset()"
+
+mpremote exec ""
+
 mpremote connect /dev/ttyUSB0 
 
-mpremote connect /dev/ttyUSB0 cp esp/config.py :config.py
-mpremote connect /dev/ttyUSB0 cp esp/main.py :main.py
+mpremote connect /dev/ttyUSB0 fs cp esp/config.py :config.py
+mpremote connect /dev/ttyUSB0 fs cp esp/main.py :main.py
 
-mpremote connect /dev/ttyUSB0 cp esp/actions.py :actions.py
-mpremote connect /dev/ttyUSB0 cp esp/dicctozmk.py :dicctozmk.py
-mpremote connect /dev/ttyUSB0 cp esp/hw.py :hw.py
-mpremote connect /dev/ttyUSB0 cp esp/pots.py :pots.py
-mpremote connect /dev/ttyUSB0 cp esp/gyro.py :gyro.py
-mpremote connect /dev/ttyUSB0 cp esp/mpu6050.py :mpu6050.py
-mpremote connect /dev/ttyUSB0 cp esp/printlogs.py :printlogs.py
+mpremote connect /dev/ttyUSB0 fs cp esp/actions.py :actions.py
+mpremote connect /dev/ttyUSB0 fs cp esp/dicctozmk.py :dicctozmk.py
+mpremote connect /dev/ttyUSB0 fs cp esp/hw.py :hw.py
+mpremote connect /dev/ttyUSB0 fs cp esp/pots.py :pots.py
+
+mpremote connect /dev/ttyUSB0 fs cp esp/gyro.py :gyro.py
+mpremote connect /dev/ttyUSB0 fs cp esp/mpu6050.py :mpu6050.py
+mpremote connect /dev/ttyUSB0 fs cp esp/printlogs.py :printlogs.py
 
 
 
@@ -2234,6 +2240,75 @@ def calc_hysteresis(pots, k=3, alpha=0.1):
     thresh_off = [baseline[i] - k * mad[i] for i in range(num_pots)]
 
     return thresh_on, thresh_off
+
+
+
+
+
+
+
+
+
+
+
+
+
+def calc_pots_hysteresis(pots, force_new_calib=False):
+    """
+    Calcula press_thresh e release_thresh para sensores touch.
+    Estratégia otimizada para microcontrolador:
+      - MAD médio (leve)
+      - Limites mínimos/máximos de MAD
+      - Ajuste automático de k para aproximar offsets antigos
+      - Baseline suavizado (EMA)
+    """
+    PRESS_OFFSET   = 50  # equivalente antigo
+    RELEASE_OFFSET = 30
+    h = RELEASE_OFFSET / PRESS_OFFSET  # 0.6
+
+    alpha = config.SUAVIZACAO          # suavização do baseline (ex: 0.1)
+    num_pots = len(pots)
+    samples_count = config.SAMPLES_HYSTERESIS
+    interval_ms = config.TIMEMS_SAMPLES
+
+    # limites de MAD para evitar thresholds muito colados
+    MAD_MIN = 5
+    MAD_MAX = 50
+
+    # inicializa baseline com primeira leitura
+    baseline = [pots[i].read() for i in range(num_pots)]
+    soma_dev = [0] * num_pots
+
+    for _ in range(samples_count):
+        for i in range(num_pots):
+            val = pots[i].read()
+            baseline[i] = (1 - alpha) * baseline[i] + alpha * val
+            soma_dev[i] += abs(val - baseline[i])
+        time.sleep_ms(interval_ms)
+
+    mad = [max(MAD_MIN, min(s / samples_count, MAD_MAX)) for s in soma_dev]
+
+    # k por canal para aproximar o PRESS_OFFSET antigo
+    k = [PRESS_OFFSET / m for m in mad]
+
+    press_thresh   = [baseline[i] - k[i] * mad[i] for i in range(num_pots)]
+    release_thresh = [baseline[i] - h * k[i] * mad[i] for i in range(num_pots)]
+
+    log("Baseline:       ", baseline, 0)
+    log("Press thresh:   ", press_thresh, 0)
+    log("Release thresh: ", release_thresh, 0)
+
+    return press_thresh, release_thresh
+
+
+
+
+
+
+
+
+
+
 ```
 
 ---
@@ -2420,3 +2495,69 @@ Assim os thresholds são calibrados automaticamente para “valer” 50 e 30 no 
 ---
 
 Quer que eu te escreva uma versão da sua `calc_pots_hysteresis` já com **percentil + MAD mínimo** (mais robusta), pronta pra rodar?
+
+
+
+
+
+```python
+
+
+def calc_pots_hysteresis(pots, force_new_calib=False):
+
+    # k: multiplicador para ajustar sensibilidade.
+    k = 3 
+    # alpha: fator de suavização para baseline (0.1 = mais rápido para se adaptar).
+    alpha = 0.1
+    # limites de MAD para evitar thresholds muito colados
+    MAD_MIN = 5
+    MAD_MAX = 50
+
+    num_pots = len(pots)
+    samples_count = 100
+    interval_ms = 70
+
+    # inicializa baseline com primeira leitura
+    baseline = [pots[i].read() for i in range(num_pots)]
+    soma_dev = [0] * num_pots
+
+    for _ in range(samples_count):
+        for i in range(num_pots):
+            val = pots[i].read()
+            # atualiza baseline suavizado (EMA)
+            baseline[i] = (1 - alpha) * baseline[i] + alpha * val
+            # acumula desvio em relação ao baseline atual
+            soma_dev[i] += abs(val - baseline[i])
+        time.sleep_ms(interval_ms)
+
+    mad = [s / samples_count for s in soma_dev]
+    # mad = [max(MAD_MIN, min(s / samples_count, MAD_MAX)) for s in soma_dev]
+
+    pots_thresh_on  = [baseline[i] - k * mad[i] for i in range(num_pots)]
+    pots_thresh_off = [baseline[i] - (k/2) * mad[i] for i in range(num_pots)]
+
+    return pots_thresh_on, pots_thresh_off
+
+
+
+    # k = config.SENSIBILIDADE # ex: 3 
+    # alpha = config.SUAVIZACAO # ex: 0.1
+    # num_pots = len(pots)
+    # samples_count = config.SAMPLES_HYSTERESIS   # ex: 100
+    # interval_ms = config.TIMEMS_SAMPLES         # ex: 70
+
+    # if not force_new_calib:
+    #     pass
+    #     # loaded_baseline, loaded_press, loaded_release = load_calibration()
+    #     # if loaded_baseline is not None and len(loaded_baseline) == num_pots:
+    #     #     baseline[:] = loaded_baseline
+    #     #     press_thresh[:] = loaded_press
+    #     #     release_thresh[:] = loaded_release
+    #     #     log("Calibração carregada do arquivo", 0)
+    #     # else:
+    #     #     log("Calibração inválida/no arquivo, fazendo nova calibração", 0)
+    #     #     force_new_calib = True
+    # if force_new_calib:
+    #     log("calibrate_samples... não toque nos sensores.", 0)
+
+```

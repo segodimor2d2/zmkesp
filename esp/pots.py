@@ -30,54 +30,62 @@ def load_calibration():
     return None, None, None
 
 
-def calc_pots_hysteresis(pots, force_new_calib=False):
+def calc_pots_hysteresis(pots, vib, force_calib=False):
 
-    """
-    k: multiplicador para ajustar sensibilidade.
-    alpha: fator de suavização para baseline (0.1 = mais rápido para se adaptar).
-    """
-    k = config.SENSIBILIDADE # ex: 3 
-    alpha = config.SUAVIZACAO # ex: 0.1
     num_pots = len(pots)
-    samples_count = config.SAMPLES_HYSTERESIS   # ex: 100
-    interval_ms = config.TIMEMS_SAMPLES         # ex: 70
+    baseline = [0] * num_pots
+    pots_thresh_on = [0] * num_pots
+    pots_thresh_off = [0] * num_pots
 
-    # inicializa baseline com primeira leitura
-    baseline = [pots[i].read() for i in range(num_pots)]
-    soma_dev = [0] * num_pots
+    if not force_calib:
+        loaded_baseline, loaded_press, loaded_release = load_calibration()
+        if loaded_baseline is not None and len(loaded_baseline) == num_pots:
+            baseline[:] = loaded_baseline
+            pots_thresh_on[:] = loaded_press
+            pots_thresh_off[:] = loaded_release
+            log("Calibração carregada do arquivo", 0)
 
-    for _ in range(samples_count):
-        for i in range(num_pots):
-            val = pots[i].read()
-            # atualiza baseline suavizado (EMA)
-            baseline[i] = (1 - alpha) * baseline[i] + alpha * val
-            # acumula desvio em relação ao baseline atual
-            soma_dev[i] += abs(val - baseline[i])
-        time.sleep_ms(interval_ms)
+            return pots_thresh_on, pots_thresh_off
 
-    mad = [s / samples_count for s in soma_dev]
+        else:
+            log("Calibração inválida/no arquivo, fazendo nova calibração", 0)
+            force_calib = True
 
-    pots_thresh_on  = [baseline[i] - k * mad[i] for i in range(num_pots)]
-    pots_thresh_off = [baseline[i] - (k/2) * mad[i] for i in range(num_pots)]
+    if force_calib:
+        vibrar(vib, 6)
+        log("calc_pots_hysteresis... nao toque nos sensores.", 0)
 
-    return pots_thresh_on, pots_thresh_off
+        # k: multiplicador para ajustar sensibilidade.
+        k = config.K_SENSIBILIDADE
+        # alpha: fator de suavização para baseline (0.1 = mais rápido para se adaptar).
+        alpha = config.ALPHA_SUAVIZACAO
 
-    # if not force_new_calib:
-    #     pass
-    #     # loaded_baseline, loaded_press, loaded_release = load_calibration()
-    #     # if loaded_baseline is not None and len(loaded_baseline) == num_pots:
-    #     #     baseline[:] = loaded_baseline
-    #     #     press_thresh[:] = loaded_press
-    #     #     release_thresh[:] = loaded_release
-    #     #     log("Calibração carregada do arquivo", 0)
-    #     # else:
-    #     #     log("Calibração inválida/no arquivo, fazendo nova calibração", 0)
-    #     #     force_new_calib = True
-    # if force_new_calib:
-    #     log("calibrate_samples... não toque nos sensores.", 0)
+        samples_count = config.SAMPLES_HYSTERESIS   # ex: 100
 
+        # inicializa baseline com primeira leitura
+        baseline = [pots[i].read() for i in range(num_pots)]
+        soma_dev = [0] * num_pots
 
+        for _ in range(samples_count):
+            for i in range(num_pots):
+                val = pots[i].read()
+                # atualiza baseline suavizado (EMA)
+                baseline[i] = (1 - alpha) * baseline[i] + alpha * val
+                # acumula desvio em relação ao baseline atual
+                soma_dev[i] += abs(val - baseline[i])
+            time.sleep_ms(config.TIMEMS_SAMPLES)
 
+        # mad = [s / samples_count for s in soma_dev]
+        mad = [max(config.MAD_MIN, min(s / samples_count, config.MAD_MAX)) for s in soma_dev]
+
+        pots_thresh_on  = [baseline[i] - k * mad[i] for i in range(num_pots)]
+        pots_thresh_off = [baseline[i] - (k/2) * mad[i] for i in range(num_pots)]
+
+        save_calibration(baseline, pots_thresh_on, pots_thresh_off)
+        log("Nova calibração concluída e salva!", 0)
+        vibrar(vib, 6)
+
+        return pots_thresh_on, pots_thresh_off
 
 
 def calibrate_pots(pots, baseline, press_thresh, release_thresh, pot_counter, triggerPot, pval, vib=None, force_new_calib=False):

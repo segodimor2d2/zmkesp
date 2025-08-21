@@ -19,7 +19,8 @@ def start(i2c=None, mpu=None, pots=None, vib=None, force_calib=False):
     # - achar calc_hysteresis de tudo
     # - salvar return thresh_on, thresh_off de tudo
 
-    pots_thresh_on, pots_thresh_off = calc_pots_hysteresis(pots, force_new_calib=True)
+    pots_thresh_on, pots_thresh_off = calc_pots_hysteresis(pots, vib, force_calib)
+
     print("Thresholds on:", pots_thresh_on)
     print("Thresholds off:", pots_thresh_off)
 
@@ -112,7 +113,7 @@ def start(i2c=None, mpu=None, pots=None, vib=None, force_calib=False):
             log(f'potsgyrotozmk {res_check_pots}', 0)
             tozmk = potsgyrotozmk(*res_check_pots)
             # log(f'send_charPs {tozmk}', 0)
-            send_charPs(tozmk)
+            # send_charPs(tozmk)
             pass
 
         # Reset se parado

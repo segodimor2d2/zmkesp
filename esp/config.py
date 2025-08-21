@@ -5,11 +5,21 @@ import ubinascii
 # ============================================================
 # CONFIGURAÇÕES DE TOUCH
 # ============================================================
+
+"""
+k: multiplicador para ajustar sensibilidade.
+alpha: fator de suavização para baseline (0.1 = mais rápido para se adaptar).
+"""
+
 SAMPLES_HYSTERESIS = 100
 TIMEMS_SAMPLES = 70
-SENSIBILIDADE = 3
-SUAVIZACAO = 0.1
+K_SENSIBILIDADE = 3
+ALPHA_SUAVIZACAO = 0.1
 DEBOUNCE_COUNT  = 2     # Leituras consecutivas para confirmar toque
+
+# limites de MAD para evitar thresholds muito colados
+MAD_MIN = 5
+MAD_MAX = 50
 
 CALIB_FILE = "calib.json"
 CALIB_SAMPLES   = 100   # Amostras por canal

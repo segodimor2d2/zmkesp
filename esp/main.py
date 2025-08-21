@@ -4,7 +4,8 @@ from hw import init_i2c, init_mpu, init_vibrator, init_pots
 from actions import vibrar, send_charPs
 from printlogs import log
 from dicctozmk import potsgyrotozmk
-from pots import calibrate_pots, check_pots, calc_pots_hysteresis
+from calibration import calibrate_pots, calc_pots_hysteresis
+from pots import check_pots
 from gyro import append_gyro, average_and_slide, check_gyro_axis, check_step_wait
 
 def start(i2c=None, mpu=None, pots=None, vib=None, force_calib=False):
@@ -19,24 +20,17 @@ def start(i2c=None, mpu=None, pots=None, vib=None, force_calib=False):
     # - achar calc_hysteresis de tudo
     # - salvar return thresh_on, thresh_off de tudo
 
-    pots_thresh_on, pots_thresh_off = calc_pots_hysteresis(pots, vib, force_calib)
-
-    print("Thresholds on:", pots_thresh_on)
-    print("Thresholds off:", pots_thresh_off)
-
     # Inicializa listas locais pots
     num_pots = len(pots)
-    # ---
-    baseline = [0] * num_pots
-    press_thresh = [0] * num_pots
-    release_thresh = [0] * num_pots
     pot_counter = [0] * num_pots
     triggerPot = [False] * num_pots
     pval = [0] * num_pots
 
-    # Calibração de pots
-    # calibrate_pots(pots, baseline, press_thresh, release_thresh, pot_counter, triggerPot, pval, vib, force_calib)
-    
+    pots_thresh_on, pots_thresh_off = calc_pots_hysteresis(pots, num_pots, vib, force_calib)
+
+    print("Thresholds on:", pots_thresh_on)
+    print("Thresholds off:", pots_thresh_off)
+
     """Coleta Samples do config.SAMLPES para Giro e Accel"""
     # Prepara buffer do gyro
     buffer = [[] for _ in range(6)]

@@ -108,6 +108,7 @@ mpremote connect /dev/ttyUSB0 fs cp esp/main.py :main.py
 mpremote connect /dev/ttyUSB0 fs cp esp/actions.py :actions.py
 mpremote connect /dev/ttyUSB0 fs cp esp/dicctozmk.py :dicctozmk.py
 mpremote connect /dev/ttyUSB0 fs cp esp/hw.py :hw.py
+mpremote connect /dev/ttyUSB0 fs cp esp/calibration.py :calibration.py
 mpremote connect /dev/ttyUSB0 fs cp esp/pots.py :pots.py
 
 mpremote connect /dev/ttyUSB0 fs cp esp/gyro.py :gyro.py

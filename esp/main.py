@@ -5,8 +5,9 @@ from actions import vibrar, send_charPs
 from printlogs import log
 from dicctozmk import potsgyrotozmk
 from calibration import calc_pots_hysteresis
-from pots import check_pots
-from gyro import initial_buffer, average_and_slide, gyro_principal
+from pots import check_pots, PotsState
+from gyro import initial_buffer, average_and_slide, gyro_principal, GyroState
+
 
 def start(i2c=None, mpu=None, pots=None, vib=None, force_calib=False):
     # Inicializa hardware se não passado
@@ -15,14 +16,11 @@ def start(i2c=None, mpu=None, pots=None, vib=None, force_calib=False):
     if vib is None: vib = init_vibrator()
     if pots is None: pots = init_pots()
 
-    # Inicializa listas locais pots
-    num_pots = len(pots)
-    pot_counter = [0] * num_pots
-    triggerPot = [False] * num_pots
-    pval = [0] * num_pots
+    # Estado dos potenciômetros
+    pots_state = PotsState(len(pots))
 
     # Calcula thresholds de histerese
-    pots_thresh_on, pots_thresh_off = calc_pots_hysteresis(pots, num_pots, vib, force_calib)
+    pots_thresh_on, pots_thresh_off = calc_pots_hysteresis(pots, pots_state.num_pots, vib, force_calib)
     print("Thresholds on:", pots_thresh_on)
     print("Thresholds off:", pots_thresh_off)
 
@@ -31,67 +29,43 @@ def start(i2c=None, mpu=None, pots=None, vib=None, force_calib=False):
     buffer = initial_buffer(buffer, mpu)
     gyro, accl = average_and_slide(buffer, mpu)
 
-    # Variáveis de estado
-    evntTriggeredXP = evntTriggeredXN = evntTriggeredYP = evntTriggeredYN = False
-    stepWaitXP = stepWaitXN = stepWaitYP = stepWaitYN = 0
-    stepX = stepY = num = cycle = 0
-    res_check_pots = None
-    wait2Zero = False
+    # Estado do giroscópio
+    gyro_state = GyroState()
 
     gy1, gy2 = config.GY1, config.GY2
-
     vibrar(vib, 2)
 
     # Loop principal
+    num = 0
     while True:
-        # Lê mais um valor, calcula média e remove o mais antigo (sliding window)
         gyro, accl = average_and_slide(buffer, mpu)
 
-        (
-            stepX, stepY,
-            evntTriggeredXP, evntTriggeredXN,
-            evntTriggeredYP, evntTriggeredYN,
-            stepWaitXP, stepWaitXN, stepWaitYP, stepWaitYN,
-            wait2Zero, cycle,
-        ) = gyro_principal(
-            gyro, gy1, gy2,
-            stepX, stepY,
-            evntTriggeredXP, evntTriggeredXN,
-            evntTriggeredYP, evntTriggeredYN,
-            stepWaitXP, stepWaitXN, stepWaitYP, stepWaitYN,
-            vib, wait2Zero, cycle,
-        )
+        # Atualiza giroscópio
+        gyro_state = gyro_principal(gyro, gy1, gy2, vib, gyro_state)
 
-        # Leitura dos potenciômetros
-        abclevel = [stepX, stepY]
-
-        (
-            res_check_pots, wait2Zero, cycle,
-        ) = check_pots(
-            pots, abclevel, pval,
-            wait2Zero, cycle,
-            triggerPot, pot_counter,
+        # Atualiza potenciômetros
+        abclevel = [gyro_state.stepX, gyro_state.stepY]
+        res_check_pots, pots_state = check_pots(
+            pots, abclevel,
             pots_thresh_on, pots_thresh_off,
+            pots_state
         )
 
-        # Verifica se há resultado antes de processar
         if res_check_pots is not None:
             log(f"potsgyrotozmk {res_check_pots}", 0)
-            tozmk = potsgyrotozmk(*res_check_pots)
-            # log(f'send_charPs {tozmk}', 0)
-            send_charPs(tozmk)
-            pass
+            send_charPs(potsgyrotozmk(*res_check_pots))
 
         # Reset se parado
-        if wait2Zero and cycle < config.CYCLE_RESET_LIMIT:
-            cycle += 1
-            if cycle == config.CYCLE_RESET_LIMIT:
-                stepY = stepX = 0
+        if gyro_state.wait2Zero and gyro_state.cycle < config.CYCLE_RESET_LIMIT:
+            gyro_state.cycle += 1
+            if gyro_state.cycle == config.CYCLE_RESET_LIMIT:
+                gyro_state.stepX = gyro_state.stepY = 0
                 vibrar(vib, 2)
                 log("[RESET] StepX e StepY resetados", 2)
-                wait2Zero = False
-                cycle = 0
+                gyro_state.wait2Zero = False
+                gyro_state.cycle = 0
 
+        # Controle de limpeza de log
         if num % config.TCLEAR == 0:
             num = 0
         num += 1

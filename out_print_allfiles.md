@@ -9,6 +9,36 @@ import ubinascii
 
 
 # ============================================================
+# PINAGEM (ESQUERDA E DIREITA)
+# ============================================================
+PINOS_R = 13,12,14,27,4,33
+INDEX_MAP_R = 0,1,2,3,4,5
+PINOS_VIB_R = 26
+
+PINOS_L = 12,13,14,27,4,33
+INDEX_MAP_L = 0,1,2,4,3,5
+PINOS_VIB_L = 26
+
+# ============================================================
+# IDENTIFICAÇÃO DO CHIP / DEFINIÇÃO DO LADO
+# ============================================================
+chip_id = ubinascii.hexlify(machine.unique_id()).decode()
+print("Chip ID:", chip_id)  # Exemplo: '240ac4083456'
+
+# IDs conhecidos dos dois lados
+alesp = '083af27f9c38'
+aresp = '78e36d170944'
+
+# Define se este chip é o lado L (0) ou R (1)
+THIS_IS = 0 if chip_id == alesp else 1
+print("THIS_IS:", THIS_IS)
+
+# INDEX MAP final (depende do lado detectado)
+INDEX_MAP_POTS = list(INDEX_MAP_L if THIS_IS == 0 else INDEX_MAP_R)
+
+
+
+# ============================================================
 # CONFIGURAÇÕES DE TOUCH
 # ============================================================
 CALIB_FILE = "calib.json"
@@ -25,11 +55,14 @@ DEBOUNCE_COUNT  = 2 # Leituras consecutivas para confirmar toque
 # CONFIGURAÇÕES DO GIROSCÓPIO
 # ============================================================
 SAMPLES = 5       # Amostras para suavisar a curva do giroscópio
-LIMGYRO       = 14000   # 8000 (sensível) | 20000 (menos sensível)
-THRES_PERCENT  = 0.1     # 0.05 (5%) | 0.2 (20%)
-GY1, GY2       = 1, 0    # Ordem dos eixos: X depois Y
-INVERT_X       = True    # Inverter sentido do eixo X
-INVERT_Y       = False    # Inverter sentido do eixo Y
+LIMGYRO = 14000   # 8000 (sensível) | 20000 (menos sensível)
+THRES_PERCENT = 0.1     # 0.05 (5%) | 0.2 (20%)
+GY1, GY2 = 1, 0    # Ordem dos eixos: X depois Y
+
+if THIS_IS == 0:
+    INVERT_X, INVERT_Y = False, True  # T,M Inverter sentido do eixo
+else:
+    INVERT_X, INVERT_Y = True, True   # T,M Inverter sentido do eixo
 
 # ============================================================
 # CONTROLE DE PASSOS / RESET
@@ -52,438 +85,6 @@ VIBRAR_LIGADO = 150     # 101 default
 VIBRAR_DESLIGADO = 70   # 70 default
 VIBRAR_LONGO = 250      # 200 para step == 0
 VIBRAR_ALERTA = 300     # 300 para step == 1
-
-
-# ============================================================
-# PINAGEM (ESQUERDA E DIREITA)
-# ============================================================
-PINOS_R = 13,12,14,27,4,33
-INDEX_MAP_R = 0,1,2,3,4,5
-PINOS_VIB_R = 26
-
-PINOS_L = 12,13,14,27,4,33
-INDEX_MAP_L = 0,1,2,4,3,5
-PINOS_VIB_L = 26
-
-
-# ============================================================
-# IDENTIFICAÇÃO DO CHIP / DEFINIÇÃO DO LADO
-# ============================================================
-chip_id = ubinascii.hexlify(machine.unique_id()).decode()
-print("Chip ID:", chip_id)  # Exemplo: '240ac4083456'
-
-# IDs conhecidos dos dois lados
-alesp = '083af27f9c38'
-aresp = '78e36d170944'
-
-# Define se este chip é o lado L (0) ou R (1)
-THIS_IS = 0 if chip_id == alesp else 1
-print("THIS_IS:", THIS_IS)
-
-# INDEX MAP final (depende do lado detectado)
-INDEX_MAP_POTS = list(INDEX_MAP_L if THIS_IS == 0 else INDEX_MAP_R)
-
-
-# ============================================================
-# DEBUG
-# ============================================================
-DEBUG = 0
-"""
-| Você Quer...                  | Configuração        | Comportamento          |
-|-------------------------------|---------------------|------------------------|
-| Só logs de nível X            | DEBUG = X           | Ignora tudo ≠ X        |
-| Todos os logs                 | DEBUG = None        | Mostra tudo            |
-| Logs sem nível                | DEBUG = -1          | Mostra só os sem nível |
-| Múltiplos níveis (ex: 0,1,2)  | DEBUG = [0, 1, 2]   | Mostra só esses níveis |
-
-
-tstpot(row, col, delay=0.1)
-tstpot(row, col)
-
-start(force_calib=True)
-
-"""
-
-
-=== ARQUIVO: esp/actions.py ===
-
-from machine import Pin, UART
-import time
-from printlogs import log
-from config import VIBRAR_LIGADO, VIBRAR_DESLIGADO, VIBRAR_LONGO, VIBRAR_ALERTA
-
-# UART - ajuste TX e RX conforme o seu hardware
-uart = UART(1, baudrate=115200, tx=17, rx=16)
-
-def send_charPs(zmkcodes):
-    if zmkcodes is not None:
-        log('send_charPs', zmkcodes, 4)
-        row = zmkcodes[0]
-        col = zmkcodes[1]
-
-        # Proteção: valores devem estar entre 0 e 255
-        if not (0 <= row <= 255 and 0 <= col <= 255):
-            log(f"[WARNING] row/col fora do range: row={row}, col={col}", 0)
-            return
-
-        if zmkcodes[2] == 0:
-            event_type = 0x00
-        else:
-            event_type = 0x01
-
-        checksum = event_type ^ row ^ col
-        packet = bytes([0xAA, event_type, row, col, checksum])
-        log('packet', packet, 5)
-        uart.write(packet)
-
-
-def tstpot(row, col, delay=0.1):
-    send_charPs([row, col, True])
-    time.sleep(delay)
-    send_charPs([row, col, False])
-
-
-def vibrar(pino_vibracao, n_pulsos, step=None):
-    if pino_vibracao is None:
-        log("vibrador não inicializado", 1)
-        return
-    for _ in range(n_pulsos):
-        try:
-            pino_vibracao.on()
-        except Exception:
-            try: pino_vibracao.value(1)
-            except: pass
-        
-        # Usando as variáveis de configuração
-        if step == 0: time.sleep_ms(VIBRAR_LONGO)
-        if step == 1: time.sleep_ms(VIBRAR_ALERTA)
-        else: time.sleep_ms(VIBRAR_LIGADO)
-        
-        try:
-            pino_vibracao.off()
-        except Exception:
-            try: pino_vibracao.value(0)
-            except: pass
-        
-        time.sleep_ms(VIBRAR_DESLIGADO)
-
-
-=== ARQUIVO: esp/hw.py ===
-
-from machine import Pin, SoftI2C, TouchPad
-import time
-import config
-from printlogs import log
-
-if config.THIS_IS == 1:
-    pinos = config.PINOS_R
-    pinos_vib = config.PINOS_VIB_R
-
-if config.THIS_IS == 0:
-    pinos = config.PINOS_L
-    pinos_vib = config.PINOS_VIB_L
-
-def init_i2c(scl_pin=22, sda_pin=21):
-    return SoftI2C(scl=Pin(scl_pin), sda=Pin(sda_pin))
-
-def init_mpu(i2c):
-    # importa aqui para evitar erro se rodar testes sem MPU
-    try:
-        import mpu6050
-        mpu = mpu6050.MPU6050(i2c)
-        return mpu
-    except Exception as e:
-        log("init_mpu erro:", e, 0)
-        return None
-
-def init_vibrator(pin_no=(pinos_vib)):
-    p = Pin(pin_no, Pin.OUT)
-    try:
-        p.off()
-    except Exception:
-        pass
-    return p
-
-def init_pots(pins=(pinos)):
-    pots = [TouchPad(Pin(p)) for p in pins]
-
-    test_pots = [i for i, p in enumerate(pots) if p.read() < 0]
-    print('test_pots',test_pots)
-
-    if len(test_pots) > 0:
-        log("test_pots erro:", test_pots, 0)
-        # sys.exit("encerrando programa.")
-        # raise SystemExit
-        raise KeyboardInterrupt("Parando programa!")
-
-    return pots
-
-
-
-=== ARQUIVO: esp/printlogs.py ===
-
-import config
-# -----------------------------
-# Função de log centralizada
-# -----------------------------
-def log(*args, **kwargs):
-    level = None  # Sem nível por padrão
-    if len(args) > 1 and isinstance(args[1], int) and args[1] >= 0:
-        level = args[1]
-        args = (args[0],) + args[2:]  # Remove o level dos args
-    
-    debug_level = getattr(config, 'DEBUG', None)
-    
-    if debug_level is not None and level is not None and level != debug_level:
-        return
-    
-    if debug_level is not None and level is None:
-        return
-    
-    print(*args, **kwargs)
-
-
-=== ARQUIVO: esp/calibration.py ===
-
-import time
-import os
-import ujson
-import config
-from printlogs import log
-from actions import vibrar
-
-def save_calibration(baseline, press_thresh, release_thresh):
-    try:
-        calib_data = {
-            'baseline': baseline,
-            'press_thresh': press_thresh,
-            'release_thresh': release_thresh
-        }
-        with open(config.CALIB_FILE, 'w') as f:
-            ujson.dump(calib_data, f)
-        log("Calibração salva com sucesso!", 1)
-    except Exception as e:
-        log(f"Erro ao salvar calibração: {e}", 0)
-
-def load_calibration():
-    try:
-        if config.CALIB_FILE in os.listdir():
-            with open(config.CALIB_FILE, 'r') as f:
-                calib_data = ujson.load(f)
-            log("Calibração carregada do arquivo", 1)
-            return calib_data['baseline'], calib_data['press_thresh'], calib_data['release_thresh']
-    except Exception as e:
-        log(f"Erro ao carregar calibração: {e}", 0)
-    return None, None, None
-
-
-def calc_pots_hysteresis(pots, num_pots, vib, force_calib=False):
-
-    baseline = [0] * num_pots
-    pots_thresh_on = [0] * num_pots
-    pots_thresh_off = [0] * num_pots
-
-    if not force_calib:
-        loaded_baseline, loaded_press, loaded_release = load_calibration()
-        if loaded_baseline is not None and len(loaded_baseline) == num_pots:
-            baseline[:] = loaded_baseline
-            pots_thresh_on[:] = loaded_press
-            pots_thresh_off[:] = loaded_release
-            log("Calibração carregada do arquivo", 0)
-
-            return pots_thresh_on, pots_thresh_off
-
-        else:
-            log("Calibração inválida/no arquivo, fazendo nova calibração", 0)
-            force_calib = True
-
-    if force_calib:
-        vibrar(vib, 6)
-        log("calc_pots_hysteresis... nao toque nos sensores.", 0)
-
-        # k: multiplicador para ajustar sensibilidade.
-        k = config.K_SENSIBILIDADE
-        # alpha: fator de suavização para baseline (0.1 = mais rápido para se adaptar).
-        alpha = config.ALPHA_SUAVIZACAO
-
-        samples_count = config.SAMPLES_HYSTERESIS   # ex: 100
-
-        # inicializa baseline com primeira leitura
-        baseline = [pots[i].read() for i in range(num_pots)]
-        soma_dev = [0] * num_pots
-
-        for _ in range(samples_count):
-            for i in range(num_pots):
-                val = pots[i].read()
-                # atualiza baseline suavizado (EMA)
-                baseline[i] = (1 - alpha) * baseline[i] + alpha * val
-                # acumula desvio em relação ao baseline atual
-                soma_dev[i] += abs(val - baseline[i])
-            time.sleep_ms(config.TIMEMS_SAMPLES)
-
-        # mad = [s / samples_count for s in soma_dev]
-        mad = [max(config.MAD_MIN, min(s / samples_count, config.MAD_MAX)) for s in soma_dev]
-
-        pots_thresh_on  = [baseline[i] - k * mad[i] for i in range(num_pots)]
-        pots_thresh_off = [baseline[i] - (k/2) * mad[i] for i in range(num_pots)]
-
-        save_calibration(baseline, pots_thresh_on, pots_thresh_off)
-        log("Nova calibração concluída e salva!", 0)
-        vibrar(vib, 6)
-
-        return pots_thresh_on, pots_thresh_off
-
-
-=== ARQUIVO: esp/calib.json ===
-
-{"baseline": [534.05, 500.12, 537.18, 700.06, 574.67, 519.35], "release_thresh": [504.05, 470.12, 507.18, 670.06, 544.67, 489.349984], "press_thresh": [484.05, 450.12, 487.18, 650.06, 524.67, 469.349984]}
-
-
-=== ARQUIVO: esp/dicctozmk.py ===
-
-from printlogs import log
-
-# --- Mapas de tradução (lado esquerdo e lado direito) ---
-
-## M=Moto, Y=Yave [M,Y]
-## pot [gx, gy] status [M,Y]
-
-MAPL = {
-    # abclevel, gx, gy: (row, col)
-
-    # --- Gyro (1,0) [P,M,T] ---
-    (0,  1,  0): (3, 2),  # space
-    (1,  1,  0): (0, 4),  # r
-    (2,  1,  0): (0, 3),  # e
-    (3,  1,  0): (0, 2),  # w
-    (4,  1,  0): (0, 1),  # q
-
-    # --- Gyro (0,0) [P,M,T] ---
-    (0,  0,  0): (3, 2),  # space
-    (1,  0,  0): (1, 4),  # f
-    (2,  0,  0): (1, 3),  # d
-    (3,  0,  0): (1, 2),  # s
-    (4,  0,  0): (1, 1),  # a
-
-    # --- Gyro (-1,0) [P,M,T] ---
-    (0, -1,  0): (3, 2),  # space
-    (1, -1,  0): (2, 4),  # v
-    (2, -1,  0): (2, 3),  # c
-    (3, -1,  0): (2, 2),  # x
-    (4, -1,  0): (2, 1),  # z
-
-    # --- Gyro (1,1) [P,M,T] ---
-    (0,  1,  1): (3, 2),  # space
-    (1,  1,  1): (0, 5),  # t
-    (4,  1,  1): (0, 0),  # esc
-
-    # --- Gyro (0,1) [P,M,T] ---
-    (0,  0,  1): (3, 2),  # space
-    (1,  0,  1): (1, 5),  # g
-    (4,  0,  1): (0, 0),  # esc
-
-    # --- Gyro (-1,1) [P,M,T] ---
-    (0, -1,  1): (3, 2),  # space
-    (1, -1,  1): (2, 5),  # b
-    (4, -1,  1): (0, 0),  # esc
-
-}
-
-MAPR = {
-    # --- Gyro (1,0) [P,M,T] ---
-    (0,  1,  0): (3, 3),   # enter
-    (1,  1,  0): (0, 7),   # u
-    (2,  1,  0): (0, 8),   # i
-    (3,  1,  0): (0, 9),   # o
-    (4,  1,  0): (0, 10),  # p
-    # --- Gyro (1,1) [P,M,T] ---
-    (0,  1,  1): (3, 3),   # enter
-    (1,  1,  1): (0, 6),   # y
-    (4,  1,  1): (0, 11),  # backspace
-
-    # --- Gyro (0,0) [P,M,T] ---
-    (0,  0,  0): (3, 3),   # enter
-    (1,  0,  0): (1, 7),   # j
-    (2,  0,  0): (1, 8),   # k
-    (3,  0,  0): (1, 9),   # l
-    (4,  0,  0): (1, 10),  # c
-    # --- Gyro (0,1) [P,M,T] ---
-    (0,  0,  1): (3, 3),   # enter
-    (1,  0,  1): (1, 6),   # h
-    (4,  0,  1): (0, 11),  # backspace
-
-    # --- Gyro (-1,0) [P,M,T] ---
-    (0, -1,  0): (3, 3),   # enter
-    (1, -1,  0): (2, 7),  # m
-    (2, -1,  0): (2, 8),  # ,
-    (3, -1,  0): (2, 9),  # .
-    (4, -1,  0): (2, 10), # ;
-    # --- Gyro (-1,1) [P,M,T] ---
-    (0,  -1, 1): (3, 3),   # enter
-    (1,  -1, 1): (2, 6),   # n
-    (4,  -1, 1): (0, 11),  # backspace
-
-}
-
-def potsgyrotozmk(abclevel, mapped_i, status, side):
-    """
-    Traduz (abclevel, gx, gy, status) -> (row, col, status)
-    side: 0 = left, 1 = right
-    """
-    log(f'{mapped_i}, {abclevel}, {status}, {side}', 4)
-    mapping = MAPL if side == 0 else MAPR
-    key = (mapped_i, abclevel[0], abclevel[1])
-    if key not in mapping:
-        return None  # tecla não mapeada
-    row, col = mapping[key]
-    return row, col, status
-
-
-
-=== ARQUIVO: esp/pots.py ===
-
-import config
-from printlogs import log
-
-
-def check_pots(
-    pots, abclevel, pval,
-    wait2Zero, cycle,
-    triggerPot, pot_counter,
-    press_thresh, release_thresh
-):
-    local_res_check_pots = None
-
-    for i, pot in enumerate(pots):
-        if i >= len(pval):
-            log(f"Erro: Índice {i} fora dos limites (max {len(pval)})", 0)
-            continue
-
-        val = pot.read()
-        pval[i] = val
-        mapped_i = config.INDEX_MAP_POTS[i]
-
-        if not triggerPot[i] and val < press_thresh[i]:
-            pot_counter[i] += 1
-            if pot_counter[i] >= config.DEBOUNCE_COUNT:
-                local_res_check_pots = [abclevel, mapped_i, 1, config.THIS_IS]
-                triggerPot[i] = True
-                pot_counter[i] = 0
-                wait2Zero = False
-                cycle = 0
-
-        elif triggerPot[i] and val > release_thresh[i]:
-            pot_counter[i] += 1
-            if pot_counter[i] >= config.DEBOUNCE_COUNT:
-                local_res_check_pots = [abclevel, mapped_i, 0, config.THIS_IS]
-                triggerPot[i] = False
-                pot_counter[i] = 0
-                wait2Zero = True
-
-        else:
-            pot_counter[i] = 0
-
-    return local_res_check_pots, wait2Zero, cycle
 
 
 === ARQUIVO: esp/gyro.py ===
@@ -616,58 +217,6 @@ def gyro_principal(
         stepWaitXP, stepWaitXN, stepWaitYP, stepWaitYN,
         wait2Zero, cycle
     )
-
-
-=== ARQUIVO: esp/mpu6050.py ===
-
-import machine
-
-class MPU6050():
-    def __init__(self, i2c, addr=0x68):
-        self.iic = i2c
-        self.addr = addr
-        self.iic.start()
-        self.iic.writeto(self.addr, bytearray([107, 0]))
-        self.iic.stop()
-
-    def get_raw_values(self):
-        self.iic.start()
-        a = self.iic.readfrom_mem(self.addr, 0x3B, 14)
-        self.iic.stop()
-        return a
-
-    def get_ints(self):
-        b = self.get_raw_values()
-        c = []
-        for i in b:
-            c.append(i)
-        return c
-
-    def bytes_toint(self, firstbyte, secondbyte):
-        if not firstbyte & 0x80:
-            return firstbyte << 8 | secondbyte
-        return - (((firstbyte ^ 255) << 8) | (secondbyte ^ 255) + 1)
-
-    def get_values(self):
-        raw_ints = self.get_raw_values()
-        vals = {}
-        vals["AcX"] = self.bytes_toint(raw_ints[0], raw_ints[1])
-        vals["AcY"] = self.bytes_toint(raw_ints[2], raw_ints[3])
-        vals["AcZ"] = self.bytes_toint(raw_ints[4], raw_ints[5])
-        vals["Tmp"] = self.bytes_toint(raw_ints[6], raw_ints[7]) / 340.00 + 36.53
-        vals["GyX"] = self.bytes_toint(raw_ints[8], raw_ints[9])
-        vals["GyY"] = self.bytes_toint(raw_ints[10], raw_ints[11])
-        vals["GyZ"] = self.bytes_toint(raw_ints[12], raw_ints[13])
-        return vals  # returned in range of Int16
-        # -32768 to 32767
-
-    def val_test(self):  # ONLY FOR TESTING! Also, fast reading sometimes crashes IIC
-        from time import sleep
-        while 1:
-            print(self.get_values())
-            sleep(0.05)
-
-
 
 === ARQUIVO: esp/main.py ===
 

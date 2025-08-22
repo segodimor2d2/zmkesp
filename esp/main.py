@@ -4,7 +4,7 @@ from hw import init_i2c, init_mpu, init_vibrator, init_pots
 from actions import vibrar, send_charPs
 from printlogs import log
 from dicctozmk import potsgyrotozmk
-from calibration import calc_pots_hysteresis
+from calibration import calc_pots_hysteresis, calc_accl_hysteresis
 from pots import check_pots, PotsState
 from gyro import initial_buffer, average_and_slide, gyro_principal, GyroState
 
@@ -19,26 +19,37 @@ def start(i2c=None, mpu=None, pots=None, vib=None, force_calib=False):
     # Estado dos potenciômetros
     pots_state = PotsState(len(pots))
 
+    # Estado do giroscópio
+    gyro_state = GyroState()
+
     # Calcula thresholds de histerese
     pots_thresh_on, pots_thresh_off = calc_pots_hysteresis(pots, pots_state.num_pots, vib, force_calib)
     print("Thresholds on:", pots_thresh_on)
     print("Thresholds off:", pots_thresh_off)
+
+    acclthresholds = calc_accl_hysteresis(mpu, vib, force_calib)
+    print("\nThresholds Acelerometro", acclthresholds)
+
+    # print("------------------------------------")
+    # raise KeyboardInterrupt("Parando programa!")
 
     # Prepara buffer do gyro
     buffer = [[] for _ in range(6)]
     buffer = initial_buffer(buffer, mpu)
     gyro, accl = average_and_slide(buffer, mpu)
 
-    # Estado do giroscópio
-    gyro_state = GyroState()
-
     gy1, gy2 = config.GY1, config.GY2
-    vibrar(vib, 2)
+
+
+
 
     # Loop principal
+    vibrar(vib, 2)
     num = 0
     while True:
         gyro, accl = average_and_slide(buffer, mpu)
+        # x[P] Y[L] Z[V]
+        # print(f'x{accl[0]},y{accl[1]},z{accl[2]}')
 
         # Atualiza giroscópio
         gyro_state = gyro_principal(gyro, gy1, gy2, vib, gyro_state)
@@ -53,8 +64,10 @@ def start(i2c=None, mpu=None, pots=None, vib=None, force_calib=False):
         )
 
         if res_check_pots is not None:
-            log(f"potsgyrotozmk {res_check_pots}", 0)
-            send_charPs(potsgyrotozmk(*res_check_pots))
+            log(f'potsgyrotozmk {res_check_pots}', 0)
+            tozmk = potsgyrotozmk(*res_check_pots)
+            # log(f'send_charPs {tozmk}', 0)
+            # send_charPs(tozmk)
 
         # Reset se parado
         if gyro_state.wait2Zero and gyro_state.cycle < config.CYCLE_RESET_LIMIT:

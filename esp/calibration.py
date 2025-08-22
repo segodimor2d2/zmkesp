@@ -12,21 +12,21 @@ def save_calibration(baseline, press_thresh, release_thresh):
             'press_thresh': press_thresh,
             'release_thresh': release_thresh
         }
-        with open(config.CALIB_FILE, 'w') as f:
+        with open(config.CALIB_POTS_FILE, 'w') as f:
             ujson.dump(calib_data, f)
-        log("Calibração salva com sucesso!", 1)
+        log("Pots Calibração dos pots salva com sucesso!", 1)
     except Exception as e:
-        log(f"Erro ao salvar calibração: {e}", 0)
+        log(f"Erro ao salvar calibração dos pots: {e}", 0)
 
 def load_calibration():
     try:
-        if config.CALIB_FILE in os.listdir():
-            with open(config.CALIB_FILE, 'r') as f:
+        if config.CALIB_POTS_FILE in os.listdir():
+            with open(config.CALIB_POTS_FILE, 'r') as f:
                 calib_data = ujson.load(f)
-            log("Calibração carregada do arquivo", 1)
+            log("Calibração dos pots carregada!", 1)
             return calib_data['baseline'], calib_data['press_thresh'], calib_data['release_thresh']
     except Exception as e:
-        log(f"Erro ao carregar calibração: {e}", 0)
+        log(f"Erro ao carregar calibração dos pots: {e}", 0)
     return None, None, None
 
 
@@ -42,12 +42,10 @@ def calc_pots_hysteresis(pots, num_pots, vib, force_calib=False):
             baseline[:] = loaded_baseline
             pots_thresh_on[:] = loaded_press
             pots_thresh_off[:] = loaded_release
-            log("Calibração carregada do arquivo", 0)
-
             return pots_thresh_on, pots_thresh_off
 
         else:
-            log("Calibração inválida/no arquivo, fazendo nova calibração", 0)
+            log("Calibração inválida dos pots carregada!", 0)
             force_calib = True
 
     if force_calib:
@@ -81,7 +79,81 @@ def calc_pots_hysteresis(pots, num_pots, vib, force_calib=False):
         pots_thresh_off = [baseline[i] - (k/2) * mad[i] for i in range(num_pots)]
 
         save_calibration(baseline, pots_thresh_on, pots_thresh_off)
-        log("Nova calibração concluída e salva!", 0)
         vibrar(vib, 6)
 
         return pots_thresh_on, pots_thresh_off
+
+
+def save_accl_calibration(baselines, thresholds):
+    try:
+        calib_data = {
+            'baselines': baselines,
+            'thresholds': thresholds
+        }
+        with open(config.CALIB_ACCL_FILE, 'w') as f:   # usar outro arquivo
+            ujson.dump(calib_data, f)
+        log("Calibração do acelerômetro salva com sucesso!", 0)
+    except Exception as e:
+        log(f"Erro ao salvar calibração do acelerômetro: {e}", 0)
+
+
+def load_accl_calibration():
+    try:
+        if config.CALIB_ACCL_FILE in os.listdir():
+            with open(config.CALIB_ACCL_FILE, 'r') as f:
+                calib_data = ujson.load(f)
+            log("Calibração do acelerômetro carregada!", 0)
+            return calib_data['baselines'], calib_data['thresholds']
+    except Exception as e:
+        log(f"Erro ao carregar calibração do acelerômetro: {e}", 0)
+    return None, None
+
+
+def calc_accl_hysteresis(mpu, vib, force_calib=False):
+
+    if not force_calib:
+        baselines, thresholds = load_accl_calibration()
+        if thresholds is not None:
+            return thresholds
+        else:
+            log("Calibração do acelerômetro inválida/no arquivo, fazendo nova calibração", 0)
+            force_calib = True
+
+    if force_calib:
+        vibrar(vib, 6)
+        log("calc_accel_hysteresis... nao toque nos sensores.", 0)
+
+        # ======== CALIBRAÇÃO ========
+        N = config.SAMPLES_ACCL
+        samples = {"X": [], "Y": [], "Z": []}
+
+        for _ in range(N):
+            vals = mpu.get_values()
+            samples["X"].append(vals["AcX"])
+            samples["Y"].append(vals["AcY"])
+            samples["Z"].append(vals["AcZ"])
+            time.sleep_ms(config.TIME_ACCL_SAMPLES)
+
+        # Calcula baseline e ruído de cada eixo
+        baselines = {}
+        noises = {}
+        for axis in ["X", "Y", "Z"]:
+            baselines[axis] = sum(samples[axis]) / N
+            noises[axis] = max(samples[axis]) - min(samples[axis])
+
+        # Define thresholds com histerese para cada eixo
+        thresholds = {}
+        for axis in ["X", "Y", "Z"]:
+            baseline = baselines[axis]
+            noise = noises[axis]
+            thresholds[axis] = {
+                "on_pos":  baseline + noise * 3,
+                "off_pos": baseline + noise * 2,
+                "on_neg":  baseline - noise * 3,
+                "off_neg": baseline - noise * 2
+            }
+
+        save_accl_calibration(baselines, thresholds)
+        vibrar(vib, 6)
+        return thresholds
+

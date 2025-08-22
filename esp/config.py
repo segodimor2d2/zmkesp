@@ -35,7 +35,7 @@ INDEX_MAP_POTS = list(INDEX_MAP_L if THIS_IS == 0 else INDEX_MAP_R)
 # ============================================================
 # CONFIGURAÇÕES DE TOUCH
 # ============================================================
-CALIB_FILE = "calib.json"
+CALIB_POTS_FILE = "pots_calib.json"
 MAD_MIN = 5 # limites de MAD para evitar thresholds muito colados
 MAD_MAX = 50 # limites de MAD para evitar thresholds muito colados
 SAMPLES_HYSTERESIS = 100 # amostras para calibrar os pots
@@ -57,6 +57,11 @@ if THIS_IS == 0:
     INVERT_X, INVERT_Y = False, True  # T,M Inverter sentido do eixo
 else:
     INVERT_X, INVERT_Y = True, True   # T,M Inverter sentido do eixo
+
+
+CALIB_ACCL_FILE = "accl_calib.json"
+SAMPLES_ACCL = 100
+TIME_ACCL_SAMPLES = 70
 
 # ============================================================
 # CONTROLE DE PASSOS / RESET

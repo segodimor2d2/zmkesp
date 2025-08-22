@@ -1,6 +1,9 @@
 $$$$
 
 
+
+
+
 ```python
 import machine, time
 
@@ -97,23 +100,24 @@ mpremote fs ls
 
 mpremote repl
 
-mpremote exec "raise KeyboardInterrupt"
 mpremote kill
 mpremote reset
+mpremote exec "raise KeyboardInterrupt"
 mpremote exec "import machine; machine.reset()"
 mpremote exec ""
 
+## RUN
 mpremote connect /dev/ttyUSB0 
 
 mpremote connect /dev/ttyUSB0 fs cp esp/config.py :config.py
 mpremote connect /dev/ttyUSB0 fs cp esp/main.py :main.py
+mpremote connect /dev/ttyUSB0 fs cp esp/calibration.py :calibration.py
 
 mpremote connect /dev/ttyUSB0 fs cp esp/gyro.py :gyro.py
 mpremote connect /dev/ttyUSB0 fs cp esp/pots.py :pots.py
 mpremote connect /dev/ttyUSB0 fs cp esp/actions.py :actions.py
 mpremote connect /dev/ttyUSB0 fs cp esp/dicctozmk.py :dicctozmk.py
 mpremote connect /dev/ttyUSB0 fs cp esp/hw.py :hw.py
-mpremote connect /dev/ttyUSB0 fs cp esp/calibration.py :calibration.py
 
 mpremote connect /dev/ttyUSB0 fs cp esp/mpu6050.py :mpu6050.py
 mpremote connect /dev/ttyUSB0 fs cp esp/printlogs.py :printlogs.py
@@ -2565,3 +2569,259 @@ def calc_pots_hysteresis(pots, force_new_calib=False):
     #     log("calibrate_samples... não toque nos sensores.", 0)
 
 ```
+
+
+
+
+
+
+---
+
+usando micropython em um esp32, eu quero entender
+como uso os dados do acelerômetro;
+eu quero extrair os dados positivos e negativos,
+usando detecção de eventos por cruzamento de limiar com histerese,
+mas eu não consigo entender como eu posso achar os thresholds para um eixo
+
+
+Boa pergunta 👌
+
+Você está no caminho certo: para usar o acelerômetro no ESP32 (via MPU6050, MPU9250 ou outro), você normalmente lê valores contínuos de **aceleração em cada eixo (X, Y, Z)**.
+O problema é que esses valores oscilam muito por causa de ruído → por isso usamos **limiar com histerese** para detectar eventos confiáveis.
+
+---
+
+## 1. O que significa "threshold com histerese"
+
+A ideia é simples:
+
+* Você define dois limites (um superior e um inferior).
+* Só dispara o evento quando cruza **fora da zona morta**.
+* Assim evita "chattering" (ficar ligando/desligando com ruído).
+
+Exemplo (eixo X):
+
+* `limiar_alto = +1000`
+* `limiar_baixo = +500`
+
+Se o valor de X passar **acima de +1000** → evento **positivo ON**.
+Só desarma quando cair **abaixo de +500**.
+
+O mesmo vale para o lado negativo:
+
+* `limiar_neg_alto = -1000`
+* `limiar_neg_baixo = -500`
+
+---
+
+## 2. Como achar os thresholds para um eixo
+
+Aqui depende do **baseline** (valor médio em repouso).
+Passos:
+
+1. **Calibrar em repouso**
+
+   * Coloque o dispositivo parado, capture N amostras (\~100).
+   * Calcule a média de cada eixo → isso é seu **baseline**.
+
+   ```python
+   baseline_x = sum(samples_x) / len(samples_x)
+   ```
+
+2. **Medir variação típica (ruído)**
+
+   * Calcule o desvio-padrão ou a faixa mínima/máxima em repouso.
+   * Isso te dá uma noção de "jitter".
+
+   ```python
+   noise_x = max(samples_x) - min(samples_x)
+   ```
+
+3. **Definir thresholds acima do ruído**
+
+   * Exemplo: `threshold_on = baseline + 3 * noise`
+   * E o off/histerese um pouco abaixo: `threshold_off = baseline + 2 * noise`.
+
+   Assim só detecta se o movimento for **muito além do ruído**.
+
+---
+
+## 3. Exemplo de código simplificado (MicroPython)
+
+```python
+from machine import I2C, Pin
+import mpu6050
+import time
+
+# Inicializa I2C + sensor
+i2c = I2C(0, scl=Pin(22), sda=Pin(21))
+mpu = mpu6050.accel(i2c)
+
+# Calibração simples
+N = 100
+samples_x = []
+for _ in range(N):
+    ax, ay, az = mpu.get_values()['AcX'], mpu.get_values()['AcY'], mpu.get_values()['AcZ']
+    samples_x.append(ax)
+    time.sleep(0.01)
+
+baseline_x = sum(samples_x) / N
+noise_x = max(samples_x) - min(samples_x)
+
+# Definição de thresholds
+th_on_pos  = baseline_x + noise_x * 3
+th_off_pos = baseline_x + noise_x * 2
+th_on_neg  = baseline_x - noise_x * 3
+th_off_neg = baseline_x - noise_x * 2
+
+print("Baseline X:", baseline_x)
+print("Thresholds:", th_on_pos, th_off_pos, th_on_neg, th_off_neg)
+
+# Loop de detecção
+state = 0  # 0 = neutro, 1 = positivo, -1 = negativo
+while True:
+    ax = mpu.get_values()['AcX']
+
+    if state == 0:
+        if ax > th_on_pos:
+            print("Evento POSITIVO")
+            state = 1
+        elif ax < th_on_neg:
+            print("Evento NEGATIVO")
+            state = -1
+
+    elif state == 1:
+        if ax < th_off_pos:
+            print("Positivo OFF")
+            state = 0
+
+    elif state == -1:
+        if ax > th_off_neg:
+            print("Negativo OFF")
+            state = 0
+
+    time.sleep(0.01)
+```
+
+---
+
+## 4. Resumindo
+
+* Você precisa **calibrar o baseline** com o sensor parado.
+* Medir o **ruído típico**.
+* Definir **limiares ON/OFF acima desse ruído**.
+* Usar **histerese** (par ON mais distante, par OFF mais próximo).
+
+👉 Dessa forma, você consegue diferenciar bem movimentos "pra valer" de pequenas oscilações do sensor.
+
+---
+
+Quer que eu prepare um **diagrama visual** mostrando como os thresholds ON/OFF funcionam em cima do sinal do acelerômetro? Isso ajuda bastante a entender.
+
+
+
+
+Boa 👍 — dá pra estender a lógica que mostrei para os **3 eixos (X, Y, Z)** de forma bem direta.
+O truque é: em vez de tratar só `ax`, você cria um dicionário de estados e thresholds para cada eixo.
+
+---
+
+## Exemplo completo (MicroPython, 3 eixos com histerese)
+
+```python
+from machine import I2C, Pin
+import mpu6050
+import time
+
+# Inicializa I2C + sensor
+i2c = I2C(0, scl=Pin(22), sda=Pin(21))
+mpu = mpu6050.accel(i2c)
+
+# ======== CALIBRAÇÃO ========
+N = 100
+samples = {"X": [], "Y": [], "Z": []}
+
+for _ in range(N):
+    vals = mpu.get_values()
+    samples["X"].append(vals["AcX"])
+    samples["Y"].append(vals["AcY"])
+    samples["Z"].append(vals["AcZ"])
+    time.sleep(0.01)
+
+# Calcula baseline e ruído de cada eixo
+baselines = {}
+noises = {}
+for axis in ["X", "Y", "Z"]:
+    baselines[axis] = sum(samples[axis]) / N
+    noises[axis] = max(samples[axis]) - min(samples[axis])
+
+# Define thresholds com histerese para cada eixo
+thresholds = {}
+for axis in ["X", "Y", "Z"]:
+    baseline = baselines[axis]
+    noise = noises[axis]
+    thresholds[axis] = {
+        "on_pos":  baseline + noise * 3,
+        "off_pos": baseline + noise * 2,
+        "on_neg":  baseline - noise * 3,
+        "off_neg": baseline - noise * 2
+    }
+
+print("Baselines:", baselines)
+print("Thresholds:", thresholds)
+
+# ======== LOOP DE DETECÇÃO ========
+states = {"X": 0, "Y": 0, "Z": 0}  # 0 = neutro, 1 = positivo, -1 = negativo
+
+while True:
+    vals = mpu.get_values()
+
+    for axis in ["X", "Y", "Z"]:
+        a = vals["Ac" + axis]
+        t = thresholds[axis]
+
+        if states[axis] == 0:  # neutro
+            if a > t["on_pos"]:
+                print(f"{axis}: Evento POSITIVO")
+                states[axis] = 1
+            elif a < t["on_neg"]:
+                print(f"{axis}: Evento NEGATIVO")
+                states[axis] = -1
+
+        elif states[axis] == 1:  # positivo ativo
+            if a < t["off_pos"]:
+                print(f"{axis}: Positivo OFF")
+                states[axis] = 0
+
+        elif states[axis] == -1:  # negativo ativo
+            if a > t["off_neg"]:
+                print(f"{axis}: Negativo OFF")
+                states[axis] = 0
+
+    time.sleep(0.01)
+```
+
+---
+
+## 🔎 Como funciona
+
+* Para **cada eixo**:
+
+  * Calcula baseline (média em repouso).
+  * Mede ruído típico.
+  * Define thresholds ON/OFF (positivo e negativo).
+  * Usa histerese para não oscilar com ruído.
+* O loop final trata os **3 eixos em paralelo**.
+
+---
+
+👉 Com esse esquema você pode detectar movimentos positivos/negativos em **X, Y ou Z** separadamente.
+
+Quer que eu te mostre uma versão que combine os 3 eixos em **um único evento de movimento (magnitude do vetor)** em vez de analisar eixo por eixo?
+
+
+eu vou precisar salvar os dados do calc_accl_hysteresis
+mas tem ja um função save_calibration que salva só que eu ela tem um formato diferente
+seria mudar em uma função diferente ou melhor adaptar save_calibration?
+
+ 

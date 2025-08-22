@@ -45,6 +45,7 @@ def start(i2c=None, mpu=None, pots=None, vib=None, force_calib=False):
 
         # Atualiza potenciômetros
         abclevel = [gyro_state.stepX, gyro_state.stepY]
+
         res_check_pots, pots_state = check_pots(
             pots, abclevel,
             pots_thresh_on, pots_thresh_off,

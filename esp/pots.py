@@ -1,7 +1,6 @@
 import config
 from printlogs import log
 
-
 class PotsState:
     def __init__(self, num_pots: int):
         self.num_pots = num_pots

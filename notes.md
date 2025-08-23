@@ -112,8 +112,8 @@ mpremote connect /dev/ttyUSB0
 mpremote connect /dev/ttyUSB0 fs cp esp/main.py :main.py
 mpremote connect /dev/ttyUSB0 fs cp esp/config.py :config.py
 mpremote connect /dev/ttyUSB0 fs cp esp/gyro.py :gyro.py
-mpremote connect /dev/ttyUSB0 fs cp esp/calibration.py :calibration.py
 
+mpremote connect /dev/ttyUSB0 fs cp esp/calibration.py :calibration.py
 mpremote connect /dev/ttyUSB0 fs cp esp/pots.py :pots.py
 mpremote connect /dev/ttyUSB0 fs cp esp/actions.py :actions.py
 mpremote connect /dev/ttyUSB0 fs cp esp/dicctozmk.py :dicctozmk.py
@@ -3313,4 +3313,27 @@ def calc_accl_hysteresis(mpu, vib, force_calib=False):
         vibrar(vib, 6)
         return thresholds
 
+---
 
+eu gostaria de adicionar nessa função umas constantes para cada eixo para aumentar o diminuir a sensibilidade dos thresholds intependientemente
+
+def check_accl_axis(accl, axis_index, step, event_pos, event_neg, thresholds, axis_key, invert=False):
+
+    t = thresholds[axis_key]
+    a = accl[axis_index]
+
+    # Movimento positivo
+    if not event_pos and a > t["on_pos"]:
+        step += -1 if invert else 1
+        event_pos = True
+    elif event_pos and a < t["off_pos"]:
+        event_pos = False
+
+    # Movimento negativo
+    if not event_neg and a < t["on_neg"]:
+        step += 1 if invert else -1
+        event_neg = True
+    elif event_neg and a > t["off_neg"]:
+        event_neg = False
+
+    return step, event_pos, event_neg

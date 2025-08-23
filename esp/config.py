@@ -66,6 +66,21 @@ ACCL_MAD_MAX = 5 # 5
 MARGIN_MIN = 2000 # 2000
 MARGIN_MAX = 4000 # 4000
 
+# Sensibilidade separada por eixo e sentido
+# "X": 1.5 Eixo X vai disparar mais facilmente (thresholds ficam 50% menores).
+# "Y": 1.0 Eixo Y fica normal.
+# "Z": 0.7 Eixo Z fica menos sensível (precisa de movimento 30% maior).
+ACCL_SENS = {
+    "X_pos": 0.001,
+    "X_neg": 0.001,
+    "Y_pos": 0.001,
+    "Y_neg": 0.001,
+    "Z_pos": 0.001,
+    "Z_neg": 0.001
+}
+
+
+
 # ============================================================
 # CONTROLE DE PASSOS / RESET
 # ============================================================

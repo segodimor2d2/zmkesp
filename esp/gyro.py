@@ -6,7 +6,6 @@ from printlogs import log
 
 class GyroState:
     def __init__(self):
-        # Giroscópio
         self.stepX = 0
         self.stepY = 0
         self.evXP = False
@@ -17,8 +16,6 @@ class GyroState:
         self.swXN = 0
         self.swYP = 0
         self.swYN = 0
-
-        # Controle geral
         self.wait2Zero = False
         self.cycle = 0
 
@@ -80,7 +77,6 @@ def check_gyro_axis(gyro, axis_index, step, event_pos, event_neg, vib, wait2Zero
     if not event_pos and gyro[axis_index] > pos_thresh:
         step += -1 if invert else 1
         vibrar(vib, 1, step)
-        log(f"[GYRO] Eixo {axis_index} POS -> step={step}", 2)
         event_pos = True
         wait2Zero = True
         cycle = 0
@@ -90,7 +86,6 @@ def check_gyro_axis(gyro, axis_index, step, event_pos, event_neg, vib, wait2Zero
     if not event_neg and gyro[axis_index] < neg_thresh:
         step += 1 if invert else -1
         vibrar(vib, 1, step)
-        log(f"[GYRO] Eixo {axis_index} NEG -> step={step}", 2)
         event_neg = True
         wait2Zero = True
         cycle = 0
@@ -105,7 +100,6 @@ def check_step_wait(event_triggered, step_wait, step, delta, vib):
     if step_wait >= config.STEP_WAIT_LIMIT:
         step += delta
         vibrar(vib, 1, step)
-        log(f"[STEP_WAIT] step={step} delta={delta}", 2)
         step_wait = 0
     return step_wait, step
 
@@ -140,23 +134,33 @@ def gyro_principal(gyro, gy1, gy2, vib, state: GyroState):
     return state
 
 def check_accl_axis(accl, axis_index, step, event_pos, event_neg, thresholds, axis_key, invert=False):
-
     t = thresholds[axis_key]
     a = accl[axis_index]
 
+    # Ajusta thresholds com fator de sensibilidade
+    sens = getattr(config, "ACCL_SENS", {}).get(axis_key, 1.0)
+    on_pos  = t["on_pos"]  * sens
+    off_pos = t["off_pos"] * sens
+    on_neg  = t["on_neg"]  * sens
+    off_neg = t["off_neg"] * sens
+
     # Movimento positivo
-    if not event_pos and a > t["on_pos"]:
+    if not event_pos and a > on_pos:
         step += -1 if invert else 1
         event_pos = True
-    elif event_pos and a < t["off_pos"]:
+    elif event_pos and a < off_pos:
         event_pos = False
 
     # Movimento negativo
-    if not event_neg and a < t["on_neg"]:
+    if not event_neg and a < on_neg:
         step += 1 if invert else -1
         event_neg = True
-    elif event_neg and a > t["off_neg"]:
+    elif event_neg and a > off_neg:
         event_neg = False
+
+    # ===== Reset para zero quando estável =====
+    if off_neg < a < off_pos and not event_pos and not event_neg:
+        step = 0
 
     return step, event_pos, event_neg
 

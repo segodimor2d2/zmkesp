@@ -62,6 +62,9 @@ else:
 CALIB_ACCL_FILE = "accl_calib.json"
 SAMPLES_ACCL = 100
 TIME_ACCL_SAMPLES = 70
+ACCL_MAD_MAX = 5 # 5
+MARGIN_MIN = 2000 # 2000
+MARGIN_MAX = 4000 # 4000
 
 # ============================================================
 # CONTROLE DE PASSOS / RESET

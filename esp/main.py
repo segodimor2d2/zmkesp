@@ -40,8 +40,8 @@ def start(i2c=None, mpu=None, pots=None, vib=None, force_calib=False):
 
     gy1, gy2 = config.GY1, config.GY2
 
-
-
+    accl_states = [0, 0, 0] # 0 = neutro, 1 = positivo, -1 = negativo
+    stable_count = [0, 0, 0]
 
     # Loop principal
     vibrar(vib, 2)
@@ -50,6 +50,44 @@ def start(i2c=None, mpu=None, pots=None, vib=None, force_calib=False):
         gyro, accl = average_and_slide(buffer, mpu)
         # x[P] Y[L] Z[V]
         # print(f'x{accl[0]},y{accl[1]},z{accl[2]}')
+
+        # Eventos do Acelerometro
+        for axis, label in enumerate(["X", "Y", "Z"]):
+            a = accl[axis]
+            t = acclthresholds[label]
+            # print(f"{label}: {a:.2f}, thresholds: {t}, state: {accl_states[axis]}")
+
+            if accl_states[axis] == 0:
+                if a > t["on_pos"]:
+                    accl_states[axis] = 1
+                    stable_count[axis] = 0
+                elif a < t["on_neg"]:
+                    accl_states[axis] = -1
+                    stable_count[axis] = 0
+
+            elif accl_states[axis] == 1:
+                if a < t["off_pos"]:
+                    accl_states[axis] = 0
+                else:
+                    stable_count[axis] += 1
+
+            elif accl_states[axis] == -1:
+                if a > t["off_neg"]:
+                    accl_states[axis] = 0
+                else:
+                    stable_count[axis] += 1
+
+            # força neutro se parado por muito tempo
+            if stable_count[axis] > 50:  
+                accl_states[axis] = 0
+                stable_count[axis] = 0
+
+        print('accl_states',accl_states,'stable_count',stable_count)
+        # print('stable_count',stable_count)
+
+
+
+
 
         # Atualiza giroscópio
         gyro_state = gyro_principal(gyro, gy1, gy2, vib, gyro_state)
@@ -64,7 +102,7 @@ def start(i2c=None, mpu=None, pots=None, vib=None, force_calib=False):
         )
 
         if res_check_pots is not None:
-            log(f'potsgyrotozmk {res_check_pots}', 0)
+            # log(f'potsgyrotozmk {res_check_pots}', 0)
             tozmk = potsgyrotozmk(*res_check_pots)
             # log(f'send_charPs {tozmk}', 0)
             # send_charPs(tozmk)

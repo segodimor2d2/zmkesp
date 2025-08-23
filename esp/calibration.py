@@ -125,6 +125,10 @@ def calc_accl_hysteresis(mpu, vib, force_calib=False):
 
         # ======== CALIBRAÇÃO ========
         N = config.SAMPLES_ACCL
+
+        margin_min = config.MARGIN_MIN # 2000
+        margin_max = config.MARGIN_MAX # 4000
+        accl_mad_max = config.ACCL_MAD_MAX # 5
         samples = {"X": [], "Y": [], "Z": []}
 
         for _ in range(N):
@@ -146,11 +150,15 @@ def calc_accl_hysteresis(mpu, vib, force_calib=False):
         for axis in ["X", "Y", "Z"]:
             baseline = baselines[axis]
             noise = noises[axis]
+
+            margin = int(noise * accl_mad_max)
+            margin = max(margin_min, min(margin_max, margin))  # limita a faixa
+
             thresholds[axis] = {
-                "on_pos":  baseline + noise * 3,
-                "off_pos": baseline + noise * 2,
-                "on_neg":  baseline - noise * 3,
-                "off_neg": baseline - noise * 2
+                "on_pos": baseline + margin,
+                "off_pos": baseline + int(margin * 0.8),
+                "on_neg": baseline - margin,
+                "off_neg": baseline - int(margin * 0.8)
             }
 
         save_accl_calibration(baselines, thresholds)

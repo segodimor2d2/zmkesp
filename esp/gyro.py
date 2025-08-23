@@ -85,6 +85,13 @@ def check_gyro_axis(gyro, axis_index, step, event_pos, event_neg, vib, wait2Zero
     return step, event_pos, event_neg, wait2Zero, cycle
 
 
+def check_accl_axis(gyro, axis_index, step, event_pos, event_neg, vib, wait2Zero, cycle, invert=False):
+
+    # return step, event_pos, event_neg, wait2Zero, cycle
+    # return step, event_pos, event_neg, wait2Zero, cycle
+    pass
+
+
 def check_step_wait(event_triggered, step_wait, step, delta, vib):
     """Controle de espera para repetição automática."""
     step_wait = step_wait + 1 if event_triggered else 0

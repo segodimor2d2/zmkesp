@@ -65,6 +65,7 @@ TIME_ACCL_SAMPLES = 70
 ACCL_MAD_MAX = 5 # 5
 MARGIN_MIN = 2000 # 2000
 MARGIN_MAX = 4000 # 4000
+DEBOUNCE_COUNT_ACCL = 5 # 2
 
 # ============================================================
 # CONTROLE DE PASSOS / RESET

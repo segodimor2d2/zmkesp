@@ -42,6 +42,7 @@ def start(i2c=None, mpu=None, pots=None, vib=None, force_calib=False):
 
     accl_states = [0, 0, 0] # 0 = neutro, 1 = positivo, -1 = negativo
     stable_count = [0, 0, 0]
+    accl_counters = [0, 0, 0]
 
     # Loop principal
     vibrar(vib, 2)
@@ -51,36 +52,43 @@ def start(i2c=None, mpu=None, pots=None, vib=None, force_calib=False):
         # x[P] Y[L] Z[V]
         # print(f'x{accl[0]},y{accl[1]},z{accl[2]}')
 
-        # Eventos do Acelerometro
+        # Eventos do Acelerometro com debounce
         for axis, label in enumerate(["X", "Y", "Z"]):
             a = accl[axis]
             t = acclthresholds[label]
             # print(f"{label}: {a:.2f}, thresholds: {t}, state: {accl_states[axis]}")
 
-            if accl_states[axis] == 0:
+            if accl_states[axis] == 0:  # Neutro
                 if a > t["on_pos"]:
-                    accl_states[axis] = 1
-                    stable_count[axis] = 0
+                    accl_counters[axis] += 1
+                    if accl_counters[axis] >= config.DEBOUNCE_COUNT_ACCL:
+                        accl_states[axis] = 1
+                        accl_counters[axis] = 0
                 elif a < t["on_neg"]:
-                    accl_states[axis] = -1
-                    stable_count[axis] = 0
+                    accl_counters[axis] += 1
+                    if accl_counters[axis] >= config.DEBOUNCE_COUNT_ACCL:
+                        accl_states[axis] = -1
+                        accl_counters[axis] = 0
+                else:
+                    accl_counters[axis] = 0
 
-            elif accl_states[axis] == 1:
+            elif accl_states[axis] == 1:  # Positivo
                 if a < t["off_pos"]:
-                    accl_states[axis] = 0
+                    accl_counters[axis] += 1
+                    if accl_counters[axis] >= config.DEBOUNCE_COUNT_ACCL:
+                        accl_states[axis] = 0
+                        accl_counters[axis] = 0
                 else:
-                    stable_count[axis] += 1
+                    accl_counters[axis] = 0
 
-            elif accl_states[axis] == -1:
+            elif accl_states[axis] == -1:  # Negativo
                 if a > t["off_neg"]:
-                    accl_states[axis] = 0
+                    accl_counters[axis] += 1
+                    if accl_counters[axis] >= config.DEBOUNCE_COUNT_ACCL:
+                        accl_states[axis] = 0
+                        accl_counters[axis] = 0
                 else:
-                    stable_count[axis] += 1
-
-            # força neutro se parado por muito tempo
-            if stable_count[axis] > 50:  
-                accl_states[axis] = 0
-                stable_count[axis] = 0
+                    accl_counters[axis] = 0
 
         print('accl_states',accl_states,'stable_count',stable_count)
         # print('stable_count',stable_count)

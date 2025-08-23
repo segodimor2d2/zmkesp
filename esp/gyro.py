@@ -6,6 +6,7 @@ from printlogs import log
 
 class GyroState:
     def __init__(self):
+        # Giroscópio
         self.stepX = 0
         self.stepY = 0
         self.evXP = False
@@ -16,9 +17,24 @@ class GyroState:
         self.swXN = 0
         self.swYP = 0
         self.swYN = 0
+
+        # Controle geral
         self.wait2Zero = False
         self.cycle = 0
 
+class AcclState:
+    def __init__(self):
+        self.stepX = 0
+        self.stepY = 0
+        self.stepZ = 0
+        self.evXP = False
+        self.evXN = False
+        self.evYP = False
+        self.evYN = False
+        self.evZP = False
+        self.evZN = False
+        self.wait2Zero = False
+        self.cycle = 0
 
 def append_gyro(buffer, mpuSensor):
     """Adiciona uma leitura ao buffer (6 listas)"""
@@ -56,7 +72,6 @@ def average_and_slide(buffer, mpuSensor):
             lst.pop(0)
     return gyro, accl
 
-
 def check_gyro_axis(gyro, axis_index, step, event_pos, event_neg, vib, wait2Zero, cycle, invert=False):
     """Verifica giroscópio em um eixo e atualiza estado."""
     pos_thresh = config.LIMGYRO - (config.LIMGYRO * config.THRES_PERCENT)
@@ -84,14 +99,6 @@ def check_gyro_axis(gyro, axis_index, step, event_pos, event_neg, vib, wait2Zero
 
     return step, event_pos, event_neg, wait2Zero, cycle
 
-
-def check_accl_axis(gyro, axis_index, step, event_pos, event_neg, vib, wait2Zero, cycle, invert=False):
-
-    # return step, event_pos, event_neg, wait2Zero, cycle
-    # return step, event_pos, event_neg, wait2Zero, cycle
-    pass
-
-
 def check_step_wait(event_triggered, step_wait, step, delta, vib):
     """Controle de espera para repetição automática."""
     step_wait = step_wait + 1 if event_triggered else 0
@@ -101,7 +108,6 @@ def check_step_wait(event_triggered, step_wait, step, delta, vib):
         log(f"[STEP_WAIT] step={step} delta={delta}", 2)
         step_wait = 0
     return step_wait, step
-
 
 def gyro_principal(gyro, gy1, gy2, vib, state: GyroState):
     """Processa movimentos do giroscópio e atualiza estado."""
@@ -131,4 +137,45 @@ def gyro_principal(gyro, gy1, gy2, vib, state: GyroState):
     state.swYP, state.stepY = check_step_wait(state.evYP, state.swYP, state.stepY, invY * (-1 if gy1 == 0 else 1), vib)
     state.swYN, state.stepY = check_step_wait(state.evYN, state.swYN, state.stepY, invY * (1 if gy1 == 0 else -1), vib)
 
+    return state
+
+def check_accl_axis(accl, axis_index, step, event_pos, event_neg, thresholds, axis_key, invert=False):
+
+    t = thresholds[axis_key]
+    a = accl[axis_index]
+
+    # Movimento positivo
+    if not event_pos and a > t["on_pos"]:
+        step += -1 if invert else 1
+        event_pos = True
+    elif event_pos and a < t["off_pos"]:
+        event_pos = False
+
+    # Movimento negativo
+    if not event_neg and a < t["on_neg"]:
+        step += 1 if invert else -1
+        event_neg = True
+    elif event_neg and a > t["off_neg"]:
+        event_neg = False
+
+    return step, event_pos, event_neg
+
+def accl_principal(accl, thresholds, state: AcclState):
+    # Eventos do Acelerômetro
+    state.stepX, state.evXP, state.evXN = check_accl_axis(
+        accl, 0, state.stepX, state.evXP, state.evXN,
+        thresholds, "X", invert=config.INVERT_X
+    )
+
+    state.stepY, state.evYP, state.evYN = check_accl_axis(
+        accl, 1, state.stepY, state.evYP, state.evYN,
+        thresholds, "Y", invert=config.INVERT_Y
+    )
+
+    state.stepZ, state.evZP, state.evZN = check_accl_axis(
+        accl, 2, state.stepZ, state.evZP, state.evZN,
+        thresholds, "Z", invert=config.INVERT_Z
+    )
+
+    print("accl_states", state.stepX, state.stepY, state.stepZ)
     return state

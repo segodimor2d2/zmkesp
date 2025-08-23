@@ -54,9 +54,9 @@ THRES_PERCENT = 0.1     # 0.05 (5%) | 0.2 (20%)
 GY1, GY2 = 1, 0    # Ordem dos eixos: X depois Y
 
 if THIS_IS == 0:
-    INVERT_X, INVERT_Y = False, True  # T,M Inverter sentido do eixo
+    INVERT_X, INVERT_Y, INVERT_Z = False, True, True  # T,M Inverter sentido do eixo
 else:
-    INVERT_X, INVERT_Y = True, True   # T,M Inverter sentido do eixo
+    INVERT_X, INVERT_Y, INVERT_Z = True, True, True   # T,M Inverter sentido do eixo
 
 
 CALIB_ACCL_FILE = "accl_calib.json"

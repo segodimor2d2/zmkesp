@@ -6,7 +6,7 @@ from printlogs import log
 from dicctozmk import potsgyrotozmk
 from calibration import calc_pots_hysteresis, calc_accl_hysteresis
 from pots import check_pots, PotsState
-from gyro import initial_buffer, average_and_slide, gyro_principal, GyroState
+from gyro import initial_buffer, average_and_slide, gyro_principal, check_accl_axis, accl_principal, GyroState, AcclState
 
 
 def start(i2c=None, mpu=None, pots=None, vib=None, force_calib=False):
@@ -21,6 +21,7 @@ def start(i2c=None, mpu=None, pots=None, vib=None, force_calib=False):
 
     # Estado do giroscópio
     gyro_state = GyroState()
+    accl_state = AcclState()
 
     # Calcula thresholds de histerese
     pots_thresh_on, pots_thresh_off = calc_pots_hysteresis(pots, pots_state.num_pots, vib, force_calib)
@@ -51,43 +52,8 @@ def start(i2c=None, mpu=None, pots=None, vib=None, force_calib=False):
         # x[P] Y[L] Z[V]
         # print(f'x{accl[0]},y{accl[1]},z{accl[2]}')
 
-        # Eventos do Acelerometro
-        for axis, label in enumerate(["X", "Y", "Z"]):
-            a = accl[axis]
-            t = acclthresholds[label]
-            # print(f"{label}: {a:.2f}, thresholds: {t}, state: {accl_states[axis]}")
-
-            if accl_states[axis] == 0:
-                if a > t["on_pos"]:
-                    accl_states[axis] = 1
-                    stable_count[axis] = 0
-                elif a < t["on_neg"]:
-                    accl_states[axis] = -1
-                    stable_count[axis] = 0
-
-            elif accl_states[axis] == 1:
-                if a < t["off_pos"]:
-                    accl_states[axis] = 0
-                else:
-                    stable_count[axis] += 1
-
-            elif accl_states[axis] == -1:
-                if a > t["off_neg"]:
-                    accl_states[axis] = 0
-                else:
-                    stable_count[axis] += 1
-
-            # força neutro se parado por muito tempo
-            if stable_count[axis] > 50:  
-                accl_states[axis] = 0
-                stable_count[axis] = 0
-
-        print('accl_states',accl_states,'stable_count',stable_count)
-        # print('stable_count',stable_count)
-
-
-
-
+        # Atualiza acelerômetro
+        accl_state = accl_principal(accl, acclthresholds, accl_state)
 
         # Atualiza giroscópio
         gyro_state = gyro_principal(gyro, gy1, gy2, vib, gyro_state)

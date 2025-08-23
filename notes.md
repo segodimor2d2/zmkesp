@@ -111,9 +111,9 @@ mpremote connect /dev/ttyUSB0
 
 mpremote connect /dev/ttyUSB0 fs cp esp/main.py :main.py
 mpremote connect /dev/ttyUSB0 fs cp esp/config.py :config.py
+mpremote connect /dev/ttyUSB0 fs cp esp/gyro.py :gyro.py
 mpremote connect /dev/ttyUSB0 fs cp esp/calibration.py :calibration.py
 
-mpremote connect /dev/ttyUSB0 fs cp esp/gyro.py :gyro.py
 mpremote connect /dev/ttyUSB0 fs cp esp/pots.py :pots.py
 mpremote connect /dev/ttyUSB0 fs cp esp/actions.py :actions.py
 mpremote connect /dev/ttyUSB0 fs cp esp/dicctozmk.py :dicctozmk.py
@@ -2879,112 +2879,11 @@ Assim você tem exatamente a lógica que mostrou, mas adaptada ao formato `accl 
 
 Quer que eu te mostre também como inicializar `thresholds` automaticamente a partir de um `baseline` e `offsets`, tipo no caso dos pots, para economizar código?
 
-
 ---
 
 
-se o dispositivo fica em movimento ele debreia imprimir accl_states [0, 0, 0] não é verdade?
-ele esta imprimindo valores poso exatos e fica grudado ao ficar sem movimento assim por exemplo:
 
-accl_states [-1, -1, 0]
-accl_states [-1, -1, 0]
-accl_states [-1, -1, 0]
-accl_states [-1, -1, 0]
-accl_states [-1, -1, 0]
-accl_states [-1, -1, 0]
-accl_states [-1, -1, 0]
-accl_states [-1, -1, 0]
-accl_states [-1, -1, 0]
-accl_states [-1, -1, 0]
-accl_states [-1, -1, 0]
-accl_states [-1, -1, 0]
-accl_states [-1, -1, 0]
-accl_states [-1, -1, 0]
-accl_states [-1, -1, 0]
-
-o que eu poderia melhorar? ou como eu poderia debugar para ver se está funcionando?
-
-minha calibração do acelerometro assim:
-
-
-def save_accl_calibration(baselines, thresholds):
-    try:
-        calib_data = {
-            'baselines': baselines,
-            'thresholds': thresholds
-        }
-        with open(config.CALIB_ACCL_FILE, 'w') as f:   # usar outro arquivo
-            ujson.dump(calib_data, f)
-        log("Calibração do acelerômetro salva com sucesso!", 0)
-    except Exception as e:
-        log(f"Erro ao salvar calibração do acelerômetro: {e}", 0)
-
-
-def load_accl_calibration():
-    try:
-        if config.CALIB_ACCL_FILE in os.listdir():
-            with open(config.CALIB_ACCL_FILE, 'r') as f:
-                calib_data = ujson.load(f)
-            log("Calibração do acelerômetro carregada!", 0)
-            return calib_data['baselines'], calib_data['thresholds']
-    except Exception as e:
-        log(f"Erro ao carregar calibração do acelerômetro: {e}", 0)
-    return None, None
-
-
-def calc_accl_hysteresis(mpu, vib, force_calib=False):
-
-    if not force_calib:
-        baselines, thresholds = load_accl_calibration()
-        if thresholds is not None:
-            return thresholds
-        else:
-            log("Calibração do acelerômetro inválida/no arquivo, fazendo nova calibração", 0)
-            force_calib = True
-
-    if force_calib:
-        vibrar(vib, 6)
-        log("calc_accel_hysteresis... nao toque nos sensores.", 0)
-
-        # ======== CALIBRAÇÃO ========
-        N = config.SAMPLES_ACCL
-        samples = {"X": [], "Y": [], "Z": []}
-
-        for _ in range(N):
-            vals = mpu.get_values()
-            samples["X"].append(vals["AcX"])
-            samples["Y"].append(vals["AcY"])
-            samples["Z"].append(vals["AcZ"])
-            time.sleep_ms(config.TIME_ACCL_SAMPLES)
-
-        # Calcula baseline e ruído de cada eixo
-        baselines = {}
-        noises = {}
-        for axis in ["X", "Y", "Z"]:
-            baselines[axis] = sum(samples[axis]) / N
-            noises[axis] = max(samples[axis]) - min(samples[axis])
-
-        # Define thresholds com histerese para cada eixo
-        thresholds = {}
-        for axis in ["X", "Y", "Z"]:
-            baseline = baselines[axis]
-            noise = noises[axis]
-            thresholds[axis] = {
-                "on_pos":  baseline + noise * 3,
-                "off_pos": baseline + noise * 2,
-                "on_neg":  baseline - noise * 3,
-                "off_neg": baseline - noise * 2
-            }
-
-        save_accl_calibration(baselines, thresholds)
-        vibrar(vib, 6)
-        return thresholds
-
-
-
-e meu programa principal assim:
-
-
+---
 import time
 import config
 from hw import init_i2c, init_mpu, init_vibrator, init_pots
@@ -3028,6 +2927,8 @@ def start(i2c=None, mpu=None, pots=None, vib=None, force_calib=False):
     gy1, gy2 = config.GY1, config.GY2
 
     accl_states = [0, 0, 0] # 0 = neutro, 1 = positivo, -1 = negativo
+    stable_count = [0, 0, 0]
+    accl_counters = [0, 0, 0]
 
     # Loop principal
     vibrar(vib, 2)
@@ -3037,30 +2938,50 @@ def start(i2c=None, mpu=None, pots=None, vib=None, force_calib=False):
         # x[P] Y[L] Z[V]
         # print(f'x{accl[0]},y{accl[1]},z{accl[2]}')
 
-        # Eventos do Acelerometro
+        # Eventos do Acelerometro com debounce
         for axis, label in enumerate(["X", "Y", "Z"]):
             a = accl[axis]
             t = acclthresholds[label]
+            # print(f"{label}: {a:.2f}, thresholds: {t}, state: {accl_states[axis]}")
 
-            if accl_states[axis] == 0:  # neutro
+            if accl_states[axis] == 0:  # Neutro
                 if a > t["on_pos"]:
-                    # print(f"{axis}: Evento POSITIVO")
-                    accl_states[axis] = 1
+                    accl_counters[axis] += 1
+                    if accl_counters[axis] >= config.DEBOUNCE_COUNT_ACCL:
+                        accl_states[axis] = 1
+                        accl_counters[axis] = 0
                 elif a < t["on_neg"]:
-                    # print(f"{axis}: Evento NEGATIVO")
-                    accl_states[axis] = -1
+                    accl_counters[axis] += 1
+                    if accl_counters[axis] >= config.DEBOUNCE_COUNT_ACCL:
+                        accl_states[axis] = -1
+                        accl_counters[axis] = 0
+                else:
+                    accl_counters[axis] = 0
 
-            elif accl_states[axis] == 1:  # positivo ativo
+            elif accl_states[axis] == 1:  # Positivo
                 if a < t["off_pos"]:
-                    # print(f"{axis}: Positivo OFF")
-                    accl_states[axis] = 0
+                    accl_counters[axis] += 1
+                    if accl_counters[axis] >= config.DEBOUNCE_COUNT_ACCL:
+                        accl_states[axis] = 0
+                        accl_counters[axis] = 0
+                else:
+                    accl_counters[axis] = 0
 
-            elif accl_states[axis] == -1:  # negativo ativo
+            elif accl_states[axis] == -1:  # Negativo
                 if a > t["off_neg"]:
-                    # print(f"{axis}: Negativo OFF")
-                    accl_states[axis] = 0
+                    accl_counters[axis] += 1
+                    if accl_counters[axis] >= config.DEBOUNCE_COUNT_ACCL:
+                        accl_states[axis] = 0
+                        accl_counters[axis] = 0
+                else:
+                    accl_counters[axis] = 0
 
-        print('accl_states',accl_states)
+        print('accl_states',accl_states,'stable_count',stable_count)
+        # print('stable_count',stable_count)
+
+
+
+
 
         # Atualiza giroscópio
         gyro_state = gyro_principal(gyro, gy1, gy2, vib, gyro_state)
@@ -3102,35 +3023,294 @@ if __name__ == "__main__":
     vibrar(init_vibrator(), 4)
 
 
+---
+
+
+se o dispositivo fica em movimento ele debreia imprimir accl_states [0, 0, 0] não é verdade?
+ele esta imprimindo valores poso exatos e fica grudado ao ficar sem movimento assim por exemplo:
+
+
+minha calibração do acelerometro assim:
+
+e meu main.py principal assim:
+
+
+
+
+neste código estou conseguindo obetr os dados do posicionamento do dispositivo mas eu gostaria que ele pegase a sacudida positiva ou negativa dos eixos como um evento, algo similar ao código do giroscopo
+
+aqui onde esta o codigo do acelerometro:
+
+
+
+        # Eventos do Acelerometro
+        for axis, label in enumerate(["X", "Y", "Z"]):
+            a = accl[axis]
+            t = acclthresholds[label]
+            # print(f"{label}: {a:.2f}, thresholds: {t}, state: {accl_states[axis]}")
+
+            if accl_states[axis] == 0:
+                if a > t["on_pos"]:
+                    accl_states[axis] = 1
+                    stable_count[axis] = 0
+                elif a < t["on_neg"]:
+                    accl_states[axis] = -1
+                    stable_count[axis] = 0
+
+            elif accl_states[axis] == 1:
+                if a < t["off_pos"]:
+                    accl_states[axis] = 0
+                else:
+                    stable_count[axis] += 1
+
+            elif accl_states[axis] == -1:
+                if a > t["off_neg"]:
+                    accl_states[axis] = 0
+                else:
+                    stable_count[axis] += 1
+
+            # força neutro se parado por muito tempo
+            if stable_count[axis] > 50:  
+                accl_states[axis] = 0
+                stable_count[axis] = 0
+
+        print('accl_states',accl_states,'stable_count',stable_count)
+        # print('stable_count',stable_count)
+
+
+
+aqui onde esta o codigo do giroscopo:
+
+
+
+import time
+import config
+from actions import vibrar
+from printlogs import log
+
+
+class GyroState:
+    def __init__(self):
+        self.stepX = 0
+        self.stepY = 0
+        self.evXP = False
+        self.evXN = False
+        self.evYP = False
+        self.evYN = False
+        self.swXP = 0
+        self.swXN = 0
+        self.swYP = 0
+        self.swYN = 0
+        self.wait2Zero = False
+        self.cycle = 0
+
+
+def append_gyro(buffer, mpuSensor):
+    """Adiciona uma leitura ao buffer (6 listas)"""
+    if mpuSensor is None:
+        return buffer
+    try:
+        mpuData = mpuSensor.get_values()
+    except Exception as e:
+        log("MPU read error:", e, 0)
+        return buffer
+
+    keys = ['GyX', 'GyY', 'GyZ', 'AcX', 'AcY', 'AcZ']
+    for i, k in enumerate(keys):
+        buffer[i].append(mpuData.get(k, 0))
+    return buffer
+
+
+def initial_buffer(buffer, mpu):
+    for _ in range(config.SAMPLES - 1):
+        append_gyro(buffer, mpu)
+        time.sleep_ms(70)
+    return buffer
+
+
+def average_and_slide(buffer, mpuSensor):
+    """Lê mais um valor, calcula média e remove o mais antigo (sliding window)"""
+    buffer = append_gyro(buffer, mpuSensor)
+    averages = [sum(lst) / len(lst) if lst else 0 for lst in buffer]
+    gyro = averages[:3]
+    accl = averages[3:6]
+
+    # sliding window: remove o mais antigo
+    for lst in buffer:
+        if lst:
+            lst.pop(0)
+    return gyro, accl
+
+
+def check_gyro_axis(gyro, axis_index, step, event_pos, event_neg, vib, wait2Zero, cycle, invert=False):
+    """Verifica giroscópio em um eixo e atualiza estado."""
+    pos_thresh = config.LIMGYRO - (config.LIMGYRO * config.THRES_PERCENT)
+    neg_thresh = -config.LIMGYRO + (config.LIMGYRO * config.THRES_PERCENT)
+
+    if not event_pos and gyro[axis_index] > pos_thresh:
+        step += -1 if invert else 1
+        vibrar(vib, 1, step)
+        log(f"[GYRO] Eixo {axis_index} POS -> step={step}", 2)
+        event_pos = True
+        wait2Zero = True
+        cycle = 0
+    elif event_pos and gyro[axis_index] <= pos_thresh:
+        event_pos = False
+
+    if not event_neg and gyro[axis_index] < neg_thresh:
+        step += 1 if invert else -1
+        vibrar(vib, 1, step)
+        log(f"[GYRO] Eixo {axis_index} NEG -> step={step}", 2)
+        event_neg = True
+        wait2Zero = True
+        cycle = 0
+    elif event_neg and gyro[axis_index] >= neg_thresh:
+        event_neg = False
+
+    return step, event_pos, event_neg, wait2Zero, cycle
+
+
+def check_accl_axis(gyro, axis_index, step, event_pos, event_neg, vib, wait2Zero, cycle, invert=False):
+
+    # return step, event_pos, event_neg, wait2Zero, cycle
+    # return step, event_pos, event_neg, wait2Zero, cycle
+    pass
+
+
+def check_step_wait(event_triggered, step_wait, step, delta, vib):
+    """Controle de espera para repetição automática."""
+    step_wait = step_wait + 1 if event_triggered else 0
+    if step_wait >= config.STEP_WAIT_LIMIT:
+        step += delta
+        vibrar(vib, 1, step)
+        log(f"[STEP_WAIT] step={step} delta={delta}", 2)
+        step_wait = 0
+    return step_wait, step
+
+
+def gyro_principal(gyro, gy1, gy2, vib, state: GyroState):
+    """Processa movimentos do giroscópio e atualiza estado."""
+
+    # Movimento no eixo X
+    state.stepX, state.evXP, state.evXN, state.wait2Zero, state.cycle = check_gyro_axis(
+        gyro, gy1, state.stepX,
+        state.evXP, state.evXN,
+        vib, state.wait2Zero, state.cycle,
+        invert=config.INVERT_X
+    )
+
+    # Movimento no eixo Y
+    state.stepY, state.evYP, state.evYN, state.wait2Zero, state.cycle = check_gyro_axis(
+        gyro, gy2, state.stepY,
+        state.evYP, state.evYN,
+        vib, state.wait2Zero, state.cycle,
+        invert=config.INVERT_Y
+    )
+
+    # Controle de repetição automática
+    invX = -1 if config.INVERT_X else 1
+    invY = -1 if config.INVERT_Y else 1
+
+    state.swXP, state.stepX = check_step_wait(state.evXP, state.swXP, state.stepX, invX * (1 if gy1 == 0 else -1), vib)
+    state.swXN, state.stepX = check_step_wait(state.evXN, state.swXN, state.stepX, invX * (-1 if gy1 == 0 else 1), vib)
+    state.swYP, state.stepY = check_step_wait(state.evYP, state.swYP, state.stepY, invY * (-1 if gy1 == 0 else 1), vib)
+    state.swYN, state.stepY = check_step_wait(state.evYN, state.swYN, state.stepY, invY * (1 if gy1 == 0 else -1), vib)
+
+    return state
+
+
 
 
 ---
 
-sobre:
+eu poderia integrar os Thresholds da calibração para ser usado no check_accl_axis?
+sería util?
 
-MARGIN = 3000  # ajuste fino depois
-thresholds[axis] = {
-    "on_pos":  baseline + MARGIN,
-    "off_pos": baseline + MARGIN * 0.8,
-    "on_neg":  baseline - MARGIN,
-    "off_neg": baseline - MARGIN * 0.8,
-}
 
-eu estou usando 
+Thresholds Acelerometro {'Y': {'on_pos': 7839.16, 'off_pos': 7039.16, 'off_neg': 639.1599, 'on_neg': -160.84009
+}, 'X': {'on_pos': 6117.92, 'off_pos': 5317.92, 'off_neg': -1082.0801, 'on_neg': -1882.08}, 'Z': {'on_pos': -12
+653.08, 'off_pos': -13453.08, 'off_neg': -19853.08, 'on_neg': -20653.08}}
 
-ACCL_MAD_MIN = 5  
-ACCL_MAD_MAX = 10 
 
-        accl_mad_min = config.ACCL_MAD_MIN # 2
-        accl_mad_max = config.ACCL_MAD_MAX # 3
+def check_accl_axis(accl, axis_index, step, event_pos, event_neg, invert=False):
+
+    LIMACCL = 20000   # limite bruto do acelerômetro (ajustar na prática)
+    THRES_PERCENT = 0.2  # margem percentual
+    
+    pos_thresh = LIMACCL - (LIMACCL * THRES_PERCENT)
+    neg_thresh = -LIMACCL + (LIMACCL * THRES_PERCENT)
+
+    if not event_pos and accl[axis_index] > pos_thresh:
+        step += -1 if invert else 1
+        event_pos = True
+    elif event_pos and accl[axis_index] <= pos_thresh:
+        event_pos = False
+
+    if not event_neg and accl[axis_index] < neg_thresh:
+        step += 1 if invert else -1
+        event_neg = True
+    elif event_neg and accl[axis_index] >= neg_thresh:
+        event_neg = False
+
+    return step, event_pos, event_neg
+
+aqui minha função da calibração:
+
+
+def calc_accl_hysteresis(mpu, vib, force_calib=False):
+
+    if not force_calib:
+        baselines, thresholds = load_accl_calibration()
+        if thresholds is not None:
+            return thresholds
+        else:
+            log("Calibração do acelerômetro inválida/no arquivo, fazendo nova calibração", 0)
+            force_calib = True
+
+    if force_calib:
+        vibrar(vib, 6)
+        log("calc_accel_hysteresis... nao toque nos sensores.", 0)
+
+        # ======== CALIBRAÇÃO ========
+        N = config.SAMPLES_ACCL
+
+        margin_min = config.MARGIN_MIN # 2000
+        margin_max = config.MARGIN_MAX # 4000
+        accl_mad_max = config.ACCL_MAD_MAX # 5
+        samples = {"X": [], "Y": [], "Z": []}
+
+        for _ in range(N):
+            vals = mpu.get_values()
+            samples["X"].append(vals["AcX"])
+            samples["Y"].append(vals["AcY"])
+            samples["Z"].append(vals["AcZ"])
+            time.sleep_ms(config.TIME_ACCL_SAMPLES)
+
+        # Calcula baseline e ruído de cada eixo
+        baselines = {}
+        noises = {}
+        for axis in ["X", "Y", "Z"]:
+            baselines[axis] = sum(samples[axis]) / N
+            noises[axis] = max(samples[axis]) - min(samples[axis])
+
+        # Define thresholds com histerese para cada eixo
+        thresholds = {}
+        for axis in ["X", "Y", "Z"]:
+            baseline = baselines[axis]
+            noise = noises[axis]
+
+            margin = int(noise * accl_mad_max)
+            margin = max(margin_min, min(margin_max, margin))  # limita a faixa
 
             thresholds[axis] = {
-                "on_pos":  baseline + noise * accl_mad_max,
-                "off_pos": baseline + noise * accl_mad_min,
-                "on_neg":  baseline - noise * accl_mad_max,
-                "off_neg": baseline - noise * accl_mad_min
+                "on_pos": baseline + margin,
+                "off_pos": baseline + int(margin * 0.8),
+                "on_neg": baseline - margin,
+                "off_neg": baseline - int(margin * 0.8)
             }
 
+        save_accl_calibration(baselines, thresholds)
+        vibrar(vib, 6)
+        return thresholds
 
-me ajuda a criar um calculo para chegar a algo similar ao margin 3000
 

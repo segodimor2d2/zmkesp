@@ -102,6 +102,7 @@ mpremote repl
 
 mpremote kill
 mpremote reset
+
 mpremote exec "raise KeyboardInterrupt"
 mpremote exec "import machine; machine.reset()"
 mpremote exec ""
@@ -124,10 +125,40 @@ mpremote connect /dev/ttyUSB0 fs cp esp/printlogs.py :printlogs.py
 
 
 
+accl_calib.json
+actions.py
+boot.py
+calibration.py
+config.py
+dicctozmk.py
+gyro.py
+hw.py
+main.py
+mpu6050.py
+pots.py
+pots_calib.json
+printlogs.py
+utils.py
 
 
 
+mpremote fs ls
 
+mpremote rm accl_calib.json
+mpremote rm actions.py
+mpremote rm boot.py
+mpremote rm calibration.py
+mpremote rm config.py
+mpremote rm dicctozmk.py
+mpremote rm gyro.py
+mpremote rm hw.py
+mpremote rm main.py
+mpremote rm mpu6050.py
+mpremote rm pots.py
+mpremote rm pots_calib.json
+mpremote rm printlogs.py
+
+mpremote rm utils.py
 
 
 
@@ -231,6 +262,7 @@ mpremote rm nome_do_arquivo.py
 mpremote rm hidcodes.py
 mpremote rm hardware.py
 mpremote rm sensors.py
+mpremote rm calib.json
 
 rshell --port /dev/ttyACM0
 
@@ -3335,5 +3367,76 @@ def check_accl_axis(accl, axis_index, step, event_pos, event_neg, thresholds, ax
         event_neg = True
     elif event_neg and a > t["off_neg"]:
         event_neg = False
+
+    return step, event_pos, event_neg
+
+---
+
+eu vi esse codigo como exemplo para mover um mouse com o acelerometro:
+
+accel = read_accel_x()
+
+if not ativo and accel > thresh_on:
+    ativo = True
+
+elif ativo and accel < thresh_off:
+    ativo = False
+
+if ativo:
+    # calcula velocidade proporcional à força
+    velocidade = k * (accel - thresh_off)
+    mover_mouse(velocidade)
+else:
+    mover_mouse(0)
+
+
+por favor me ajude a implementar isso no meu código que ja tem dados do acelerometro
+e tem os thresholds para cada eixo no sentido positivo e negativo para cada assim:
+
+
+Thresholds Acelerometro {'Y': {'on_pos': 7839.16, 'off_pos': 7039.16, 'off_neg': 639.1599, 'on_neg': -160.84009
+}, 'X': {'on_pos': 6117.92, 'off_pos': 5317.92, 'off_neg': -1082.0801, 'on_neg': -1882.08}, 'Z': {'on_pos': -12
+653.08, 'off_pos': -13453.08, 'off_neg': -19853.08, 'on_neg': -20653.08}}
+
+
+ACCL_SENS = {
+    "X_pos": 1.0,
+    "X_neg": 1.0,
+    "Y_pos": 1.0,
+    "Y_neg": 1.0,
+    "Z_pos": 1.0,
+    "Z_neg": 1.0
+}
+
+aqui está o código que eu tenho e onde eu quero implementar o codigo do mouse:
+
+def check_accl_axis(accl, axis_index, step, event_pos, event_neg, thresholds, axis_key, invert=False):
+    t = thresholds[axis_key]
+    a = accl[axis_index]
+
+    # Ajusta thresholds com fator de sensibilidade
+    sens = getattr(config, "ACCL_SENS", {}).get(axis_key, 1.0)
+    on_pos  = t["on_pos"]  * sens
+    off_pos = t["off_pos"] * sens
+    on_neg  = t["on_neg"]  * sens
+    off_neg = t["off_neg"] * sens
+
+    # Movimento positivo
+    if not event_pos and a > on_pos:
+        step += -1 if invert else 1
+        event_pos = True
+    elif event_pos and a < off_pos:
+        event_pos = False
+
+    # Movimento negativo
+    if not event_neg and a < on_neg:
+        step += 1 if invert else -1
+        event_neg = True
+    elif event_neg and a > off_neg:
+        event_neg = False
+
+    # ===== Reset para zero quando estável =====
+    if off_neg < a < off_pos and not event_pos and not event_neg:
+        step = 0
 
     return step, event_pos, event_neg

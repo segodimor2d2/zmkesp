@@ -21,9 +21,9 @@ class GyroState:
 
 class AcclState:
     def __init__(self):
-        self.stepX = 0
-        self.stepY = 0
-        self.stepZ = 0
+        self.velX = 0
+        self.velY = 0
+        self.velZ = 0
         self.evXP = False
         self.evXN = False
         self.evYP = False
@@ -133,7 +133,7 @@ def gyro_principal(gyro, gy1, gy2, vib, state: GyroState):
 
     return state
 
-def check_accl_axis(accl, axis_index, step, event_pos, event_neg, thresholds, axis_key, invert=False):
+def check_accl_axis(accl, axis_index, step, event_pos, event_neg, thresholds, axis_key, invert=False, k=0.01):
     t = thresholds[axis_key]
     a = accl[axis_index]
 
@@ -144,42 +144,55 @@ def check_accl_axis(accl, axis_index, step, event_pos, event_neg, thresholds, ax
     on_neg  = t["on_neg"]  * sens
     off_neg = t["off_neg"] * sens
 
+    velocidade = 0  # padrão = parado
+
     # Movimento positivo
     if not event_pos and a > on_pos:
-        step += -1 if invert else 1
         event_pos = True
     elif event_pos and a < off_pos:
         event_pos = False
 
+    if event_pos:
+        # calcula velocidade proporcional ao quanto passou do off_pos
+        velocidade = k * (a - off_pos)
+        if invert:
+            velocidade = -velocidade
+
     # Movimento negativo
     if not event_neg and a < on_neg:
-        step += 1 if invert else -1
         event_neg = True
     elif event_neg and a > off_neg:
         event_neg = False
 
+    if event_neg:
+        # calcula velocidade proporcional ao quanto passou do off_neg
+        velocidade = k * (a - off_neg)
+        if not invert:
+            velocidade = -velocidade
+
     # ===== Reset para zero quando estável =====
     if off_neg < a < off_pos and not event_pos and not event_neg:
-        step = 0
+        velocidade = 0
 
-    return step, event_pos, event_neg
+    return velocidade, event_pos, event_neg
 
 def accl_principal(accl, thresholds, state: AcclState):
     # Eventos do Acelerômetro
-    state.stepX, state.evXP, state.evXN = check_accl_axis(
-        accl, 0, state.stepX, state.evXP, state.evXN,
+    state.velX, state.evXP, state.evXN = check_accl_axis(
+        accl, 0, state.velX, state.evXP, state.evXN,
         thresholds, "X", invert=config.INVERT_X
     )
 
-    state.stepY, state.evYP, state.evYN = check_accl_axis(
-        accl, 1, state.stepY, state.evYP, state.evYN,
+    state.velY, state.evYP, state.evYN = check_accl_axis(
+        accl, 1, state.velY, state.evYP, state.evYN,
         thresholds, "Y", invert=config.INVERT_Y
     )
 
-    state.stepZ, state.evZP, state.evZN = check_accl_axis(
-        accl, 2, state.stepZ, state.evZP, state.evZN,
+    state.velZ, state.evZP, state.evZN = check_accl_axis(
+        accl, 2, state.velZ, state.evZP, state.evZN,
         thresholds, "Z", invert=config.INVERT_Z
     )
 
-    print("accl_states", state.stepX, state.stepY, state.stepZ)
+    print("accl_states", state.velX, state.velY, state.velZ)
+
     return state

@@ -33,16 +33,13 @@ def init_vibrator(pin_no=(pinos_vib)):
     return p
 
 def init_pots(pins=(pinos)):
-    pots = [TouchPad(Pin(p)) for p in pins]
-
-    test_pots = [i for i, p in enumerate(pots) if p.read() < 0]
-    print('test_pots',test_pots)
-
-    if len(test_pots) > 0:
-        log("test_pots erro:", test_pots, 0)
+    try:
+        pots = [TouchPad(Pin(p)) for p in pins]
+        return pots
+    except Exception as e:
         # sys.exit("encerrando programa.")
         # raise SystemExit
-        raise KeyboardInterrupt("Parando programa!")
-
-    return pots
+        # raise KeyboardInterrupt("Parando programa!")
+        log("init_mpu erro:", e, 0)
+        return None
 

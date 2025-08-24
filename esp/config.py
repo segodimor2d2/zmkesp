@@ -71,12 +71,12 @@ MARGIN_MAX = 4000 # 4000
 # "Y": 1.0 Eixo Y fica normal.
 # "Z": 0.7 Eixo Z fica menos sensível (precisa de movimento 30% maior).
 ACCL_SENS = {
-    "X_pos": 0.001,
-    "X_neg": 0.001,
-    "Y_pos": 0.001,
-    "Y_neg": 0.001,
-    "Z_pos": 0.001,
-    "Z_neg": 0.001
+    "X_pos": 1.0,
+    "X_neg": 1.0,
+    "Y_pos": 1.0,
+    "Y_neg": 1.0,
+    "Z_pos": 1.0,
+    "Z_neg": 1.0
 }
 
 

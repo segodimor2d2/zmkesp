@@ -1,6 +1,6 @@
 import time
 import config
-from hw import init_i2c, init_mpu, init_vibrator, init_pots
+from hw import init_i2c, init_mpu, init_vibrator, init_pots, test_pots
 from actions import vibrar, send_charPs
 from printlogs import log
 from dicctozmk import potsgyrotozmk
@@ -28,8 +28,8 @@ def start(i2c=None, mpu=None, pots=None, vib=None, force_calib=False):
     print("Thresholds on:", pots_thresh_on)
     print("Thresholds off:", pots_thresh_off)
 
-    acclthresholds = calc_accl_hysteresis(mpu, vib, force_calib)
-    print("\nThresholds Acelerometro", acclthresholds)
+    # acclthresholds = calc_accl_hysteresis(mpu, vib, force_calib)
+    # print("\nThresholds Acelerometro", acclthresholds)
 
     # print("------------------------------------")
     # raise KeyboardInterrupt("Parando programa!")
@@ -53,7 +53,7 @@ def start(i2c=None, mpu=None, pots=None, vib=None, force_calib=False):
         # print(f'x{accl[0]},y{accl[1]},z{accl[2]}')
 
         # Atualiza acelerômetro
-        accl_state = accl_principal(accl, acclthresholds, accl_state)
+        # accl_state = accl_principal(accl, acclthresholds, accl_state)
 
         # Atualiza giroscópio
         gyro_state = gyro_principal(gyro, gy1, gy2, vib, gyro_state)
@@ -68,7 +68,10 @@ def start(i2c=None, mpu=None, pots=None, vib=None, force_calib=False):
         )
 
         if res_check_pots is not None:
-            # log(f'potsgyrotozmk {res_check_pots}', 0)
+            log(f'res_check_pots {res_check_pots}', 0)
+            if res_check_pots[0][1] == -2:
+                if res_check_pots[1] == 0 and res_check_pots[2] == 1:
+                    start(force_calib=True)
             tozmk = potsgyrotozmk(*res_check_pots)
             # log(f'send_charPs {tozmk}', 0)
             # send_charPs(tozmk)

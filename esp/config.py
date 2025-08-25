@@ -5,13 +5,18 @@ import ubinascii
 # ============================================================
 # PINAGEM (ESQUERDA E DIREITA)
 # ============================================================
-PINOS_R = 13,12,14,27,4,33
-INDEX_MAP_R = 0,1,2,3,4,5
-PINOS_VIB_R = 26
 
+# L 0G,1I,2C,3A,4M,5G
+# L 4G,3I,2C,1A,5M,0G
 PINOS_L = 12,13,14,27,4,33
-INDEX_MAP_L = 0,1,2,4,3,5
+INDEX_MAP_L = 4,3,2,1,5,0
 PINOS_VIB_L = 26
+
+# R 0G,1I,2C,3A,4M,5G
+# R 0G,5I,1C,2A,4M,3G
+PINOS_R = 12,13,14,27,4,33
+INDEX_MAP_R = 0,5,1,2,4,3
+PINOS_VIB_R = 26
 
 # ============================================================
 # IDENTIFICAÇÃO DO CHIP / DEFINIÇÃO DO LADO
@@ -28,7 +33,15 @@ THIS_IS = 0 if chip_id == alesp else 1
 print("THIS_IS:", THIS_IS)
 
 # INDEX MAP final (depende do lado detectado)
-INDEX_MAP_POTS = list(INDEX_MAP_L if THIS_IS == 0 else INDEX_MAP_R)
+# Correção: atribua diretamente a lista/tupla correta
+if THIS_IS == 0:
+    INDEX_MAP_POTS = list(INDEX_MAP_L)
+    PINOS = list(PINOS_R)
+    PINOS_VIB = PINOS_VIB_R
+else:
+    INDEX_MAP_POTS = list(INDEX_MAP_R)
+    PINOS = list(PINOS_L)
+    PINOS_VIB = PINOS_VIB_L
 
 
 
@@ -36,7 +49,7 @@ INDEX_MAP_POTS = list(INDEX_MAP_L if THIS_IS == 0 else INDEX_MAP_R)
 # CONFIGURAÇÕES DE TOUCH
 # ============================================================
 CALIB_POTS_FILE = "pots_calib.json"
-MAD_MIN = 5 # limites de MAD para evitar thresholds muito colados
+MAD_MIN = 10 # limites de MAD para evitar thresholds muito colados
 MAD_MAX = 50 # limites de MAD para evitar thresholds muito colados
 SAMPLES_HYSTERESIS = 100 # amostras para calibrar os pots
 TIMEMS_SAMPLES = 70 # tempo para coleta de amostras

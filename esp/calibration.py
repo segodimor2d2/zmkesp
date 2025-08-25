@@ -14,7 +14,7 @@ def save_calibration(baseline, press_thresh, release_thresh):
         }
         with open(config.CALIB_POTS_FILE, 'w') as f:
             ujson.dump(calib_data, f)
-        log("Pots Calibração dos pots salva com sucesso!", 1)
+        log("Pots Calibração dos pots salva com sucesso!", 0)
     except Exception as e:
         log(f"Erro ao salvar calibração dos pots: {e}", 0)
 
@@ -50,7 +50,7 @@ def calc_pots_hysteresis(pots, num_pots, vib, force_calib=False):
 
     if force_calib:
         vibrar(vib, 6)
-        log("calc_pots_hysteresis... nao toque nos sensores.", 0)
+        log("\ncalc_pots_hysteresis... nao toque nos sensores.", 0)
 
         # k: multiplicador para ajustar sensibilidade.
         k = config.K_SENSIBILIDADE
@@ -79,6 +79,7 @@ def calc_pots_hysteresis(pots, num_pots, vib, force_calib=False):
         pots_thresh_off = [baseline[i] - (k/2) * mad[i] for i in range(num_pots)]
 
         save_calibration(baseline, pots_thresh_on, pots_thresh_off)
+        log("calc_pots_hysteresi concluido", 0)
         vibrar(vib, 6)
 
         return pots_thresh_on, pots_thresh_off
@@ -121,7 +122,7 @@ def calc_accl_hysteresis(mpu, vib, force_calib=False):
 
     if force_calib:
         vibrar(vib, 6)
-        log("calc_accel_hysteresis... nao toque nos sensores.", 0)
+        log("\ncalc_accel_hysteresis... nao toque nos sensores.", 0)
 
         # ======== CALIBRAÇÃO ========
         N = config.SAMPLES_ACCL
@@ -162,6 +163,7 @@ def calc_accl_hysteresis(mpu, vib, force_calib=False):
             }
 
         save_accl_calibration(baselines, thresholds)
+        log("calc_accel_hysteresis concluido", 0)
         vibrar(vib, 6)
         return thresholds
 

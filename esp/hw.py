@@ -3,13 +3,8 @@ import time
 import config
 from printlogs import log
 
-if config.THIS_IS == 1:
-    pinos = config.PINOS_R
-    pinos_vib = config.PINOS_VIB_R
-
-if config.THIS_IS == 0:
-    pinos = config.PINOS_L
-    pinos_vib = config.PINOS_VIB_L
+pinos = config.PINOS
+pinos_vib = config.PINOS_VIB
 
 def init_i2c(scl_pin=22, sda_pin=21):
     return SoftI2C(scl=Pin(scl_pin), sda=Pin(sda_pin))
@@ -32,8 +27,32 @@ def init_vibrator(pin_no=(pinos_vib)):
         pass
     return p
 
+def test_pots():
+    touch_pins = [4, 0, 2, 15, 13, 12, 14, 27, 33, 32]  # possíveis pinos touch no ESP32
+    erros = []  # lista para guardar pinos problemáticos
+    for pin in touch_pins:
+        try:
+            tp = TouchPad(Pin(pin))
+            vals = []
+            for _ in range(5):
+                vals.append(tp.read())
+                time.sleep_ms(50)
+            print(f"OK: TouchPad inicializado no pino {pin}, leituras = {vals}")
+        except Exception as e:
+            print(f"ERRO no pino {pin}: {e}")
+            erros.append(pin)
+
+    # Resumo final
+    if erros:
+        print("Pinos com problema:", ", ".join(str(p) for p in erros))
+        print("******************************\n")
+    else:
+        print("Todos os pinos testados estão funcionando!")
+        print("******************************\n")
+
 def init_pots(pins=(pinos)):
     try:
+        test_pots()
         pots = [TouchPad(Pin(p)) for p in pins]
         return pots
     except Exception as e:

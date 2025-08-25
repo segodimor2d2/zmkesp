@@ -22,8 +22,12 @@ def check_pots(pots, abclevel, press_thresh, release_thresh, state: PotsState):
         if i >= state.num_pots:
             log(f"Erro: Índice {i} fora dos limites (max {state.num_pots})", 0)
             continue
+        try:
+            val = pot.read()
+        except Exception as e:
+            log(f"Erro ao ler TouchPad no índice {i} pino {config.PINOS[i]} (pot {pot}): {e}", 0)
+            continue
 
-        val = pot.read()
         state.pval[i] = val
         mapped_i = config.INDEX_MAP_POTS[i]
 

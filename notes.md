@@ -91,9 +91,15 @@ https://www.mercadolivre.com.br/20-placa-de-fenolite-cobreado-10x30-cm-p-pcb-pci
 38/2=19.0$ dividir 2m 2 20x30
 
 
-$$$$
 
-start(force_calib=True)
+mpremote connect /dev/ttyUSB0 
+mpremote connect auto
+mpremote repl
+mpremote connect list
+ls /dev/tty*
+
+
+$$$$
 
 # ESP
 mpremote fs ls
@@ -105,21 +111,26 @@ mpremote reset
 
 mpremote exec "raise KeyboardInterrupt"
 mpremote exec "import machine; machine.reset()"
-mpremote exec ""
+mpremote exec "start(force_calib=True)"
 
+
+
+test_pots()
+start(force_calib=True)
 ## RUN
-mpremote connect /dev/ttyUSB0 
+mpremote connect /dev/ttyUSB0
+mpremote connect auto
 
 mpremote connect /dev/ttyUSB0 fs cp esp/main.py :main.py
 mpremote connect /dev/ttyUSB0 fs cp esp/config.py :config.py
 mpremote connect /dev/ttyUSB0 fs cp esp/gyro.py :gyro.py
+mpremote connect /dev/ttyUSB0 fs cp esp/pots.py :pots.py
 
 mpremote connect /dev/ttyUSB0 fs cp esp/calibration.py :calibration.py
-mpremote connect /dev/ttyUSB0 fs cp esp/pots.py :pots.py
 mpremote connect /dev/ttyUSB0 fs cp esp/actions.py :actions.py
 mpremote connect /dev/ttyUSB0 fs cp esp/dicctozmk.py :dicctozmk.py
 mpremote connect /dev/ttyUSB0 fs cp esp/hw.py :hw.py
-
+mpremote fs ls
 mpremote connect /dev/ttyUSB0 fs cp esp/mpu6050.py :mpu6050.py
 mpremote connect /dev/ttyUSB0 fs cp esp/printlogs.py :printlogs.py
 
@@ -3440,3 +3451,515 @@ def check_accl_axis(accl, axis_index, step, event_pos, event_neg, thresholds, ax
         step = 0
 
     return step, event_pos, event_neg
+
+
+---
+
+me ajuda entende qual pino esta tendo problema:  
+
+o meu config esta assim: 
+
+PINOS_R = 13,12,14,27,4,33
+INDEX_MAP_R = 0,1,2,3,4,5
+PINOS_VIB_R = 26
+
+
+Chip ID: 78e36d170944
+THIS_IS: 1
+OK: TouchPad inicializado no pino 4, leituras = [526, 568, 567, 567, 568]
+ERRO no pino 0: Touch pad error
+ERRO no pino 2: Touch pad error
+OK: TouchPad inicializado no pino 15, leituras = [755, 754, 754, 755, 753]
+OK: TouchPad inicializado no pino 13, leituras = [484, 482, 484, 484, 484]
+OK: TouchPad inicializado no pino 12, leituras = [514, 506, 508, 519, 510]
+OK: TouchPad inicializado no pino 14, leituras = [540, 541, 537, 537, 548]
+OK: TouchPad inicializado no pino 27, leituras = [595, 599, 600, 597, 596]
+ERRO no pino 33: Touch pad error
+ERRO no pino 32: Touch pad error
+Thresholds on: [467.6979, 474.7647, 501.7789, 582.5297, 537.0697, 220.153]
+Thresholds off: [475.1979, 482.2647, 509.2789, 590.0297, 544.5697, 227.653]
+Erro ao ler TouchPad no índice 5 (pot <TouchPad>): Touch pad error
+Erro ao ler TouchPad no índice 5 (pot <TouchPad>): Touch pad error
+Erro ao ler TouchPad no índice 5 (pot <TouchPad>): Touch pad error
+Erro ao ler TouchPad no índice 5 (pot <TouchPad>): Touch pad error
+Erro ao ler TouchPad no índice 5 (pot <TouchPad>): Touch pad error
+Erro ao ler TouchPad no índice 5 (pot <TouchPad>): Touch pad error
+Erro ao ler TouchPad no índice 5 (pot <TouchPad>): Touch pad error
+Erro ao ler TouchPad no índice 5 (pot <TouchPad>): Touch pad error
+Erro ao ler TouchPad no índice 5 (pot <TouchPad>): Touch pad error
+Erro ao ler TouchPad no índice 5 (pot <TouchPad>): Touch pad error
+Erro ao ler TouchPad no índice 5 (pot <TouchPad>): Touch pad error
+Erro ao ler TouchPad no índice 5 (pot <TouchPad>): Touch pad error
+
+
+
+
+---
+
+Exato, Segodimo 👍
+
+O **TouchPad do ESP32** é bem sensível a ruídos elétricos e ao ambiente físico, e alguns problemas que você descreveu (variação de leitura, erros em certos pinos, alteração quando os fios estão próximos) são comuns. Vou te explicar os pontos principais e como mitigar:
+
+---
+
+### ⚡ Por que acontece
+
+1. **Ruído e interferência** – Fios longos ou próximos criam capacitância parasita, mudando a leitura do sensor touch.
+2. **Crosstalk entre pinos** – Pinos de touch vizinhos no chip podem interferir entre si, principalmente quando fios ficam colados.
+3. **Umidade / toque falso** – A umidade no ambiente ou até respingos na placa alteram a capacitância.
+4. **Falhas na leitura** – Se o valor lido fica fora da faixa esperada (muito baixo ou alto), o driver pode até lançar erro.
+
+---
+
+### 🛠️ Formas de corrigir ou minimizar
+
+#### 1. **Calibração e thresholds dinâmicos**
+
+* Sempre tire uma **média inicial de baseline** sem toque.
+* Defina thresholds relativos ao baseline, e não valores fixos.
+* Recalibre periodicamente (ou quando detectar leitura muito instável).
+
+Exemplo em MicroPython:
+
+```python
+from machine import TouchPad, Pin
+import time
+
+pin = TouchPad(Pin(33))
+
+# Calibração inicial
+baseline = sum(pin.read() for _ in range(20)) // 20
+threshold = baseline - 200  # ajuste conforme seu caso
+
+while True:
+    val = pin.read()
+    if val < threshold:
+        print("Toque detectado", val)
+    time.sleep(0.05)
+```
+
+---
+
+#### 2. **Layout e fiação**
+
+* Use fios **curtos** e bem separados (evite passar juntos em paralelo).
+* Se possível, use cabo blindado (tipo cabo de áudio ou coaxial) com o GND na malha.
+* Mantenha distância de fios que levam sinais de alta frequência (ex.: I2C, SPI, PWM).
+
+---
+
+#### 3. **Filtros de software**
+
+* Use **média móvel** ou **mediana** em vez de valores crus.
+* Implemente **debounce por tempo** para não disparar em leituras isoladas.
+
+---
+
+#### 4. **Testar diferentes pinos**
+
+* Nem todos os pinos de touch do ESP32 são iguais; alguns são mais confiáveis.
+* Tente alternar entre os disponíveis:
+  `0, 2, 4, 12, 13, 14, 15, 27, 32, 33`
+
+---
+
+#### 5. **Pull-down e resistores**
+
+* Em alguns casos, adicionar um resistor de pull-down (1MΩ \~ 10MΩ) pode ajudar a estabilizar leituras quando não há toque.
+
+---
+
+👉 Pergunto: você quer que eu te ajude a montar uma **função de leitura robusta** que já faça:
+
+* calibração automática,
+* média móvel,
+* detecção de toque,
+* e fallback em caso de erro no pino?
+
+Assim já fica pronto para uso nos teus sensores.
+
+boa! dá pra melhorar bastante a robustez só mexendo no hardware. vou dividir em duas partes: (A) dicas práticas de hardware/layout/fiação e (B) como e por que usar pull-down (e outros resistores) nos Touch do ESP32.
+
+---
+
+# A) Dicas de hardware que realmente ajudam
+
+**1) Fios curtos e separados**
+
+* Quanto mais longo o fio do “eletrodo” de touch, maior a capacitância parasita → mais ruído e mais variação.
+* Tenta manter **<10–15 cm** quando possível e **não** roteá-los em paralelo. Se precisarem cruzar outros fios, que seja **em 90°**.
+
+**2) Par trançado/Blindagem**
+
+* Use **par trançado**: “sinal” + **GND**. Isso reduz captação de interferência.
+* Se puder, cabo blindado (malha ligada a **GND**): ligue a malha **em um único ponto** (lado do ESP32) para evitar loop de terra.
+
+**3) Guardas e espaçamento**
+
+* Se fizer PCB: mantenha **um anel de guarda (guard ring)** de **GND** ao redor do eletrodo (sem tocar o eletrodo). Isso “captura” ruído lateral e reduz crosstalk.
+* Deixe **keepout de GND** logo abaixo do eletrodo (no layer de baixo) para aumentar sensibilidade; mas **não exagere** se o ambiente for ruidoso.
+
+**4) Eletrodo (tamanho/material)**
+
+* Formato redondo/oval com área moderada (\~1–2 cm²) costuma ser estável.
+* Sobreposição: acrílico/PCB/soldmask. Quanto **mais espessa** a cobertura, **menor** sensibilidade (mais imune a ruído/umidade, porém).
+
+**5) Umidade e sujeira**
+
+* Umidade “imita” toque. Se o ambiente for úmido, use **revestimento conformal** (ou mesmo fita transparente boa) e **recalibração periódica** por software.
+
+**6) Aterramento e alimentação**
+
+* Fonte estável: um **LDO 3,3 V** limpo ajuda (USB ruidoso pode atrapalhar).
+* **Desacoplamento** perto do ESP32: **100 nF** cerâmico por pino de Vdd + **10 µF** de bulk.
+* Evite compartilhar GND de cargas comutadas (motores, LEDs PWM) no mesmo caminho do GND dos sensores → **estrela** ou planos dedicados.
+
+**7) ESD/Proteção**
+
+* Se o eletrodo for acessível ao toque humano “pelado” (sem camada protetora), um **resistor em série** pequeno (100–330 Ω) no fio do eletrodo dá **alívio de ESD** sem degradar muito a medição.
+
+**8) Redução de crosstalk**
+
+* Entre linhas de touch, deixe **espaçamento generoso** (≥3× a largura da trilha).
+* Se possível, roteie **guard traces** de GND entre elas.
+
+**9) Filtrar na fonte (com cuidado)**
+
+* Evite adicionar capacitores diretos ao GND no eletrodo: **aumenta a capacitância total**, reduzindo a faixa dinâmica e pode mascarar o toque.
+* Se for usar, que seja **bem pequeno** (pF baixos, só em último caso) e teste.
+
+---
+
+# B) Pull-down e resistores — como funcionam e como escolher
+
+### Como o ESP32 mede “touch”
+
+Os pinos touch do ESP32 medem **tempo/contagem** de carga/descarga de um pequeno circuito RC interno.
+Quando você aproxima o dedo, a **capacitância efetiva do eletrodo aumenta**, o que **altera o tempo** de carga/descarga. O driver reporta um **valor (contagem)** que diminui/aumenta conforme essa capacitância muda (depende da versão/SDK, mas a ideia é: **capacitância ↑ → tempo ↑** → valor lido muda).
+
+### Onde entra o pull-down
+
+Colocar um **resistor pull-down (grande)** do eletrodo para **GND**:
+
+* cria um **caminho de descarga** lento e previsível para o eletrodo,
+* **estabiliza** o potencial quando nada toca,
+* **acelera** a recuperação depois de um toque/ruído,
+* pode **reduzir falsos toques** por interferência “flutuante”.
+
+> Pense no eletrodo como um capacitor C para GND. Com um pull-down R, você forma uma constante de tempo **τ = R·C**.
+> Se R for **muito baixo**, você “mata” a sensibilidade (o circuito descarrega rápido demais).
+> Se R for **alto o suficiente** (megaohms), você estabiliza sem roubar muita sensibilidade.
+
+### Valores práticos
+
+* Comece com **4,7 MΩ** a **10 MΩ**.
+* Se ainda estiver muito “nervoso”, suba para **15–22 MΩ**.
+* Se ficar **pouco sensível**, baixe para **2,2 MΩ – 3,3 MΩ**.
+
+> Regra de bolso: com fio + eletrodo, a capacitância parasita fica fácil em **20–100 pF** (ou mais).
+> Com R = 5 MΩ e C = 50 pF → τ ≈ **0,25 ms**. Isso já dá uma ancoragem sem matar a variação causada pelo dedo (que adiciona dezenas a centenas de pF dependendo do design).
+
+### Onde soldar
+
+* **Entre o fio do eletrodo e GND**, o mais **perto possível do ESP32** (lado da placa), para ancorar o nó antes do cabo pegar ruído.
+* Se tiver vários eletrodos, cada um com seu **R** individual.
+
+### Pull-up vs pull-down?
+
+* Use **pull-down** (para GND). Pull-up para 3V3 raramente é útil aqui e pode injetar carga indesejada.
+
+### Resistor em série (extra)
+
+* **100–330 Ω em série** no fio do eletrodo (perto do ESP32) ajuda contra ESD e RF sem impactar muito.
+* Evite valores altos (kΩ), pois começam a interferir no tempo de carga/descarga que o periférico mede.
+
+### “RC de filtro” (capacitor ao GND)
+
+* Só em casos extremos, e **bem pequeno** (1–10 pF) + teste.
+* Capacitor grande (≥100 pF) **achata** a diferença entre “toque” e “sem toque”.
+
+---
+
+## Passo a passo para você ajustar no seu setup
+
+1. **Arrume a fiação**: encurte, separe, trançado com GND, blinde se der.
+2. **Alimentação limpa** e desacoplamento perto do ESP32.
+3. **Coloque pull-down** de **4,7–10 MΩ** em cada eletrodo.
+4. (Opcional) **Série 100–330 Ω** no fio do eletrodo, perto do ESP32.
+5. **Recalibração** por software (baseline + thresholds relativos).
+6. Se ainda “nervoso”:
+
+   * aumente pull-down (até \~22 MΩ) **ou**
+   * reduza área do eletrodo **ou**
+   * aumente cobertura/espessura (menor sensibilidade, mais estabilidade).
+7. Se ficou “duro” (pouca sensibilidade):
+
+   * diminua o pull-down (3,3–2,2 MΩ) **ou**
+   * aumente a área do eletrodo **ou**
+   * afrouxe a blindagem (menor blindagem → mais sensível, porém mais ruído).
+
+---
+
+se quiser, te mando um esqueminha rápido (fiação + resistores) com valores sugeridos por pino, e já adapto para os **pinos específicos** que você está usando (ex.: 4, 0, 2, 15, 13, 12, 14, 27, 33, 32). basta me dizer seu comprimento de fio aproximado e como estão posicionados os eletrodos 😉
+
+
+---
+
+
+Perfeito, Segodimo 🙌 agora ficou claro: você está usando o **fio de cobre cru como "botão" touch**.
+Vou te explicar de forma bem simples o que está acontecendo:
+
+---
+
+## 🌱 Como funciona o "touch" do ESP32
+
+* Cada pino **touch** do ESP32 é ligado internamente a um **sensor capacitivo**.
+* Ele **mede a capacitância** naquele pino.
+* **Capacitância** é, em resumo, a capacidade de armazenar carga elétrica.
+* Quando você aproxima o **dedo** (que é cheio de água e eletrólitos → bom condutor) do fio ou da placa, você **aumenta a capacitância** desse pino.
+* O ESP32 percebe essa mudança → interpreta como “toque”.
+
+---
+
+## ⚡ O que é o "eletrodo"
+
+* O **eletrodo** é a “placa” de metal que serve de área sensível.
+* Pode ser:
+
+  * um **fio desencapado**,
+  * uma **ilha de cobre na PCB**,
+  * uma **chapinha de metal**,
+  * até **papel alumínio** colado numa superfície.
+
+No seu caso:
+➡️ o **fio soldado no pino** está atuando como o eletrodo.
+➡️ quando você encosta o dedo no cobre, ele muda a capacitância → o ESP32 lê como toque.
+
+---
+
+## 🎛️ Dicas para melhorar seu eletrodo
+
+1. **Área**
+
+   * Quanto **maior a área** metálica → mais sensível (mas também mais ruído).
+   * Muito pequeno → precisa encostar o dedo.
+   * Muito grande → pega falsos toques de longe.
+   * Um tamanho bom: **1–2 cm²** (um quadradinho ou círculo).
+
+2. **Forma**
+
+   * Redondo ou oval é melhor que quadrado (campos elétricos ficam mais uniformes).
+   * Se fizer PCB, costuram usar pads redondos.
+
+3. **Material**
+
+   * Qualquer condutor serve: fio, cobre, alumínio.
+   * **Não precisa ser exposto**: pode estar coberto por plástico, acrílico, fita, ou até madeira fina.
+
+     * Quanto mais grossa a cobertura → menos sensível, mas mais protegido.
+
+4. **Cobertura protetora**
+
+   * Evite deixar cobre cru exposto → oxida, pega suor/umidade.
+   * Uma **fita transparente boa (Kapton, durex)** já funciona.
+   * Em PCB, normalmente só deixam a **máscara de solda** por cima (já isola e protege).
+
+5. **Fiação**
+
+   * O fio que leva do pino até o eletrodo também faz parte do sensor.
+   * Se for longo, ele adiciona capacitância e ruído.
+   * Mantenha curto ou use fio blindado se precisar distância.
+
+---
+
+## 🔩 Onde entram os resistores (explicando no seu caso)
+
+* Se você só solda um fio e toca → funciona, mas pode ficar instável (ruído).
+* Se você soldar também um **resistor de 5 MΩ–10 MΩ do fio para GND**:
+
+  * O fio/eletrodo **não fica “flutuando”** quando ninguém toca.
+  * O valor de “sem toque” fica mais estável.
+  * Fica mais difícil dar falsos toques por fio próximo.
+
+---
+
+👉 Resumindo:
+
+* O **fio desencapado** que você toca **já é o eletrodo**.
+* Se você quiser algo mais confiável:
+
+  * faça um **pad maior de cobre** (ou cole alumínio numa base isolante),
+  * cubra com fita transparente,
+  * mantenha fio curto,
+  * e adicione um **resistor pull-down grande** para GND.
+
+---
+
+Quer que eu desenhe pra você um **esquema simples** mostrando:
+`ESP32_PIN → fio → eletrodo (pedacinho de cobre/alu)` com o resistor de pull-down?
+
+---
+
+
+Boa pergunta, Segodimo 👌
+Agora ficou claro: você vai levar **6 fios touch juntos, uns 10 cm**, como se fosse um “flat cable” ou um barramento.
+
+Isso aumenta bastante a chance de **crosstalk** (um fio influenciar no outro) e **ruído**. Mas dá pra reduzir os problemas com alguns cuidados de hardware.
+
+---
+
+# ✅ Dicas práticas pro seu caso (6 fios em paralelo, 10 cm)
+
+### 1. **Separação / organização dos fios**
+
+* Não deixe os 6 fios de touch todos grudados.
+
+* Intercale com **GND** se possível:
+
+  ```
+  GND - TOUCH1 - GND - TOUCH2 - GND - TOUCH3 ...
+  ```
+
+  Isso forma um “escudo” natural e corta a interferência entre canais.
+
+* Se não der pra intercalar GND em todos, ao menos ponha **um fio de GND de cada lado** do “pacote” de 6 fios:
+
+  ```
+  GND - T1 - T2 - T3 - T4 - T5 - T6 - GND
+  ```
+
+---
+
+### 2. **Cabo blindado / par trançado**
+
+* Se usar **par trançado** (tipo cabo de rede):
+
+  * Coloque **TOUCH + GND** em cada par.
+  * Exemplo:
+
+    * Par1: T1 + GND
+    * Par2: T2 + GND
+    * Par3: T3 + GND
+
+* Isso reduz bastante ruído externo e crosstalk entre os sinais.
+
+* Se usar **cabo flat**, pode colar uma fita de cobre ou fio GND junto como blindagem.
+
+---
+
+### 3. **Pull-down em cada fio**
+
+* Coloque um resistor de **4,7 MΩ a 10 MΩ** de cada fio touch para GND (na **placa do ESP32**).
+* Isso mantém cada eletrodo “ancorado” e evita que um fio influencie o outro quando ninguém toca.
+
+---
+
+### 4. **Eletrodos iguais**
+
+* Se os 6 fios forem para botões touch separados, tente deixar os **pads/eletrodos de tamanho parecido**, pra que o baseline fique equilibrado.
+* Se um pad for muito maior que os outros, ele “domina” a capacitância e atrapalha a calibração relativa.
+
+---
+
+### 5. **Fiação curta e bem fixada**
+
+* 10 cm não é muito, mas tente **não passar paralelo a cabos de energia, PWM ou motores**.
+* Se puder, cole os fios juntos (fitinha, tubo termo) pra reduzir antena aberta.
+* Se usar flat, melhor ainda se tiver GND de cada lado.
+
+---
+
+### 6. **Filtro de software**
+
+Mesmo com todo cuidado de hardware, é normal ter ruído. Então:
+
+* Use **média móvel** ou **mediana** na leitura.
+* Recalibre o baseline sempre que necessário (por exemplo, quando o ESP32 ligar, e de vez em quando).
+* Coloque **histerese** (um valor para “tocar” e outro um pouco diferente para “soltar”).
+
+---
+
+# 🔧 Montagem sugerida (simples, barata)
+
+* Use um cabo de rede CAT5 (par trançado).
+* Ligue **3 fios de touch + 3 fios GND** → você já cobre 6 sinais.
+* Cada fio de touch com **resistor de 4,7–10 MΩ para GND** perto do ESP32.
+* No fim do cabo, solda o fio a um **pad de cobre/alumínio** (seu “botão”).
+
+---
+
+👉 Pergunto: você quer que eu te faça um **desenho esquemático simples** mostrando como ficariam os 6 fios com resistores e GND intercalado, no estilo diagrama elétrico?
+
+
+---
+
+
+
+Sim, entendi a tua dúvida Segodimo 🙌 e ela é muito boa.
+
+👉 A resposta é:
+o resistor **não é em série com o fio do eletrodo**, mas sim em **paralelo para o GND** (pull-down).
+
+---
+
+### 🔎 Diferença entre série e pull-down:
+
+**1) Série (não é o caso do pull-down):**
+
+```
+ESP32_PIN ──[ R ]─── Fio/Eletrodo ──→ dedo
+```
+
+Aqui o resistor **bloquearia parte da corrente** do eletrodo → o ESP32 teria dificuldade para medir a capacitância. Esse resistor em série só se usa pequeno (100–330 Ω) para proteção contra ESD, **não para pull-down**.
+
+---
+
+**2) Pull-down (o que você precisa):**
+
+```
+                ┌───[ R = 4M7 a 10M ]─── GND
+ESP32_PIN ──────┤
+                └─── Fio/Eletrodo ──→ dedo
+```
+
+* O resistor **liga o pino ao GND permanentemente** (caminho de fuga).
+* O fio/eletrodo continua direto no pino.
+* O resistor “puxa” o pino para GND bem devagar (como se fosse um **peso leve** segurando).
+* Assim o valor de "sem toque" fica estável, mas quando o dedo encosta, a capacitância ainda altera bastante a leitura.
+
+---
+
+### ⚡ Sobre “o fio se pode estender?”
+
+Sim 👍
+O resistor não precisa estar grudado no pad.
+O ideal é que ele fique **o mais próximo possível do ESP32** (lado do chip), porque:
+
+* reduz chance de ruído entrar no fio,
+* estabiliza antes de o cabo atuar como antena.
+
+Exemplo prático:
+
+```
+ESP32_PIN ────o─────────────── Fio (~10cm) ────────────────[PAD Touch]
+              |
+              └─[Rp = 10MΩ]─ GND
+```
+
+---
+
+✅ **Resumo:**
+
+* O fio do eletrodo vai **direto** ao pino.
+* O resistor pull-down é **em paralelo** entre esse mesmo pino e o GND.
+* Coloque o resistor na **placa, perto do ESP32**, não no fim do fio.
+
+---
+
+Quer que eu te faça um **diagrama em texto** mostrando claramente as duas opções (série vs pull-down), para você visualizar como ficam no circuito?
+
+---
+
+
+
+

@@ -49,13 +49,13 @@ else:
 # CONFIGURAÇÕES DE TOUCH
 # ============================================================
 CALIB_POTS_FILE = "pots_calib.json"
-MAD_MIN = 10 # limites de MAD para evitar thresholds muito colados
+MAD_MIN = 20 # limites de MAD para evitar thresholds muito colados
 MAD_MAX = 50 # limites de MAD para evitar thresholds muito colados
 SAMPLES_HYSTERESIS = 100 # amostras para calibrar os pots
 TIMEMS_SAMPLES = 70 # tempo para coleta de amostras
 K_SENSIBILIDADE = 3 # k: multiplicador para ajustar sensibilidade.
 ALPHA_SUAVIZACAO = 0.1 # alpha: fator de suavização para baseline (0.1 = mais rápido para se adaptar).
-DEBOUNCE_COUNT  = 2 # Leituras consecutivas para confirmar toque
+DEBOUNCE_COUNT  = 3 # Leituras consecutivas para confirmar toque
 
 
 # ============================================================

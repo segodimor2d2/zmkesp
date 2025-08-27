@@ -1,3 +1,4 @@
+import time
 import config
 from printlogs import log
 
@@ -58,11 +59,11 @@ def check_pots(pots, abclevel, press_thresh, release_thresh, state: PotsState):
     # res_check_pots [[M, Y], pot, status, R/L]
     return local_res_check_pots, state
 
-
-def tap_pots(abclevel, mapped_i, status, side, state: PotsState):
-
+def tap_pots_test(abclevel, mapped_i, status, side, state: PotsState):
+    """
+    Versão de teste sem timeout, só para debug.
+    """
     event = [abclevel, mapped_i, status, side]
-
     state.tap_event.append(event)
 
     if status == 1:  # pressionado
@@ -70,14 +71,58 @@ def tap_pots(abclevel, mapped_i, status, side, state: PotsState):
 
     elif status == 0:  # solto
         state.active_buttons.discard(mapped_i)
-
-        # todos soltos → ciclo fechado
         if not state.active_buttons:
-            result = {
-                "tap_go": True,
-                "events": state.tap_event[:]
-            }
-            state.tap_event.clear()  # reseta para o próximo ciclo
+            result = {"tap_go": True, "events": state.tap_event[:]}
+            state.tap_event.clear()
             return result, state
+
+    return None, state
+
+def tap_pots(abclevel, mapped_i, status, side, state: PotsState):
+    """
+    Processa evento de pressionar/soltar e organiza ciclos.
+    Ignora release que não teve press.
+    Fecha ciclo quando todos os botões ativos já foram liberados.
+    """
+    now = time.ticks_ms()
+
+    if status == 1:  # press
+        state.active_buttons.add(mapped_i)
+        state.tap_event.append([abclevel, mapped_i, status, side, now])
+
+    elif status == 0:  # release
+        # só processa release se o botão estava ativo
+        if mapped_i in state.active_buttons:
+            state.tap_event.append([abclevel, mapped_i, status, side, now])
+            state.active_buttons.remove(mapped_i)
+
+        # se não sobra nenhum botão ativo → ciclo fechado
+        if not state.active_buttons:
+            result = {"tap_go": True, "events": state.tap_event}
+            state.tap_event = []
+            return result, state
+
+    return None, state
+
+
+def check_timeout(state: PotsState, timeout=1000):
+    """
+    Força fechamento do ciclo se passar muito tempo sem release.
+    Cria release apenas para botões que realmente estavam ativos.
+    """
+    if not state.active_buttons:
+        return None, state
+
+    now = time.ticks_ms()
+    oldest = state.tap_event[0][4]
+    if time.ticks_diff(now, oldest) > timeout:
+        # adiciona release apenas para botões que estavam ativos
+        for btn in list(state.active_buttons):
+            state.tap_event.append([[0, 0], btn, 0, 1, now])  # release forçado
+        state.active_buttons.clear()
+
+        result = {"tap_go": True, "events": state.tap_event}
+        state.tap_event = []
+        return result, state
 
     return None, state

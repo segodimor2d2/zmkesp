@@ -4076,17 +4076,21 @@ Se quiser, eu posso:
 
 estou tentando criar essa função em micropython que vai rodar em um esp32: 
 
-def tap_pots(abclevel, mapped_i, status, side):
+def tap_pots(abclevel, mapped_i, status, side, state: PotsState):
 
-- abclevel é dos eixos no gyroscope = [exio_x, exio_y]
-- mapped_i é o botão que foi pressionado 0-5
-- status é o estado do botão press = 1 e release = 0
-- side sempre vai ser 1 (direita)
+onde:
+    - abclevel é dos eixos no gyroscope = [exio_x, exio_y]
+    - mapped_i é o botão que foi pressionado 0-5
+    - status é o estado do botão press = 1 e release = 0
+    - side sempre vai ser 1 (direita)
 
-a ideia é reconhecer quando os botões foram precionados e soltos
-o programa tem que reconhecer quando todos os botões foram soltos e hay fazer com que self.tap_go = seja True,
-o problema é que muitos botões poderiam ter sido precionados sem ser soltos
-e vai chegar uma o momento que todos estão soltos ahí o self.tap_go = True para enviar, envia e vota a o False para iniciar de novo o ciclo
+a ideia é reconhecer quando os botões foram pressionados e soltos
+o programa tem que reconhecer quando todos os botões foram soltos então vai fazer com que self.tap_go = seja True, retornando uma lista do conjunto de pares pressionados e soltos
+o problema é que muitos botões poderiam ter sido pressionados sem ser soltos
+a função debe validar se tem algum botão sem ser solto e apos de um tempo esse vai adicionar o botão que falta.
+
+
+chegar uma o momento que todos estão soltos ahí o self.tap_go = True para enviar, envia e vota a o False para iniciar de novo o ciclo
 sempre vai fechar e enviar self.tap_go = True quando os botẽos que abriu estão fechando
 
 por exemplo podem entrar valores em sequaencia assim:
@@ -4236,3 +4240,195 @@ tap_pots([[0,0], 5, 1, 1]),
 tap_pots([[0,0], 5, 0, 1]),
 tap_pots([[0,0], 1, 0, 1])]
 
+
+---
+
+nessa função eu quero que depois de um tempo avalie se tem algum tap_event que não tenha sido desativado,
+a ideia  poder desativar ele depois desse tempo 
+
+def tap_pots(abclevel, mapped_i, status, side, state: PotsState):
+
+    event = [abclevel, mapped_i, status, side]
+
+    state.tap_event.append(event)
+
+    if status == 1:  # pressionado
+        state.active_buttons.add(mapped_i)
+
+    elif status == 0:  # solto
+        state.active_buttons.discard(mapped_i)
+
+        # todos soltos → ciclo fechado
+        if not state.active_buttons:
+            result = {
+                "tap_go": True,
+                "events": state.tap_event[:]
+            }
+            state.tap_event.clear()  # reseta para o próximo ciclo
+            return result, state
+
+    return None, state
+
+---
+
+aqui esta meu modulo mas ele não valida qual debreia que ficar solto para depois tel alista completa de botões pressionados es soltos.
+
+
+estou tentando criar essa função em micropython que vai rodar em um esp32: 
+
+def tap_pots(abclevel, mapped_i, status, side, state: PotsState):
+
+onde:
+    - abclevel é dos eixos no gyroscope = [exio_x, exio_y]
+    - mapped_i é o botão que foi pressionado 0-5
+    - status é o estado do botão press = 1 e release = 0
+    - side sempre vai ser 1 (direita)
+
+a ideia é reconhecer quando os botões foram pressionados e soltos
+o programa tem que reconhecer quando todos os botões foram soltos então vai fazer com que self.tap_go = seja True, retornando uma lista do conjunto de pares pressionados e soltos
+o problema é que muitos botões poderiam ter sido pressionados sem ser soltos
+a função debe validar se tem algum botão sem ser solto e apos de um tempo esse vai adicionar o botão que falta.
+
+asim fica a chamanda na função principal:
+
+
+        res_check_pots, pots_state = check_pots( pots, abclevel,
+            pots_thresh_on, pots_thresh_off,
+            pots_state
+        )
+
+        result = None
+        if res_check_pots is not None:
+            ## pot [gx, gy] status [M,Y]  M=Moto, Y=Yave [M,Y]
+            # res_check_pots [[M, Y], pot, status, R/L]
+            log(f'res_check_pots {res_check_pots}', 0)
+
+            # Processa evento vindo do check_pots
+            result, pots_state = tap_pots(*res_check_pots, pots_state)
+
+            if res_check_pots[0][1] == -2:
+                # if res_check_pots[1] == 0 and res_check_pots[2] == 1:
+                if res_check_pots[1] == 0:
+                    start(force_calib=True)
+
+        # Se ainda não fechou ciclo, verifica timeout
+        if not result:
+            result, pots_state = check_timeout(pots_state)
+
+        # Se um ciclo foi fechado → envia eventos
+        if result and result["tap_go"]:
+            for event in result["events"]:
+                print(f'event {event}')
+                # tozmk = potsgyrotozmk(*event)
+                # log(f'tozmk {tozmk}', 0)
+                # log(f'send_charPs {tozmk}', 0)
+                # send_charPs(tozmk)
+            print()
+
+
+os modulos que deben resolver isso são:
+
+
+def tap_pots(abclevel, mapped_i, status, side, state: PotsState):
+    """
+    Processa evento de pressionar/soltar e organiza ciclos.
+    Não faz timeout, apenas registra eventos reais.
+    """
+    now = time.ticks_ms()
+    state.tap_event.append([abclevel, mapped_i, status, side, now])
+
+    if status == 1:  # pressionado
+        state.active_buttons.add(mapped_i)
+
+    elif status == 0:  # solto
+        state.active_buttons.discard(mapped_i)
+        if not state.active_buttons:  # todos soltos → ciclo fechado
+            result = {"tap_go": True, "events": state.tap_event}
+            state.tap_event = []
+            return result, state
+
+    return None, state
+
+
+def check_timeout(state: PotsState, timeout=1500):
+    """
+    Força fechamento do ciclo se passar muito tempo sem release.
+    Deve ser chamada a cada iteração do loop principal.
+    """
+    if not state.active_buttons:
+        return None, state
+
+    now = time.ticks_ms()
+    oldest = state.tap_event[0][4]  # timestamp do 1º evento
+    if time.ticks_diff(now, oldest) > timeout:
+        state.active_buttons.clear()
+        result = {"tap_go": True, "events": state.tap_event}
+        state.tap_event = []
+        return result, state
+
+    return None, state
+
+
+---
+
+veja uma exemplo nesta parte:
+
+aqui o codigo que imprime os logs:
+
+        result = None
+        if res_check_pots is not None:
+            ## pot [gx, gy] status [M,Y]  M=Moto, Y=Yave [M,Y]
+            # res_check_pots [[M, Y], pot, status, R/L]
+            log(f'res_check_pots {res_check_pots}', 0)
+
+            # Processa evento vindo do check_pots
+            result, pots_state = tap_pots(*res_check_pots, pots_state)
+
+            if res_check_pots[0][1] == -2:
+                # if res_check_pots[1] == 0 and res_check_pots[2] == 1:
+                if res_check_pots[1] == 0:
+                    start(force_calib=True)
+
+        # Se ainda não fechou ciclo, verifica timeout
+        if not result:
+            result, pots_state = check_timeout(pots_state)
+
+        # Se um ciclo foi fechado → envia eventos
+        if result and result["tap_go"]:
+            for event in result["events"]:
+                print(f'event {event}')
+                # tozmk = potsgyrotozmk(*event)
+                # log(f'tozmk {tozmk}', 0)
+                # log(f'send_charPs {tozmk}', 0)
+                # send_charPs(tozmk)
+            print()
+
+
+neste cenário eu apertei dois botões ao mesmo tempo
+o que tem inidice 2 consegue sim abrir e fechar ,as o 1 fica aberto ao fechar o ciclo
+
+res_check_pots [[0, 0], 2, 1, 1]
+res_check_pots [[0, 0], 1, 0, 1]
+res_check_pots [[0, 0], 2, 0, 1]
+event [[0, 0], 2, 1, 1, 11821]
+event [[0, 0], 1, 0, 1, 12659]
+event [[0, 0], 2, 0, 1, 12715]
+
+
+o correto seria uma siada assi:
+
+event [[0, 0], 2, 1, 1, 11821]
+event [[0, 0], 2, 0, 1, 12715]
+event [[0, 0], 1, 1, 1, 12659]
+event [[0, 0], 1, 0, 1, 12659]
+
+
+aqui outro cenário onde fiquei com o dedo preso no botão, ele consegue sim adicionar o botão para soltar
+mas quando eu soltar aparece um com status=0 ahi nesse caso o tap_go não deveria passar a ser True
+
+res_check_pots [[0, 0], 2, 1, 1]
+event [[0, 0], 2, 1, 1, 139767]
+event [[0, 0], 2, 0, 1, 141274]
+
+res_check_pots [[0, 0], 2, 0, 1]
+event [[0, 0], 2, 0, 1, 142226]

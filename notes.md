@@ -1,95 +1,34 @@
 $$$$
 
+- modo Hold ou modo Tap
+- modo Hold é uma ação similar ao -2 gyro que deixa o Hold liberado
 
+- bug tecla pressionada ao mudar step do gyro
+    - um teclado envia todas as teclas no momento que todas estejam soltas
 
+- usar dados do acelerômetro para o mouse
+    - o gyro controla a direção
+    - valor absoluto do acelerômetro se converte em velocidade do movimento do mouse
 
+- reviçar o pull/down com resistores para os eletrodos
+    - isolar os eletrodos do ambiente
 
-```python
-import machine, time
-
-adc = machine.ADC(machine.Pin(32))
-adc.atten(machine.ADC.ATTN_11DB)
-
-def calc_hysteresis(samples_count=20, k=1.5):
-    samples = [adc.read() for _ in range(samples_count)]
-    baseline = sum(samples) / samples_count
-    mad = sum(abs(x - baseline) for x in samples) / samples_count
-    thresh_on = baseline + k * mad
-    thresh_off = baseline - k * mad
-    return thresh_on, thresh_off
-
-th_on, th_off = calc_hysteresis()
-print("thresh_on:", th_on, "thresh_off:", th_off)
-```
-
-```python
-accel = read_accel_x()
-
-if not ativo and accel > thresh_on:
-    ativo = True
-
-elif ativo and accel < thresh_off:
-    ativo = False
-
-if ativo:
-    # calcula velocidade proporcional à força
-    velocidade = k * (accel - thresh_off)
-    mover_mouse(velocidade)
-else:
-    mover_mouse(0)
-```
-
-
-mpremote fs cp :arquivo_no_esp ./arquivo_no_pc
-mpremote fs cp :calib.json ./calib.json
-
-
-
-
-
+- ver se funciona calibrar com valores máximos
 
 - ligar e desligar envio de eventos de kb
+
 - gesto iniciar calibração
-- usar dados do acelerômetro para o mouse
-- refactorizar o código
 
-
-- ver a parte de ter um conetor
 - reviçar a questão do buffer porque trava
 - testar tirar o chunks
-- ver a parte da tecla press 
 - ver logs no nRF52840
-- pensar no mouse
+
+
 
 valor_se_verdadeiro if condicao else valor_se_falso
 
-crimpar
-YEFYM YE 013B
-YE-013BR Micro Connector Crimping Tool,
-
-# corne
-135mm x 95mm 
-150mm x 100mm
-10 x 15
-10 x 30 30$
-
-100mm x 50mm
-50mm x 50mm
-
-200 400
-100 200 
-10 20 - 72$
-20 30 
-
-177/20=8.85$
-https://www.mercadolivre.com.br/20-placa-de-fenolite-cobreado-10x30-cm-p-pcb-pci/up/MLBU732249071#polycard_client=search-nordic&searchVariation=MLBU732249071&wid=MLB1762542422&position=26&search_layout=stack&type=product&tracking_id=c71262d7-9ec4-4961-b1c9-729cd8982f5a&sid=search
-
-106/10=10.6$
-
-10x15
-
-38/2=19.0$ dividir 2m 2 20x30
-
+mpremote fs cp :arquivo_no_esp ./arquivo_no_pc
+mpremote fs cp :calib.json ./calib.json
 
 
 mpremote connect /dev/ttyUSB0 
@@ -486,6 +425,82 @@ Lado Direito:
 2 [-1,0] = 10 2 # ,
 3 [-1,0] = 10 3 # ,
 4 [-1,0] = 10 4 # ;
+
+
+---
+
+@@@@
+
+
+
+```python
+import machine, time
+
+adc = machine.ADC(machine.Pin(32))
+adc.atten(machine.ADC.ATTN_11DB)
+
+def calc_hysteresis(samples_count=20, k=1.5):
+    samples = [adc.read() for _ in range(samples_count)]
+    baseline = sum(samples) / samples_count
+    mad = sum(abs(x - baseline) for x in samples) / samples_count
+    thresh_on = baseline + k * mad
+    thresh_off = baseline - k * mad
+    return thresh_on, thresh_off
+
+th_on, th_off = calc_hysteresis()
+print("thresh_on:", th_on, "thresh_off:", th_off)
+```
+
+```python
+accel = read_accel_x()
+
+if not ativo and accel > thresh_on:
+    ativo = True
+
+elif ativo and accel < thresh_off:
+    ativo = False
+
+if ativo:
+    # calcula velocidade proporcional à força
+    velocidade = k * (accel - thresh_off)
+    mover_mouse(velocidade)
+else:
+    mover_mouse(0)
+```
+
+
+
+crimpar
+YEFYM YE 013B
+YE-013BR Micro Connector Crimping Tool,
+
+# corne
+135mm x 95mm 
+150mm x 100mm
+10 x 15
+10 x 30 30$
+
+100mm x 50mm
+50mm x 50mm
+
+200 400
+100 200 
+10 20 - 72$
+20 30 
+
+177/20=8.85$
+https://www.mercadolivre.com.br/20-placa-de-fenolite-cobreado-10x30-cm-p-pcb-pci/up/MLBU732249071#polycard_client=search-nordic&searchVariation=MLBU732249071&wid=MLB1762542422&position=26&search_layout=stack&type=product&tracking_id=c71262d7-9ec4-4961-b1c9-729cd8982f5a&sid=search
+
+106/10=10.6$
+
+10x15
+
+38/2=19.0$ dividir 2m 2 20x30
+
+
+
+
+
 
 
 ---
@@ -3961,5 +3976,263 @@ Quer que eu te faça um **diagrama em texto** mostrando claramente as duas opç�
 ---
 
 
+Boa pergunta — e a resposta direta é: **não é recomendável usar o mesmo resistor pull-down para vários canais**. Vou explicar o porquê, dar alternativas práticas e um desenho ASCII rápido.
 
+---
+
+## Por que não usar 1 resistor para vários canais
+
+Quando você coloca um **único** resistor do "bus" todo para GND, todos os pinos touch passam a **compartilhar o mesmo nó elétrico** através desse resistor. Isso causa:
+
+* **Crosstalk maior** — tocar em um eletrodo altera o potencial do nó comum e afeta as leituras dos outros canais.
+* **Baseline compartilhado** — os canais deixam de ter referências independentes; calibração fica difícil.
+* **Divisor/efeitos indesejados** — dependendo do fio/eletrodo, o circuito pode formar divisores ou caminhos de fuga que alteram a sensibilidade.
+* **Dificuldade de isolar falhas** — se um canal fica ruidoso, vai prejudicar todos.
+
+Em resumo: cada canal precisa de **seu próprio pull-down** para manter a referência independente e estabilidade.
+
+---
+
+## O que fazer na prática (sugestões)
+
+1. **Pull-down individual (recomendado)**
+
+   * Use **um resistor por canal** entre o pino touch e GND.
+   * Valores típicos: **4,7 MΩ → 10 MΩ** (comece 4,7 MΩ ou 10 MΩ e ajuste).
+   * Coloque **próximo ao ESP32** (o mais perto possível do pino).
+
+2. **Se tiver limitação de espaço ou componentes**
+
+   * Use um **resistor array / SIP pack** (pacote com 6 ou 8 resistores) com cada resistor dedicado a um canal. Funciona igual aos resistores discretos, mas ocupa menos espaço.
+   * Ex.: um pacote de 6 resistores de 4,7 MΩ (SIP-6) ou um resistor network SMD (6x4.7M).
+   * Ainda assim, **cada canal tem seu resistor** — só que no mesmo componente físico.
+
+3. **Não compartilhar um único Rp**
+
+   * Não faça: `TCH1---\`
+     `TCH2----[Rp único]----GND`
+   * Isso provoca os problemas citados.
+
+4. **Resistor em série (ESD)**
+
+   * Resistor série (100–330 Ω) também **deve ser por canal** se for usado — protege individualmente contra ESD. Não compartilhe um só em série no bus.
+
+5. **Se absolutamente for necessário economizar**
+
+   * Você pode usar um **pulldown comum para a blindagem** (malha do cabo) — isto é, uma resistência para o shield/gnd do cabo — **mas não** para os eletrodos. O shield pode e deve ter uma conexão de referência, mas os canais ainda precisam dos seus Rp individuais.
+
+---
+
+## Diagrama ASCII — errado vs certo
+
+**Errado (não faça):**
+
+```
+ESP32 TCH1 ─────────────────┐
+ESP32 TCH2 ─────────────────┼──[ Rp único 10M ]── GND   <-- RUIM: compartilha referência
+ESP32 TCH3 ─────────────────┘
+```
+
+**Certo (cada canal com pull-down próximo ao ESP32):**
+
+```
+ESP32 TCH1 ───[Rp 4.7M]───┐
+                          ├─ GND
+ESP32 TCH2 ───[Rp 4.7M]───┤
+                          ├─ GND
+ESP32 TCH3 ───[Rp 4.7M]───┘
+```
+
+**Certo com resistor array (economiza espaço):**
+
+```
+ESP32 TCH1 ───[R1 4.7M in array]───┐
+ESP32 TCH2 ───[R2 4.7M in array]───┤ all grounds tied to board GND
+ESP32 TCH3 ───[R3 4.7M in array]───┘
+(é só um componente físico, mas internamente são resistores separados)
+```
+
+---
+
+## Testes que recomendo
+
+* Monte com Rp = **4,7 MΩ** por canal. Ligue e faça calibração baseline.
+* Se tiver falsos positivos, aumente para **10 MΩ** ou 22 MΩ (mais "âncora" para o GND).
+* Se tiver pouca sensibilidade, reduza para **2,2–3,3 MΩ**.
+* Teste tocando um canal e medindo se os outros variam (se varia muito, tem crosstalk e talvez cabo/blindagem/ground interleave precise melhorar).
+
+---
+
+Se quiser, eu posso:
+
+* Te sugerir um **modelo de resistor array** (footprint) que cumpra isso, ou
+* Gerar um **esquema ASCII** completo para os 6 canais com valores e indicação de posicionamento (onde soldar perto do ESP32). Quer que eu faça isso?
+
+
+---
+
+
+
+
+estou tentando criar essa função em micropython que vai rodar em um esp32: 
+
+def tap_pots(abclevel, mapped_i, status, side):
+
+- abclevel é dos eixos no gyroscope = [exio_x, exio_y]
+- mapped_i é o botão que foi pressionado 0-5
+- status é o estado do botão press = 1 e release = 0
+- side sempre vai ser 1 (direita)
+
+a ideia é reconhecer quando os botões foram precionados e soltos
+o programa tem que reconhecer quando todos os botões foram soltos e hay fazer com que self.tap_go = seja True,
+o problema é que muitos botões poderiam ter sido precionados sem ser soltos
+e vai chegar uma o momento que todos estão soltos ahí o self.tap_go = True para enviar, envia e vota a o False para iniciar de novo o ciclo
+sempre vai fechar e enviar self.tap_go = True quando os botẽos que abriu estão fechando
+
+por exemplo podem entrar valores em sequaencia assim:
+
+tap_pots([[0, 0], 1, 1, 1])
+tap_pots([[0, 0], 1, 0, 1])
+aqui so libera um botão com self.tap_go = True
+
+tap_pots([[0, 0], 1, 1, 1])
+tap_pots([[0, 0], 5, 1, 1])
+tap_pots([[0, 0], 5, 0, 1])
+aqui não libera nenhum botão por que o primeiro ainda não foi desativado então self.tap_go = False
+
+tap_pots([[0, 0], 1, 1, 1])
+tap_pots([[0, 0], 5, 1, 1])
+tap_pots([[0, 0], 5, 0, 1])
+tap_pots([[0, 0], 1, 0, 1])
+aqui so libera os botões com self.tap_go = True
+
+tap_pots([[0, 1], 1, 1, 1])
+tap_pots([[0, 1], 1, 0, 1])
+tap_pots([[1, 0], 2, 1, 1])
+tap_pots([[0, 0], 2, 1, 1])
+tap_pots([[0, 1], 2, 0, 1])
+tap_pots([[1, 0], 2, 0, 1])
+aqui não libera nenhum botão por que
+ainda tem um botão ligado, o tap_pots([[0, 0], 2, 1, 1])
+e tem algo estranho porque passou um botão para desligar mas não tinha um botão ligado antes
+então finalmenteo self.tap_go = False
+
+tap_pots([[-2, 0], 2, 1, 1])
+tap_pots([[0, 1], 1, 1, 1])
+tap_pots([[0, 0], 2, 1, 1])
+tap_pots([[0, 0], 2, 0, 1])
+tap_pots([[-2, 0], 2, 0, 1])
+tap_pots([[0, 1], 1, 0, 1])
+neste caso o self.tap_go = True porque todos os botões foram liberados
+
+
+tap_pots([[0, 1], 2, 0, 1])
+tap_pots([[0, 1], 1, 1, 1])
+tap_pots([[0, 2], 2, 1, 1])
+tap_pots([[0, 1], 1, 0, 1])
+tap_pots([[0, 1], 2, 1, 1])
+para este caso o self.tap_go = Falo porque ainda tem botão sem liberar
+
+
+se tiever alguma duvida ou algo errado nos exemplos me pergunte:
+
+aqui eu comesei fazer o codigo:
+
+def tap_pots(abclevel, mapped_i, status, side):
+    
+    self.tap_event.append([mapped_i, abclevel[0], abclevel[1], status])
+
+    if status == 0 and self.tap_event >= 2:
+        self.tap_go = True
+        return self.tap_event
+
+    elif status == 1 and self.tap_go:
+        self.tap_go = False
+        return self.tap_event
+
+
+tem mais alguma sugestão para melhorar essa função?
+
+aqui estaria meu modulo completo:
+
+import config
+from printlogs import log
+
+class PotsState:
+    def __init__(self, num_pots: int):
+        self.num_pots = num_pots
+        self.pval = [0] * num_pots
+        self.triggerPot = [False] * num_pots
+        self.pot_counter = [0] * num_pots
+        self.wait2Zero = False
+        self.cycle = 0
+        self.tap_event = []
+        self.tap_go = False
+
+
+def check_pots(pots, abclevel, press_thresh, release_thresh, state: PotsState):
+    """
+    Verifica os potenciômetros e atualiza o estado.
+    Retorna um evento (ou None) + estado atualizado.
+    """
+    local_res_check_pots = None
+
+    for i, pot in enumerate(pots):
+        if i >= state.num_pots:
+            log(f"Erro: Índice {i} fora dos limites (max {state.num_pots})", 0)
+            continue
+        try:
+            val = pot.read()
+        except Exception as e:
+            log(f"Erro ao ler TouchPad no índice {i} pino {config.PINOS[i]} (pot {pot}): {e}", 0)
+            continue
+
+        state.pval[i] = val
+        mapped_i = config.INDEX_MAP_POTS[i]
+
+        # Pressionado
+        if not state.triggerPot[i] and val < press_thresh[i]:
+            state.pot_counter[i] += 1
+            if state.pot_counter[i] >= config.DEBOUNCE_COUNT:
+                local_res_check_pots = [abclevel, mapped_i, 1, config.THIS_IS]
+                state.triggerPot[i] = True
+                state.pot_counter[i] = 0
+                state.wait2Zero = False
+                state.cycle = 0
+
+        # Solto
+        elif state.triggerPot[i] and val > release_thresh[i]:
+            state.pot_counter[i] += 1
+            if state.pot_counter[i] >= config.DEBOUNCE_COUNT:
+                local_res_check_pots = [abclevel, mapped_i, 0, config.THIS_IS]
+                state.triggerPot[i] = False
+                state.pot_counter[i] = 0
+                state.wait2Zero = True
+
+        else:
+            state.pot_counter[i] = 0
+
+    # res_check_pots [[M, Y], pot, status, R/L]
+    return local_res_check_pots, state
+
+def tap_pots(abclevel, mapped_i, status, side):
+    
+    self.tap_event.append([mapped_i, abclevel[0], abclevel[1], status])
+
+    if status == 0 and self.tap_event >= 2:
+        self.tap_go = True
+        return self.tap_event
+
+    elif status == 1 and self.tap_go:
+        self.tap_go = False
+        return self.tap_event
+
+
+
+
+na saida eu gostaria que devolvece uma lista com os elementos assim:
+[ tap_pots([[0,0], 1, 1, 1]),
+tap_pots([[0,0], 5, 1, 1]),
+tap_pots([[0,0], 5, 0, 1]),
+tap_pots([[0,0], 1, 0, 1])]
 

@@ -11,13 +11,18 @@ import ubinascii
 # ============================================================
 # PINAGEM (ESQUERDA E DIREITA)
 # ============================================================
-PINOS_R = 13,12,14,27,4,33
-INDEX_MAP_R = 0,1,2,3,4,5
-PINOS_VIB_R = 26
 
+# L 0G,1I,2C,3A,4M,5G
+# L 4G,3I,2C,1A,5M,0G
 PINOS_L = 12,13,14,27,4,33
-INDEX_MAP_L = 0,1,2,4,3,5
+INDEX_MAP_L = 4,3,2,1,5,0
 PINOS_VIB_L = 26
+
+# R 0G,1I,2C,3A,4M,5G
+# R 0G,5I,1C,2A,4M,3G
+PINOS_R = 12,13,14,27,4,33
+INDEX_MAP_R = 0,5,1,2,4,3
+PINOS_VIB_R = 26
 
 # ============================================================
 # IDENTIFICAÇÃO DO CHIP / DEFINIÇÃO DO LADO
@@ -34,7 +39,15 @@ THIS_IS = 0 if chip_id == alesp else 1
 print("THIS_IS:", THIS_IS)
 
 # INDEX MAP final (depende do lado detectado)
-INDEX_MAP_POTS = list(INDEX_MAP_L if THIS_IS == 0 else INDEX_MAP_R)
+# Correção: atribua diretamente a lista/tupla correta
+if THIS_IS == 0:
+    INDEX_MAP_POTS = list(INDEX_MAP_L)
+    PINOS = list(PINOS_R)
+    PINOS_VIB = PINOS_VIB_R
+else:
+    INDEX_MAP_POTS = list(INDEX_MAP_R)
+    PINOS = list(PINOS_L)
+    PINOS_VIB = PINOS_VIB_L
 
 
 
@@ -42,7 +55,7 @@ INDEX_MAP_POTS = list(INDEX_MAP_L if THIS_IS == 0 else INDEX_MAP_R)
 # CONFIGURAÇÕES DE TOUCH
 # ============================================================
 CALIB_POTS_FILE = "pots_calib.json"
-MAD_MIN = 5 # limites de MAD para evitar thresholds muito colados
+MAD_MIN = 10 # limites de MAD para evitar thresholds muito colados
 MAD_MAX = 50 # limites de MAD para evitar thresholds muito colados
 SAMPLES_HYSTERESIS = 100 # amostras para calibrar os pots
 TIMEMS_SAMPLES = 70 # tempo para coleta de amostras
@@ -60,9 +73,9 @@ THRES_PERCENT = 0.1     # 0.05 (5%) | 0.2 (20%)
 GY1, GY2 = 1, 0    # Ordem dos eixos: X depois Y
 
 if THIS_IS == 0:
-    INVERT_X, INVERT_Y = False, True  # T,M Inverter sentido do eixo
+    INVERT_X, INVERT_Y, INVERT_Z = False, True, True  # T,M Inverter sentido do eixo
 else:
-    INVERT_X, INVERT_Y = True, True   # T,M Inverter sentido do eixo
+    INVERT_X, INVERT_Y, INVERT_Z = True, True, True   # T,M Inverter sentido do eixo
 
 
 CALIB_ACCL_FILE = "accl_calib.json"
@@ -71,6 +84,21 @@ TIME_ACCL_SAMPLES = 70
 ACCL_MAD_MAX = 5 # 5
 MARGIN_MIN = 2000 # 2000
 MARGIN_MAX = 4000 # 4000
+
+# Sensibilidade separada por eixo e sentido
+# "X": 1.5 Eixo X vai disparar mais facilmente (thresholds ficam 50% menores).
+# "Y": 1.0 Eixo Y fica normal.
+# "Z": 0.7 Eixo Z fica menos sensível (precisa de movimento 30% maior).
+ACCL_SENS = {
+    "X_pos": 1.0,
+    "X_neg": 1.0,
+    "Y_pos": 1.0,
+    "Y_neg": 1.0,
+    "Z_pos": 1.0,
+    "Z_neg": 1.0
+}
+
+
 
 # ============================================================
 # CONTROLE DE PASSOS / RESET
@@ -188,13 +216,8 @@ import time
 import config
 from printlogs import log
 
-if config.THIS_IS == 1:
-    pinos = config.PINOS_R
-    pinos_vib = config.PINOS_VIB_R
-
-if config.THIS_IS == 0:
-    pinos = config.PINOS_L
-    pinos_vib = config.PINOS_VIB_L
+pinos = config.PINOS
+pinos_vib = config.PINOS_VIB
 
 def init_i2c(scl_pin=22, sda_pin=21):
     return SoftI2C(scl=Pin(scl_pin), sda=Pin(sda_pin))
@@ -217,19 +240,40 @@ def init_vibrator(pin_no=(pinos_vib)):
         pass
     return p
 
+def test_pots():
+    touch_pins = [4, 0, 2, 15, 13, 12, 14, 27, 33, 32]  # possíveis pinos touch no ESP32
+    erros = []  # lista para guardar pinos problemáticos
+    for pin in touch_pins:
+        try:
+            tp = TouchPad(Pin(pin))
+            vals = []
+            for _ in range(5):
+                vals.append(tp.read())
+                time.sleep_ms(50)
+            print(f"OK: TouchPad inicializado no pino {pin}, leituras = {vals}")
+        except Exception as e:
+            print(f"ERRO no pino {pin}: {e}")
+            erros.append(pin)
+
+    # Resumo final
+    if erros:
+        print("Pinos com problema:", ", ".join(str(p) for p in erros))
+        print("******************************\n")
+    else:
+        print("Todos os pinos testados estão funcionando!")
+        print("******************************\n")
+
 def init_pots(pins=(pinos)):
-    pots = [TouchPad(Pin(p)) for p in pins]
-
-    test_pots = [i for i, p in enumerate(pots) if p.read() < 0]
-    print('test_pots',test_pots)
-
-    if len(test_pots) > 0:
-        log("test_pots erro:", test_pots, 0)
+    try:
+        test_pots()
+        pots = [TouchPad(Pin(p)) for p in pins]
+        return pots
+    except Exception as e:
         # sys.exit("encerrando programa.")
         # raise SystemExit
-        raise KeyboardInterrupt("Parando programa!")
-
-    return pots
+        # raise KeyboardInterrupt("Parando programa!")
+        log("init_mpu erro:", e, 0)
+        return None
 
 
 
@@ -274,7 +318,7 @@ def save_calibration(baseline, press_thresh, release_thresh):
         }
         with open(config.CALIB_POTS_FILE, 'w') as f:
             ujson.dump(calib_data, f)
-        log("Pots Calibração dos pots salva com sucesso!", 1)
+        log("Pots Calibração dos pots salva com sucesso!", 0)
     except Exception as e:
         log(f"Erro ao salvar calibração dos pots: {e}", 0)
 
@@ -310,7 +354,7 @@ def calc_pots_hysteresis(pots, num_pots, vib, force_calib=False):
 
     if force_calib:
         vibrar(vib, 6)
-        log("calc_pots_hysteresis... nao toque nos sensores.", 0)
+        log("\ncalc_pots_hysteresis... nao toque nos sensores.", 0)
 
         # k: multiplicador para ajustar sensibilidade.
         k = config.K_SENSIBILIDADE
@@ -339,6 +383,7 @@ def calc_pots_hysteresis(pots, num_pots, vib, force_calib=False):
         pots_thresh_off = [baseline[i] - (k/2) * mad[i] for i in range(num_pots)]
 
         save_calibration(baseline, pots_thresh_on, pots_thresh_off)
+        log("calc_pots_hysteresi concluido", 0)
         vibrar(vib, 6)
 
         return pots_thresh_on, pots_thresh_off
@@ -381,7 +426,7 @@ def calc_accl_hysteresis(mpu, vib, force_calib=False):
 
     if force_calib:
         vibrar(vib, 6)
-        log("calc_accel_hysteresis... nao toque nos sensores.", 0)
+        log("\ncalc_accel_hysteresis... nao toque nos sensores.", 0)
 
         # ======== CALIBRAÇÃO ========
         N = config.SAMPLES_ACCL
@@ -422,6 +467,7 @@ def calc_accl_hysteresis(mpu, vib, force_calib=False):
             }
 
         save_accl_calibration(baselines, thresholds)
+        log("calc_accel_hysteresis concluido", 0)
         vibrar(vib, 6)
         return thresholds
 
@@ -554,8 +600,12 @@ def check_pots(pots, abclevel, press_thresh, release_thresh, state: PotsState):
         if i >= state.num_pots:
             log(f"Erro: Índice {i} fora dos limites (max {state.num_pots})", 0)
             continue
+        try:
+            val = pot.read()
+        except Exception as e:
+            log(f"Erro ao ler TouchPad no índice {i} pino {config.PINOS[i]} (pot {pot}): {e}", 0)
+            continue
 
-        val = pot.read()
         state.pval[i] = val
         mapped_i = config.INDEX_MAP_POTS[i]
 
@@ -607,6 +657,19 @@ class GyroState:
         self.wait2Zero = False
         self.cycle = 0
 
+class AcclState:
+    def __init__(self):
+        self.velX = 0
+        self.velY = 0
+        self.velZ = 0
+        self.evXP = False
+        self.evXN = False
+        self.evYP = False
+        self.evYN = False
+        self.evZP = False
+        self.evZN = False
+        self.wait2Zero = False
+        self.cycle = 0
 
 def append_gyro(buffer, mpuSensor):
     """Adiciona uma leitura ao buffer (6 listas)"""
@@ -644,7 +707,6 @@ def average_and_slide(buffer, mpuSensor):
             lst.pop(0)
     return gyro, accl
 
-
 def check_gyro_axis(gyro, axis_index, step, event_pos, event_neg, vib, wait2Zero, cycle, invert=False):
     """Verifica giroscópio em um eixo e atualiza estado."""
     pos_thresh = config.LIMGYRO - (config.LIMGYRO * config.THRES_PERCENT)
@@ -653,7 +715,6 @@ def check_gyro_axis(gyro, axis_index, step, event_pos, event_neg, vib, wait2Zero
     if not event_pos and gyro[axis_index] > pos_thresh:
         step += -1 if invert else 1
         vibrar(vib, 1, step)
-        log(f"[GYRO] Eixo {axis_index} POS -> step={step}", 2)
         event_pos = True
         wait2Zero = True
         cycle = 0
@@ -663,7 +724,6 @@ def check_gyro_axis(gyro, axis_index, step, event_pos, event_neg, vib, wait2Zero
     if not event_neg and gyro[axis_index] < neg_thresh:
         step += 1 if invert else -1
         vibrar(vib, 1, step)
-        log(f"[GYRO] Eixo {axis_index} NEG -> step={step}", 2)
         event_neg = True
         wait2Zero = True
         cycle = 0
@@ -672,24 +732,14 @@ def check_gyro_axis(gyro, axis_index, step, event_pos, event_neg, vib, wait2Zero
 
     return step, event_pos, event_neg, wait2Zero, cycle
 
-
-def check_accl_axis(gyro, axis_index, step, event_pos, event_neg, vib, wait2Zero, cycle, invert=False):
-
-    # return step, event_pos, event_neg, wait2Zero, cycle
-    # return step, event_pos, event_neg, wait2Zero, cycle
-    pass
-
-
 def check_step_wait(event_triggered, step_wait, step, delta, vib):
     """Controle de espera para repetição automática."""
     step_wait = step_wait + 1 if event_triggered else 0
     if step_wait >= config.STEP_WAIT_LIMIT:
         step += delta
         vibrar(vib, 1, step)
-        log(f"[STEP_WAIT] step={step} delta={delta}", 2)
         step_wait = 0
     return step_wait, step
-
 
 def gyro_principal(gyro, gy1, gy2, vib, state: GyroState):
     """Processa movimentos do giroscópio e atualiza estado."""
@@ -718,6 +768,70 @@ def gyro_principal(gyro, gy1, gy2, vib, state: GyroState):
     state.swXN, state.stepX = check_step_wait(state.evXN, state.swXN, state.stepX, invX * (-1 if gy1 == 0 else 1), vib)
     state.swYP, state.stepY = check_step_wait(state.evYP, state.swYP, state.stepY, invY * (-1 if gy1 == 0 else 1), vib)
     state.swYN, state.stepY = check_step_wait(state.evYN, state.swYN, state.stepY, invY * (1 if gy1 == 0 else -1), vib)
+
+    return state
+
+def check_accl_axis(accl, axis_index, step, event_pos, event_neg, thresholds, axis_key, invert=False, k=0.01):
+    t = thresholds[axis_key]
+    a = accl[axis_index]
+
+    # Ajusta thresholds com fator de sensibilidade
+    sens = getattr(config, "ACCL_SENS", {}).get(axis_key, 1.0)
+    on_pos  = t["on_pos"]  * sens
+    off_pos = t["off_pos"] * sens
+    on_neg  = t["on_neg"]  * sens
+    off_neg = t["off_neg"] * sens
+
+    velocidade = 0  # padrão = parado
+
+    # Movimento positivo
+    if not event_pos and a > on_pos:
+        event_pos = True
+    elif event_pos and a < off_pos:
+        event_pos = False
+
+    if event_pos:
+        # calcula velocidade proporcional ao quanto passou do off_pos
+        velocidade = k * (a - off_pos)
+        if invert:
+            velocidade = -velocidade
+
+    # Movimento negativo
+    if not event_neg and a < on_neg:
+        event_neg = True
+    elif event_neg and a > off_neg:
+        event_neg = False
+
+    if event_neg:
+        # calcula velocidade proporcional ao quanto passou do off_neg
+        velocidade = k * (a - off_neg)
+        if not invert:
+            velocidade = -velocidade
+
+    # ===== Reset para zero quando estável =====
+    if off_neg < a < off_pos and not event_pos and not event_neg:
+        velocidade = 0
+
+    return velocidade, event_pos, event_neg
+
+def accl_principal(accl, thresholds, state: AcclState):
+    # Eventos do Acelerômetro
+    state.velX, state.evXP, state.evXN = check_accl_axis(
+        accl, 0, state.velX, state.evXP, state.evXN,
+        thresholds, "X", invert=config.INVERT_X
+    )
+
+    state.velY, state.evYP, state.evYN = check_accl_axis(
+        accl, 1, state.velY, state.evYP, state.evYN,
+        thresholds, "Y", invert=config.INVERT_Y
+    )
+
+    state.velZ, state.evZP, state.evZN = check_accl_axis(
+        accl, 2, state.velZ, state.evZP, state.evZN,
+        thresholds, "Z", invert=config.INVERT_Z
+    )
+
+    print("accl_states", state.velX, state.velY, state.velZ)
 
     return state
 
@@ -777,13 +891,13 @@ class MPU6050():
 
 import time
 import config
-from hw import init_i2c, init_mpu, init_vibrator, init_pots
+from hw import init_i2c, init_mpu, init_vibrator, init_pots, test_pots
 from actions import vibrar, send_charPs
 from printlogs import log
 from dicctozmk import potsgyrotozmk
 from calibration import calc_pots_hysteresis, calc_accl_hysteresis
 from pots import check_pots, PotsState
-from gyro import initial_buffer, average_and_slide, gyro_principal, GyroState
+from gyro import initial_buffer, average_and_slide, gyro_principal, check_accl_axis, accl_principal, GyroState, AcclState
 
 
 def start(i2c=None, mpu=None, pots=None, vib=None, force_calib=False):
@@ -798,14 +912,15 @@ def start(i2c=None, mpu=None, pots=None, vib=None, force_calib=False):
 
     # Estado do giroscópio
     gyro_state = GyroState()
+    accl_state = AcclState()
 
     # Calcula thresholds de histerese
     pots_thresh_on, pots_thresh_off = calc_pots_hysteresis(pots, pots_state.num_pots, vib, force_calib)
     print("Thresholds on:", pots_thresh_on)
     print("Thresholds off:", pots_thresh_off)
 
-    acclthresholds = calc_accl_hysteresis(mpu, vib, force_calib)
-    print("\nThresholds Acelerometro", acclthresholds)
+    # acclthresholds = calc_accl_hysteresis(mpu, vib, force_calib)
+    # print("\nThresholds Acelerometro", acclthresholds)
 
     # print("------------------------------------")
     # raise KeyboardInterrupt("Parando programa!")
@@ -828,43 +943,8 @@ def start(i2c=None, mpu=None, pots=None, vib=None, force_calib=False):
         # x[P] Y[L] Z[V]
         # print(f'x{accl[0]},y{accl[1]},z{accl[2]}')
 
-        # Eventos do Acelerometro
-        for axis, label in enumerate(["X", "Y", "Z"]):
-            a = accl[axis]
-            t = acclthresholds[label]
-            # print(f"{label}: {a:.2f}, thresholds: {t}, state: {accl_states[axis]}")
-
-            if accl_states[axis] == 0:
-                if a > t["on_pos"]:
-                    accl_states[axis] = 1
-                    stable_count[axis] = 0
-                elif a < t["on_neg"]:
-                    accl_states[axis] = -1
-                    stable_count[axis] = 0
-
-            elif accl_states[axis] == 1:
-                if a < t["off_pos"]:
-                    accl_states[axis] = 0
-                else:
-                    stable_count[axis] += 1
-
-            elif accl_states[axis] == -1:
-                if a > t["off_neg"]:
-                    accl_states[axis] = 0
-                else:
-                    stable_count[axis] += 1
-
-            # força neutro se parado por muito tempo
-            if stable_count[axis] > 50:  
-                accl_states[axis] = 0
-                stable_count[axis] = 0
-
-        print('accl_states',accl_states,'stable_count',stable_count)
-        # print('stable_count',stable_count)
-
-
-
-
+        # Atualiza acelerômetro
+        # accl_state = accl_principal(accl, acclthresholds, accl_state)
 
         # Atualiza giroscópio
         gyro_state = gyro_principal(gyro, gy1, gy2, vib, gyro_state)
@@ -879,7 +959,10 @@ def start(i2c=None, mpu=None, pots=None, vib=None, force_calib=False):
         )
 
         if res_check_pots is not None:
-            # log(f'potsgyrotozmk {res_check_pots}', 0)
+            log(f'res_check_pots {res_check_pots}', 0)
+            if res_check_pots[0][1] == -2:
+                if res_check_pots[1] == 0 and res_check_pots[2] == 1:
+                    start(force_calib=True)
             tozmk = potsgyrotozmk(*res_check_pots)
             # log(f'send_charPs {tozmk}', 0)
             # send_charPs(tozmk)

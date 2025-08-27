@@ -10,6 +10,8 @@ class PotsState:
         self.wait2Zero = False
         self.cycle = 0
 
+        self.tap_event = []          # histórico bruto de eventos (inclui abclevel)
+        self.active_buttons = set()  # botões atualmente pressionados
 
 def check_pots(pots, abclevel, press_thresh, release_thresh, state: PotsState):
     """
@@ -53,4 +55,29 @@ def check_pots(pots, abclevel, press_thresh, release_thresh, state: PotsState):
         else:
             state.pot_counter[i] = 0
 
+    # res_check_pots [[M, Y], pot, status, R/L]
     return local_res_check_pots, state
+
+
+def tap_pots(abclevel, mapped_i, status, side, state: PotsState):
+
+    event = [abclevel, mapped_i, status, side]
+
+    state.tap_event.append(event)
+
+    if status == 1:  # pressionado
+        state.active_buttons.add(mapped_i)
+
+    elif status == 0:  # solto
+        state.active_buttons.discard(mapped_i)
+
+        # todos soltos → ciclo fechado
+        if not state.active_buttons:
+            result = {
+                "tap_go": True,
+                "events": state.tap_event[:]
+            }
+            state.tap_event.clear()  # reseta para o próximo ciclo
+            return result, state
+
+    return None, state

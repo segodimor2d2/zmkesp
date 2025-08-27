@@ -44,6 +44,9 @@ def start(i2c=None, mpu=None, pots=None, vib=None, force_calib=False):
 
     gy1, gy2 = config.GY1, config.GY2
 
+    # tap_hold = True
+    tap_hold = False
+
     accl_states = [0, 0, 0] # 0 = neutro, 1 = positivo, -1 = negativo
     stable_count = [0, 0, 0]
 
@@ -73,18 +76,20 @@ def start(i2c=None, mpu=None, pots=None, vib=None, force_calib=False):
         if res_check_pots is not None:
             ## pot [gx, gy] status [M,Y]  M=Moto, Y=Yave [M,Y]
             # res_check_pots [[M, Y], pot, status, R/L]
-            log(f'res_check_pots {res_check_pots}', 0)
+            # log(f'res_check_pots {res_check_pots}', 0)
 
             # Processa evento vindo do check_pots
-            result, pots_state = tap_pots(*res_check_pots, pots_state)
+            if tap_hold: result, pots_state = tap_pots(*res_check_pots, pots_state)
+
+            result, pots_state = tap_pots_test(*res_check_pots, pots_state)
 
             if res_check_pots[0][1] == -2:
                 # if res_check_pots[1] == 0 and res_check_pots[2] == 1:
                 if res_check_pots[1] == 0:
                     start(force_calib=True)
-
+ 
         # Se ainda não fechou ciclo, verifica timeout
-        if not result:
+        if not result and tap_hold:
             result, pots_state = check_timeout(pots_state)
 
         # Se um ciclo foi fechado → envia eventos
@@ -96,6 +101,20 @@ def start(i2c=None, mpu=None, pots=None, vib=None, force_calib=False):
                 # log(f'send_charPs {tozmk}', 0)
                 # send_charPs(tozmk)
             print()
+
+        # if tap_hold is False:
+        #     # Se ainda não fechou ciclo, verifica timeout
+        #     if not result: result, pots_state = check_timeout(pots_state)
+        #
+        #     # Se um ciclo foi fechado → envia eventos
+        #     if result and result["tap_go"]:
+        #         for event in result["events"]:
+        #             print(f'event {event}')
+        #             # tozmk = potsgyrotozmk(*event)
+        #             # log(f'tozmk {tozmk}', 0)
+        #             # log(f'send_charPs {tozmk}', 0)
+        #             # send_charPs(tozmk)
+        #         print()
 
 
         """FIM E LIMPEZA"""

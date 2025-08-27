@@ -62,8 +62,9 @@ mpremote connect auto
 
 mpremote connect /dev/ttyUSB0 fs cp esp/main.py :main.py
 mpremote connect /dev/ttyUSB0 fs cp esp/config.py :config.py
-mpremote connect /dev/ttyUSB0 fs cp esp/gyro.py :gyro.py
+
 mpremote connect /dev/ttyUSB0 fs cp esp/pots.py :pots.py
+mpremote connect /dev/ttyUSB0 fs cp esp/gyro.py :gyro.py
 
 mpremote connect /dev/ttyUSB0 fs cp esp/calibration.py :calibration.py
 mpremote connect /dev/ttyUSB0 fs cp esp/actions.py :actions.py
@@ -4371,9 +4372,7 @@ def check_timeout(state: PotsState, timeout=1500):
 
 ---
 
-veja uma exemplo nesta parte:
-
-aqui o codigo que imprime os logs:
+veja uma exemplo nesta parte, aqui o codigo que imprime os logs:
 
         result = None
         if res_check_pots is not None:

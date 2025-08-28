@@ -5,6 +5,8 @@ from printlogs import log
 
 pinos = config.PINOS
 pinos_vib = config.PINOS_VIB
+numsamples = config.NUMTSTSAMPLES
+tsamples = config.TIMEMS_SAMPLES
 
 def init_i2c(scl_pin=22, sda_pin=21):
     return SoftI2C(scl=Pin(scl_pin), sda=Pin(sda_pin))
@@ -34,9 +36,9 @@ def test_pots():
         try:
             tp = TouchPad(Pin(pin))
             vals = []
-            for _ in range(5):
+            for _ in range(numsamples):
                 vals.append(tp.read())
-                time.sleep_ms(50)
+                time.sleep_ms(tsamples)
             print(f"OK: TouchPad inicializado no pino {pin}, leituras = {vals}")
         except Exception as e:
             print(f"ERRO no pino {pin}: {e}")

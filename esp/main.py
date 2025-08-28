@@ -16,6 +16,8 @@ def start(i2c=None, mpu=None, pots=None, vib=None, force_calib=False):
     if vib is None: vib = init_vibrator()
     if pots is None: pots = init_pots()
 
+    vibrar(vib, 1)
+
     # Estado dos potenciômetros
     pots_state = PotsState(len(pots))
 
@@ -27,7 +29,7 @@ def start(i2c=None, mpu=None, pots=None, vib=None, force_calib=False):
     pots_thresh_on, pots_thresh_off = calc_pots_hysteresis(
         pots, pots_state.num_pots, vib, force_calib
     )
-    print("Thresholds on:", pots_thresh_on)
+    print("\nThresholds on:", pots_thresh_on)
     print("Thresholds off:", pots_thresh_off)
 
     # # Se quiser calibrar o acelerômetro:

@@ -1,5 +1,7 @@
 $$$$
 
+
+
 - modo Hold ou modo Tap
 - modo Hold é uma ação similar ao -2 gyro que deixa o Hold liberado
 
@@ -23,7 +25,9 @@ $$$$
 - testar tirar o chunks
 - ver logs no nRF52840
 
-
+## corne
+- click esquerdo na f
+- / por ?
 
 valor_se_verdadeiro if condicao else valor_se_falso
 

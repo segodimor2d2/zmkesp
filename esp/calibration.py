@@ -42,6 +42,8 @@ def calc_pots_hysteresis(pots, num_pots, vib, force_calib=False):
             baseline[:] = loaded_baseline
             pots_thresh_on[:] = loaded_press
             pots_thresh_off[:] = loaded_release
+            pots_thresh_on = [p + config.MAD_MAX for p in pots_thresh_on]
+            pots_thresh_off = [p + config.MAD_MIN for p in pots_thresh_off]
             return pots_thresh_on, pots_thresh_off
 
         else:
@@ -72,13 +74,18 @@ def calc_pots_hysteresis(pots, num_pots, vib, force_calib=False):
                 soma_dev[i] += abs(val - baseline[i])
             time.sleep_ms(config.TIMEMS_SAMPLES)
 
-        # mad = [s / samples_count for s in soma_dev]
-        mad = [max(config.MAD_MIN, min(s / samples_count, config.MAD_MAX)) for s in soma_dev]
+        mad = [s / samples_count for s in soma_dev]
+        # mad = [max(config.MAD_MIN, min(s / samples_count, config.MAD_MAX)) for s in soma_dev]
 
         pots_thresh_on  = [baseline[i] - k * mad[i] for i in range(num_pots)]
-        pots_thresh_off = [baseline[i] - (k/2) * mad[i] for i in range(num_pots)]
+        # pots_thresh_off = [baseline[i] - (k/2) * mad[i] for i in range(num_pots)]
+        pots_thresh_off = [baseline[i] - k * mad[i] for i in range(num_pots)]
 
         save_calibration(baseline, pots_thresh_on, pots_thresh_off)
+
+        pots_thresh_on = [p - (p * config.MAD_MAX) for p in pots_thresh_on]
+        pots_thresh_off = [p - (p * config.MAD_MIN) for p in pots_thresh_off]
+
         log("calc_pots_hysteresi concluido", 0)
         vibrar(vib, 6)
 

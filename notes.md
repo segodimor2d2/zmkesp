@@ -1,7 +1,6 @@
 $$$$
 
 
-
 - modo Hold ou modo Tap
 - modo Hold é uma ação similar ao -2 gyro que deixa o Hold liberado
 
@@ -13,6 +12,7 @@ $$$$
     - valor absoluto do acelerômetro se converte em velocidade do movimento do mouse
 
 - reviçar o pull/down com resistores para os eletrodos
+    - 1MΩ 2.2MΩ 3.3MΩ 4.7MΩ 10MΩ 22MΩ
     - isolar os eletrodos do ambiente
 
 - ver se funciona calibrar com valores máximos
@@ -28,6 +28,9 @@ $$$$
 ## corne
 - click esquerdo na f
 - / por ?
+- testar setas com o botão FN e não com numbes frocaria pelas F1 F2 F3
+
+---
 
 valor_se_verdadeiro if condicao else valor_se_falso
 
@@ -4435,3 +4438,1038 @@ event [[0, 0], 2, 0, 1, 141274]
 
 res_check_pots [[0, 0], 2, 0, 1]
 event [[0, 0], 2, 0, 1, 142226]
+
+---
+
+
+modulo touch hw-017
+HW-017 Capacitive Touch Sensor
+
+HW-017 Capacitive Touch Sensor Breakout
+
+
+sobre fazer Pull-down em cada fio para o touch do ESP32
+
+* Coloque um resistor de **4,7 MΩ a 10 MΩ** de cada fio touch para GND (na **placa do ESP32**).
+* Isso mantém cada eletrodo “ancorado” e evita que um fio influencie o outro quando ninguém toca.
+
+se eu usar um modulo touch hw-017 ao invez de usar os touch do esp32, eu teria ja essa solução? teria alguma vantagem para obter dados mais precisos do touch?
+
+---
+
+
+Sim — usando um módulo “HW-017” (geralmente baseado no **TTP223** de toque capacitivo) você **já tem o “pull-down”/polarização e filtragem embutidos** no próprio CI. Você não precisa colocar resistores de 4,7–10 MΩ em cada fio como faria ao usar diretamente os pinos touch do ESP32.
+
+Aqui vai um comparativo direto:
+
+### Vantagens do módulo (TTP223 / HW-017)
+
+* **Sinal pronto (digital)**: ele entrega HIGH/LOW já com **filtro, histerese e auto-calibração**. Poupa você de tratar ruído/threshold no firmware.
+* **Imunidade melhor a ruído e deriva**: o CI dedicado costuma lidar melhor com variações de temperatura/umidade e com fios um pouco mais longos.
+* **Debounce integrado**: menos “falsos toques”.
+* **Modos configuráveis** (em muitos módulos): “momentâneo” ou “toggle”, ativo alto/baixo, e às vezes modo “low-power” vs “rápido”.
+
+### Desvantagens do módulo
+
+* **Perde “precisão”/granularidade**: ele te dá **apenas binário** (tocou/não tocou). Com o ESP32 nativo você tem **leituras brutas** (contagens) e pode ajustar thresholds dinamicamente, criar níveis de sensibilidade, etc.
+* **Mais hardware por canal**: 1 módulo por tecla/eletrodo. No ESP32 você usa vários pinos touch sem placas extras.
+* **Alimentação/cuidados elétricos**: alimente o módulo em **3,3 V** para compatibilizar o nível lógico com o ESP32 (se usar 5 V, pode precisar de divisor/level-shifter).
+
+### Precisão dos dados
+
+* Se por “mais preciso” você quer **medir intensidade/variação fina** do toque, o **ESP32 direto é melhor** (você lê o valor “raw” e decide o threshold).
+* Se você quer **detecção robusta e simples** (apenas toque/não toque) com **menos instabilidade e menos código**, o **módulo é melhor**.
+
+### E quanto aos fios longos?
+
+* No **ESP32 direto**, adicionar **pull-down alto (4,7–10 MΩ)** na **placa do ESP32** ajuda a “ancorar” cada canal e reduzir acoplamento entre fios.
+* No **módulo**, o CI já faz a polarização. Mesmo assim:
+
+  * Mantenha os **fios curtos** (idealmente <20–30 cm).
+  * Se precisar estender, use **fio blindado** (malha no GND) ou roteie um **fio de GND paralelo** ao fio do eletrodo para formar um “retorno” e reduzir captação.
+  * Um **resistor em série** pequeno (1 k–2,2 k) no fio do eletrodo ajuda na **proteção ESD**.
+
+### Ligações recomendadas (módulo)
+
+* **VCC = 3,3 V**, **GND = GND**, **OUT → GPIO comum** (não use pino touch do ESP32 para ler OUT; use um GPIO digital).
+* Se o módulo tiver jumpers/trilhas de modo (ex.: TOG, AHLB, etc.), configure para **momentary/ativo-alto** conforme seu firmware.
+
+### Quando escolher cada abordagem?
+
+* **Quero simplicidade e estabilidade já** → **HW-017 (TTP223)**.
+* **Quero controle fino de sensibilidade, vários canais e lógica adaptativa** → **pinos touch nativos do ESP32** com os resistores de 4,7–10 MΩ para cada canal e, se possível, eletrodos e fios bem curtos.
+
+Se você me disser quantos canais pretende usar e o comprimento aproximado dos fios até os eletrodos, eu já te sugiro um esquema prático (com ou sem módulo) e valores/materiais ideais.
+
+---
+
+
+
+
+
+
+
+---
+
+apos calibrar os Threshold com histerese eu acho o ruido máximo para e ter os thresholds não é verdade?
+
+
+Exatamente 👌 você pegou a lógica certinha.
+
+Vamos por partes:
+
+### 1. O que o ESP32 mede
+
+Cada canal *touch* do ESP32 dá um valor **numérico bruto** (quanto menor, maior o “toque”).
+Quando ninguém toca, esse valor ainda oscila (ruído ambiental, fios longos, interferência).
+
+### 2. Calibração
+
+Na calibração você mede o valor **em repouso** (sem toque).
+Depois mede o valor **com toque real**.
+Assim você consegue:
+
+* Estimar o **valor médio de repouso**.
+* Estimar o **valor médio de toque**.
+* Medir também a **amplitude máxima do ruído** quando está em repouso.
+
+### 3. Thresholds com histerese
+
+Você define dois limites:
+
+* **Limite de ativação (threshold ON)** = valor de repouso − (ruído máx + margem extra).
+* **Limite de desativação (threshold OFF)** = um pouco acima (ou abaixo, dependendo da polaridade).
+
+🔑 Isso cria a **histerese**:
+
+* Só ativa quando cruza bem abaixo do ruído.
+* Só desativa quando sobe de volta além de um valor seguro.
+* Assim você não fica ativando/desativando rapidamente por causa do ruído.
+
+### 4. Em resumo
+
+👉 Sim, depois de calibrar, você usa o **ruído máximo em repouso** como referência para posicionar seus thresholds, adicionando uma margem para não ter falsos positivos.
+👉 A histerese garante que, uma vez ativado, o toque só “solte” quando tiver realmente voltado ao estado de repouso.
+
+---
+
+Quer que eu te monte uma formulinha prática em Python para calcular `threshold_on` e `threshold_off` a partir de:
+
+* valor médio em repouso,
+* valor médio em toque,
+* ruído máximo medido?
+
+
+minha duvida é se serviria ter uma calibração avaliando o valor máximos dos sensores assim eu saberia por exemplo a que porcentagem eu gostaria ter meus thresholds
+
+
+Perfeito — sim, faz muito sentido calibrar usando os **valores máximos (e/ou amplitude) dos sensores** e então escolher os thresholds como **uma porcentagem do caminho entre repouso e toque**. Isso é simples, intuitivo e fácil de ajustar por canal.
+
+Vou explicar a ideia, dar a fórmula e um trecho de código Python prático que você pode adaptar.
+
+# Idea principal
+
+* Meça no estado **repouso** (sem toque): `rest_mean`, e registre também `rest_max` e `rest_min` (ou `rest_noise = rest_max - rest_min`).
+* Meça com **toque real**: `touch_mean` (ou `touch_min` se você preferir).
+* Defina uma porcentagem `p_on` (0..1) que indica **quão perto do valor de toque** você quer que o `threshold_on` fique.
+* Defina `p_off` (0..1) menor que `p_on` para a **desativação** — isto cria a histerese.
+
+Observação importante para ESP32: **os valores diminuem quando há toque** (isto é, `rest_mean > touch_mean`). As fórmulas abaixo assumem isso.
+
+# Fórmulas
+
+Delta entre repouso e toque:
+
+```
+delta = rest_mean - touch_mean   # positivo
+```
+
+Thresholds por porcentagem:
+
+```
+threshold_on  = rest_mean - p_on * delta   # p_on perto de 1 => mais perto do touch
+threshold_off = rest_mean - p_off * delta  # p_off < p_on => mais perto do repouso
+```
+
+Para segurança contra ruído, garanta que `threshold_on` fique abaixo do ruído máximo em repouso:
+
+```
+min_allowed_on = rest_mean - rest_noise - margin
+threshold_on = min(threshold_on, min_allowed_on)   # como o valor de toque é menor, 'min' aqui força ser ainda mais baixo
+```
+
+(ajuste `margin` tipo 5–20 unidades conforme sua escala).
+
+# Valores sugeridos (padrão)
+
+* `p_on`: 0.7 — 0.9 (ativa quando estiver 70–90% do caminho do repouso até o toque)
+* `p_off`: 0.1 — 0.3 (desativa quando voltar 10–30% do caminho)
+  Ex.: `p_on = 0.8`, `p_off = 0.2` → liga em 20% acima do valor de toque e desliga perto do repouso.
+
+# Código Python exemplo
+
+(adapte à sua coleta de amostras)
+
+```python
+def calc_thresholds(rest_samples, touch_samples, p_on=0.8, p_off=0.2, margin=5):
+    # rest_samples/touch_samples: listas de leituras por canal
+    rest_mean = sum(rest_samples) / len(rest_samples)
+    rest_min = min(rest_samples)
+    rest_max = max(rest_samples)
+    rest_noise = rest_max - rest_min
+
+    touch_mean = sum(touch_samples) / len(touch_samples)
+
+    delta = rest_mean - touch_mean
+    if delta <= 0:
+        # proteção caso medições invertidas
+        raise ValueError("rest_mean deve ser maior que touch_mean (ESP32: toque reduz o valor)")
+
+    thr_on = rest_mean - p_on * delta
+    thr_off = rest_mean - p_off * delta
+
+    # Proteção contra ruído: force thr_on a ser pelo menos rest_mean - rest_noise - margin
+    min_allowed_on = rest_mean - rest_noise - margin
+    # Lembre: valores menores significam toque; queremos thr_on <= min_allowed_on
+    if thr_on > min_allowed_on:
+        thr_on = min_allowed_on
+
+    return {
+        "rest_mean": rest_mean,
+        "touch_mean": touch_mean,
+        "rest_noise": rest_noise,
+        "threshold_on": thr_on,
+        "threshold_off": thr_off
+    }
+
+# Exemplo rápido:
+rest = [300, 302, 298, 301, 299]   # repouso
+touch = [110, 105, 108, 112, 107]  # toque
+res = calc_thresholds(rest, touch, p_on=0.8, p_off=0.2, margin=4)
+print(res)
+```
+Perfeito — sim, faz muito sentido calibrar usando os **valores máximos (e/ou amplitude) dos sensores** e então escolher os thresholds como **uma porcentagem do caminho entre repouso e toque**. Isso é simples, intuitivo e fácil de ajustar por canal.
+
+
+Vou explicar a ideia, dar a fórmula e um trecho de código Python prático que você pode adaptar.
+
+# Idea principal
+
+* Meça no estado **repouso** (sem toque): `rest_mean`, e registre também `rest_max` e `rest_min` (ou `rest_noise = rest_max - rest_min`).
+* Meça com **toque real**: `touch_mean` (ou `touch_min` se você preferir).
+* Defina uma porcentagem `p_on` (0..1) que indica **quão perto do valor de toque** você quer que o `threshold_on` fique.
+* Defina `p_off` (0..1) menor que `p_on` para a **desativação** — isto cria a histerese.
+
+Observação importante para ESP32: **os valores diminuem quando há toque** (isto é, `rest_mean > touch_mean`). As fórmulas abaixo assumem isso.
+
+# Fórmulas
+
+Delta entre repouso e toque:
+
+```
+delta = rest_mean - touch_mean   # positivo
+```
+
+Thresholds por porcentagem:
+
+```
+threshold_on  = rest_mean - p_on * delta   # p_on perto de 1 => mais perto do touch
+threshold_off = rest_mean - p_off * delta  # p_off < p_on => mais perto do repouso
+```
+
+Para segurança contra ruído, garanta que `threshold_on` fique abaixo do ruído máximo em repouso:
+
+```
+min_allowed_on = rest_mean - rest_noise - margin
+threshold_on = min(threshold_on, min_allowed_on)   # como o valor de toque é menor, 'min' aqui força ser ainda mais baixo
+```
+
+(ajuste `margin` tipo 5–20 unidades conforme sua escala).
+
+# Valores sugeridos (padrão)
+
+* `p_on`: 0.7 — 0.9 (ativa quando estiver 70–90% do caminho do repouso até o toque)
+* `p_off`: 0.1 — 0.3 (desativa quando voltar 10–30% do caminho)
+  Ex.: `p_on = 0.8`, `p_off = 0.2` → liga em 20% acima do valor de toque e desliga perto do repouso.
+
+# Código Python exemplo
+
+(adapte à sua coleta de amostras)
+
+```python
+def calc_thresholds(rest_samples, touch_samples, p_on=0.8, p_off=0.2, margin=5):
+    # rest_samples/touch_samples: listas de leituras por canal
+    rest_mean = sum(rest_samples) / len(rest_samples)
+    rest_min = min(rest_samples)
+    rest_max = max(rest_samples)
+    rest_noise = rest_max - rest_min
+
+    touch_mean = sum(touch_samples) / len(touch_samples)
+
+    delta = rest_mean - touch_mean
+    if delta <= 0:
+        # proteção caso medições invertidas
+        raise ValueError("rest_mean deve ser maior que touch_mean (ESP32: toque reduz o valor)")
+
+    thr_on = rest_mean - p_on * delta
+    thr_off = rest_mean - p_off * delta
+
+    # Proteção contra ruído: force thr_on a ser pelo menos rest_mean - rest_noise - margin
+    min_allowed_on = rest_mean - rest_noise - margin
+    # Lembre: valores menores significam toque; queremos thr_on <= min_allowed_on
+    if thr_on > min_allowed_on:
+        thr_on = min_allowed_on
+
+    return {
+        "rest_mean": rest_mean,
+        "touch_mean": touch_mean,
+        "rest_noise": rest_noise,
+        "threshold_on": thr_on,
+        "threshold_off": thr_off
+    }
+
+# Exemplo rápido:
+rest = [300, 302, 298, 301, 299]   # repouso
+touch = [110, 105, 108, 112, 107]  # toque
+res = calc_thresholds(rest, touch, p_on=0.8, p_off=0.2, margin=4)
+print(res)
+```
+
+# Boas práticas extras
+
+* Colete algumas centenas de amostras em repouso e durante toque, preferencialmente em diferentes momentos (variações de temperatura/umidade).
+* Use `rest_noise` como métrica mais robusta do que só `stddev` ou `max`: `rest_noise = rest_max - rest_min` dá a amplitude completa do ruído.
+* Se o ruído for impulsivo, prefira usar percentis (ex.: 95º percentil) em vez do `max`, para evitar influências de outliers.
+* Recalibre periodicamente (ou quando detectar drift). Você pode fazer uma calibração automática a cada boot e uma micro-recalibração de baseline em períodos de inatividade.
+* Se usar fios longos, espere até estabilizar o valor (filtragem) antes de coletar amostras de calibração.
+* Teste com diferentes `p_on/p_off` por canal — sensores próximos/longos podem precisar de valores diferentes.
+
+---
+
+Quer que eu gere um pequeno script para coletar automaticamente `rest_samples` e `touch_samples` por canal (por exemplo, 500 amostras cada) no ESP32 em MicroPython e te devolver os thresholds já prontos? Posso já te mostrar o código pronto pra você colar no micro.
+
+# Boas práticas extras
+
+* Colete algumas centenas de amostras em repouso e durante toque, preferencialmente em diferentes momentos (variações de temperatura/umidade).
+* Use `rest_noise` como métrica mais robusta do que só `stddev` ou `max`: `rest_noise = rest_max - rest_min` dá a amplitude completa do ruído.
+* Se o ruído for impulsivo, prefira usar percentis (ex.: 95º percentil) em vez do `max`, para evitar influências de outliers.
+* Recalibre periodicamente (ou quando detectar drift). Você pode fazer uma calibração automática a cada boot e uma micro-recalibração de baseline em períodos de inatividade.
+* Se usar fios longos, espere até estabilizar o valor (filtragem) antes de coletar amostras de calibração.
+* Teste com diferentes `p_on/p_off` por canal — sensores próximos/longos podem precisar de valores diferentes.
+
+---
+
+Quer que eu gere um pequeno script para coletar automaticamente `rest_samples` e `touch_samples` por canal (por exemplo, 500 amostras cada) no ESP32 em MicroPython e te devolver os thresholds já prontos? Posso já te mostrar o código pronto pra você colar no micro.
+
+
+MAD_MIN = 30 # limites de MAD para evitar thresholds muito colados
+MAD_MAX = 60 # limites de MAD para evitar thresholds muito colados
+
+print('pots0', pots[0].read(),pots_thresh_on[0],pots_thresh_off[0])
+
+pots0 364 241.7062 286.7062
+pots0 373 241.7062 286.7062
+pots0 367 241.7062 286.7062
+pots0 371 241.7062 286.7062
+pots0 370 241.7062 286.7062
+pots0 366 241.7062 286.7062
+
+
+MAD_MIN = 10 # limites de MAD para evitar thresholds muito colados
+MAD_MAX = 60 # limites de MAD para evitar thresholds muito colados
+
+print('pots0', pots[0].read(),pots_thresh_on[0],pots_thresh_off[0])
+
+
+pots0 362 263.8952 308.8952
+pots0 360 263.8952 308.8952
+pots0 361 263.8952 308.8952
+pots0 363 263.8952 308.8952
+pots0 365 263.8952 308.8952
+pots0 363 263.8952 308.8952
+
+
+MAD_MIN = 1 # limites de MAD para evitar thresholds muito colados
+MAD_MAX = 50 # limites de MAD para evitar thresholds muito colados
+
+pots0 353 350.7253 354.5148
+pots0 358 350.7253 354.5148
+pots0 356 350.7253 354.5148
+pots0 357 350.7253 354.5148
+
+
+
+MAD_MIN = 1 # limites de MAD para evitar thresholds muito colados
+MAD_MAX = 90 # limites de MAD para evitar thresholds muito colados
+
+pots0 369 351.972 353.5693
+pots0 365 351.972 353.5693
+pots0 368 351.972 353.5693
+pots0 367 351.972 353.5693
+pots0 363 351.972 353.5693
+pots0 369 351.972 353.5693
+pots0 363 351.972 353.5693
+pots0 367 351.972 353.5693
+pots0 365 351.972 353.5693
+pots0 366 351.972 353.5693
+pots0 365 351.972 353.5693
+
+
+MAD_MIN = 50 # limites de MAD para evitar thresholds muito colados
+MAD_MAX = 90 # limites de MAD para evitar thresholds muito colados
+
+203.5272 278.5272 pots0 360
+203.5272 278.5272 pots0 361
+203.5272 278.5272 pots0 362
+203.5272 278.5272 pots0 363
+203.5272 278.5272 pots0 364
+203.5272 278.5272 pots0 364
+203.5272 278.5272 pots0 363
+203.5272 278.5272 pots0 362
+203.5272 278.5272 pots0 363
+203.5272 278.5272 pots0 361
+
+MAD_MIN = 80 # limites de MAD para evitar thresholds muito colados
+MAD_MAX = 90 # limites de MAD para evitar thresholds muito colados
+
+113.9982 233.9982 pots0 354
+113.9982 233.9982 pots0 353
+113.9982 233.9982 pots0 353
+113.9982 233.9982 pots0 354
+
+
+113.9982 233.9982 pots0 117
+113.9982 233.9982 pots0 73
+113.9982 233.9982 pots0 99
+113.9982 233.9982 pots0 116
+113.9982 233.9982 pots0 79
+113.9982 233.9982 pots0 106
+113.9982 233.9982 pots0 115
+113.9982 233.9982 pots0 97
+113.9982 233.9982 pots0 105
+113.9982 233.9982 pots0 90
+113.9982 233.9982 pots0 118
+113.9982 233.9982 pots0 107
+113.9982 233.9982 pots0 80
+113.9982 233.9982 pots0 123
+113.9982 233.9982 pots0 120
+113.9982 233.9982 pots0 79
+
+
+
+MAD_MIN = 80 # limites de MAD para evitar thresholds muito colados
+MAD_MAX = 80 # limites de MAD para evitar thresholds muito colados
+
+78.33206 198.3321 pots0 311
+78.33206 198.3321 pots0 318
+78.33206 198.3321 pots0 309
+78.33206 198.3321 pots0 323
+
+
+MAD_MIN = 80 # limites de MAD para evitar thresholds muito colados
+MAD_MAX = 60 # limites de MAD para evitar thresholds muito colados
+
+100.8245 220.8245 pots0 335
+100.8245 220.8245 pots0 324
+100.8245 220.8245 pots0 329
+100.8245 220.8245 pots0 337
+100.8245 220.8245 pots0 329
+
+
+MAD_MIN = 100 # limites de MAD para evitar thresholds muito colados
+MAD_MAX = 60 # limites de MAD para evitar thresholds muito colados
+
+
+21.13 171.13 pots0 325
+21.13 171.13 pots0 320
+21.13 171.13 pots0 323
+21.13 171.13 pots0 322
+21.13 171.13 pots0 312
+
+
+MAD_MIN = 60 # limites de MAD para evitar thresholds muito colados
+MAD_MAX = 100 # limites de MAD para evitar thresholds muito colados
+
+
+157.3265 247.3265 pots0 316
+157.3265 247.3265 pots0 310
+157.3265 247.3265 pots0 322
+157.3265 247.3265 pots0 317
+157.3265 247.3265 pots0 317
+
+
+
+340.6259 340.6259 pots0 345
+340.6259 340.6259 pots0 343
+340.6259 340.6259 pots0 346
+340.6259 340.6259 pots0 346
+340.6259 340.6259 pots0 341
+340.6259 340.6259 pots0 345
+
+340-120 220
+340-200 140
+
+340 + 
+
+340-340*0.1 306.0
+340-340*0.2 272.0
+340-340*0.3 238.0
+340-340*0.4 204.0
+340-340*0.5 170.0
+340-340*0.6 136.0
+340-340*0.7 102.1
+340-340*0.8 68.0
+340-340*0.9 34.0
+
+
+
+modulo touch hw-017
+HW-017 Capacitive Touch Sensor
+
+HW-017 Capacitive Touch Sensor Breakout
+
+
+se eu quero usar o modulo touch hw-017 e o mpu6050 num esp32 com micropython? eu preciso conectar os pinos i2c em paralelo ao esp32?
+
+
+
+---
+
+Boa pergunta 👍
+
+Sim, você pode usar **os dois módulos (HW-017 e MPU6050) juntos no mesmo barramento I²C** do ESP32, conectando os pinos em paralelo:
+
+* **SCL** de ambos os módulos → no mesmo pino **SCL** do ESP32
+* **SDA** de ambos os módulos → no mesmo pino **SDA** do ESP32
+* **GND** de ambos os módulos → **GND** do ESP32
+* **VCC** de ambos os módulos → **3.3V** do ESP32 (confira se o HW-017 funciona a 3.3V, alguns aceitam 5V também)
+
+🔹 O I²C foi projetado justamente para isso: vários dispositivos no mesmo barramento, cada um com seu **endereço I²C único**.
+
+* O **MPU6050** normalmente usa o endereço `0x68` (ou `0x69` se o pino AD0 estiver em HIGH).
+* O **HW-017 (sensor de toque capacitivo TTP223)** não usa I²C → ele tem saída **digital**, que você deve ligar a qualquer **pino GPIO** do ESP32.
+
+👉 Então, detalhe importante:
+
+* O **MPU6050** vai no **I²C** (SCL + SDA).
+* O **HW-017** vai em **GPIO normal** (entrada digital), não no I²C.
+
+Ou seja:
+
+* Você só precisa compartilhar os pinos I²C se tiver **outros sensores I²C além do MPU6050**.
+* O HW-017 fica em um pino separado, funcionando como um botão "touch".
+
+---
+
+Quer que eu faça um **esquemático em texto** mostrando a ligação completa ESP32 + MPU6050 + HW-017?
+
+---
+
+eu quero usar o HW-017 Capacitive Touch Sensor usando micropython via I2c
+
+
+
+Perfeito — pela descrição, o seu módulo é um **MPR121** (12 eletrodos, IRQ, 1.71–3.6 V, I²C). O endereço que você viu no `scan()` (**0x5A**) é exatamente o **padrão** do MPR121 quando o pino **ADDR** está em GND.
+
+A leitura no MPR121 **não é `readfrom` direto** como no TTP229: você precisa **escrever o endereço do registrador** e então **ler**. Abaixo deixo uma classe MicroPython enxuta que faz o **reset**, configura **limiares** e **habilita os 12 canais**, e fornece métodos para ler o **bitmap** de toques e consultar um eletrodo específico.
+
+### Ligações (ESP32 ↔ MPR121)
+
+* **3V3** ↔ **VCC**
+* **GND** ↔ **GND**
+* **GPIO22** ↔ **SCL** (ou o pino SCL que você usa)
+* **GPIO21** ↔ **SDA** (ou o pino SDA que você usa)
+* **IRQ (opcional)** ↔ um GPIO do ESP32 (entrada com pull-up). Se não ligar, dá para **polling** (ficar lendo).
+
+> Endereço I²C: 0x5A (ADD R=GND). Pode ser 0x5B/0x5C/0x5D se o pino ADDR for ligado em VDD/SDA/SCL.
+
+---
+
+### Código (classe MPR121 + exemplo)
+
+```python
+from machine import I2C, Pin
+import time
+
+class MPR121:
+    # Registros principais
+    REG_TOUCH_STATUS_L = 0x00  # LSB dos 12 bits de toque
+    REG_TOUCH_STATUS_H = 0x01  # MSB dos 12 bits de toque
+    REG_ECR            = 0x5E  # Electrode Configuration
+    REG_DEBOUNCE       = 0x5B
+    REG_SOFTRESET      = 0x80
+
+    # Limiares: E0 TTH=0x41, RTH=0x42; E1 TTH=0x43, RTH=0x44; ...
+    REG_TOUCH_THR_BASE = 0x41  # TTHRESH base
+    REG_RELEASE_THR_BASE = 0x42  # RTHRESH base
+
+    def __init__(self, i2c, addr=0x5A, electrodes=12, touch_thr=12, release_thr=6):
+        self.i2c = i2c
+        self.addr = addr
+        self.electrodes = min(max(electrodes, 0), 12)
+        # Reset + init
+        self._write8(self.REG_SOFTRESET, 0x63)  # valor de reset do MPR121
+        time.sleep_ms(1)
+
+        # Desabilita eletrodos durante configuração
+        self._write8(self.REG_ECR, 0x00)
+
+        # Debounce (1 amostra para press/release)
+        self._write8(self.REG_DEBOUNCE, 0x11)
+
+        # Define limiares por eletrodo
+        for i in range(self.electrodes):
+            self._write8(self.REG_TOUCH_THR_BASE + 2*i, touch_thr)
+            self._write8(self.REG_RELEASE_THR_BASE + 2*i, release_thr)
+
+        # Habilita N eletrodos + auto-config baseline habilitado
+        # Bits: [CLA, SFE, ELEPROX, ELE[3:0]] — valor típico 0x8F para 12 eletrodos
+        enable_val = 0x80 | (self.electrodes & 0x0F)
+        self._write8(self.REG_ECR, enable_val)
+
+    def _write8(self, reg, val):
+        self.i2c.writeto(self.addr, bytes([reg, val & 0xFF]))
+
+    def _read8(self, reg):
+        self.i2c.writeto(self.addr, bytes([reg]))
+        return self.i2c.readfrom(self.addr, 1)[0]
+
+    def _read16(self, reg):
+        self.i2c.writeto(self.addr, bytes([reg]))
+        data = self.i2c.readfrom(self.addr, 2)
+        # LSB primeiro (little-endian)
+        return data[0] | (data[1] << 8)
+
+    def get_touched_mask(self):
+        """Retorna os 12 bits (0..11) onde 1 = pressionado."""
+        val = self._read16(self.REG_TOUCH_STATUS_L) & 0x0FFF
+        return val
+
+    def is_touched(self, electrode):
+        if not (0 <= electrode < self.electrodes):
+            return False
+        return bool(self.get_touched_mask() & (1 << electrode))
+
+
+# ====== EXEMPLO DE USO ======
+# Ajuste os pinos I2C conforme seu ESP32
+i2c = I2C(0, scl=Pin(22), sda=Pin(21), freq=100000)
+
+print("Dispositivos I2C:", i2c.scan())  # deve mostrar 0x5A e 0x68
+
+mpr = MPR121(i2c, addr=0x5A, electrodes=12, touch_thr=12, release_thr=6)
+
+last = 0
+while True:
+    mask = mpr.get_touched_mask()
+    if mask != last:
+        # imprime as teclas ativas
+        ativos = [i for i in range(12) if mask & (1 << i)]
+        print("Toques:", ativos, "  (mask=0x%03X)" % mask)
+        last = mask
+    time.sleep(0.05)
+```
+
+#### Observações
+
+* **Sem IRQ**: o loop acima fica consultando (polling). Se quiser usar **IRQ**, ligue o pino **IRQ** do módulo a um GPIO do ESP32 como entrada com pull-up interno (`Pin.IN, Pin.PULL_UP`) e dispare a leitura no **falling edge**.
+* **Endereço**: se o `scan()` mostrar outro endereço (0x5B–0x5D), mude `addr`.
+* **Sensibilidade**: ajuste `touch_thr` e `release_thr` (ex.: `touch_thr=8`, `release_thr=4` para mais sensível).
+* **Alimentação**: use 3.3 V; compartilhe o **GND**.
+
+Se quiser, eu adapto essa classe para acionar **GPIOs/LEDs** automaticamente quando um eletrodo é tocado, ou para integrar com o seu **MPU6050** no mesmo script (I²C compartilhado).
+
+
+---
+
+
+# teste mpu e mpr121
+Perfeito! 😄 Aqui está o **script completo ajustado** para **ESP32 com MicroPython moderno**, usando **MPU6050** e **MPR121** no mesmo barramento I²C. Ele já evita `start()/stop()` que não são suportados e lê ambos os módulos corretamente.
+
+```python
+from machine import Pin, I2C
+import time
+
+# =============================
+# MPU6050 (ajustado para MicroPython moderno)
+# =============================
+class MPU6050():
+    def __init__(self, i2c, addr=0x68):
+        self.iic = i2c
+        self.addr = addr
+        # Acorda o MPU6050 (remove sleep mode)
+        self.iic.writeto_mem(self.addr, 0x6B, b'\x00')
+
+    def get_raw_values(self):
+        # Lê 14 bytes de 0x3B a 0x48
+        return self.iic.readfrom_mem(self.addr, 0x3B, 14)
+
+    def bytes_toint(self, firstbyte, secondbyte):
+        # Converte dois bytes para int16
+        if not firstbyte & 0x80:
+            return firstbyte << 8 | secondbyte
+        return - (((firstbyte ^ 255) << 8) | ((secondbyte ^ 255) + 1))
+
+    def get_values(self):
+        raw = self.get_raw_values()
+        vals = {}
+        vals["AcX"] = self.bytes_toint(raw[0], raw[1])
+        vals["AcY"] = self.bytes_toint(raw[2], raw[3])
+        vals["AcZ"] = self.bytes_toint(raw[4], raw[5])
+        vals["Tmp"] = self.bytes_toint(raw[6], raw[7]) / 340.0 + 36.53
+        vals["GyX"] = self.bytes_toint(raw[8], raw[9])
+        vals["GyY"] = self.bytes_toint(raw[10], raw[11])
+        vals["GyZ"] = self.bytes_toint(raw[12], raw[13])
+        return vals
+
+# =============================
+# MPR121 (classe I2C 12 canais)
+# =============================
+class MPR121:
+    REG_TOUCH_STATUS_L = 0x00
+    REG_TOUCH_STATUS_H = 0x01
+    REG_ECR            = 0x5E
+    REG_DEBOUNCE       = 0x5B
+    REG_SOFTRESET      = 0x80
+    REG_TOUCH_THR_BASE = 0x41
+    REG_RELEASE_THR_BASE = 0x42
+
+    def __init__(self, i2c, addr=0x5A, electrodes=12, touch_thr=12, release_thr=6):
+        self.i2c = i2c
+        self.addr = addr
+        self.electrodes = min(max(electrodes, 0), 12)
+        self._write8(self.REG_SOFTRESET, 0x63)
+        time.sleep_ms(1)
+        self._write8(self.REG_ECR, 0x00)
+        self._write8(self.REG_DEBOUNCE, 0x11)
+        for i in range(self.electrodes):
+            self._write8(self.REG_TOUCH_THR_BASE + 2*i, touch_thr)
+            self._write8(self.REG_RELEASE_THR_BASE + 2*i, release_thr)
+        enable_val = 0x80 | (self.electrodes & 0x0F)
+        self._write8(self.REG_ECR, enable_val)
+
+    def _write8(self, reg, val):
+        self.i2c.writeto(self.addr, bytes([reg, val & 0xFF]))
+
+    def _read16(self, reg):
+        self.i2c.writeto(self.addr, bytes([reg]))
+        data = self.i2c.readfrom(self.addr, 2)
+        return data[0] | (data[1] << 8)
+
+    def get_touched_mask(self):
+        return self._read16(self.REG_TOUCH_STATUS_L) & 0x0FFF
+
+# =============================
+# Inicialização I2C
+# =============================
+i2c = I2C(0, scl=Pin(22), sda=Pin(21), freq=100000)
+print("Dispositivos I2C encontrados:", i2c.scan())  # deve mostrar [0x5A, 0x68]
+
+mpr = MPR121(i2c)
+mpu = MPU6050(i2c)
+
+# =============================
+# Loop principal
+# =============================
+last_mask = 0
+while True:
+    # Leitura do MPR121
+    mask = mpr.get_touched_mask()
+    if mask != last_mask:
+        ativos = [i for i in range(12) if mask & (1 << i)]
+        print("Toques MPR121:", ativos)
+        last_mask = mask
+
+    # Leitura do MPU6050
+    vals = mpu.get_values()
+    print("MPU6050:", vals)
+
+    time.sleep(0.3)
+```
+
+---
+
+### ✅ Funcionalidades deste script
+
+* Detecta **toques nos 12 eletrodos do MPR121** (`get_touched_mask()`)
+* Lê **aceleração, giroscópio e temperatura do MPU6050**
+* Ambos compartilham o mesmo barramento **I²C do ESP32**
+* Compatível com **MicroPython moderno** (não usa `start()/stop()` do I2C)
+
+---
+
+
+
+Perfeito! Vamos detalhar como funciona a **classe MPR121** que você tem, e quais parâmetros você pode mudar para ajustar o comportamento do módulo. Vou explicar registro por registro e parâmetro por parâmetro.
+
+---
+
+## 1️⃣ Registros importantes na classe
+
+```python
+REG_TOUCH_STATUS_L = 0x00  # LSB do status de toque (bits 0–7)
+REG_TOUCH_STATUS_H = 0x01  # MSB do status de toque (bits 8–11)
+REG_ECR            = 0x5E  # Electrode Configuration Register
+REG_DEBOUNCE       = 0x5B  # Configuração de debounce (press/release)
+REG_SOFTRESET      = 0x80  # Reset do chip
+REG_TOUCH_THR_BASE = 0x41  # Limiar de toque do canal 0
+REG_RELEASE_THR_BASE = 0x42 # Limiar de liberação do canal 0
+```
+
+* **STATUS\_L/H**: Mostra quais eletrodos estão sendo tocados. Cada bit representa um eletrodo (0–11).
+* **ECR**: Configura quais eletrodos estão ativos e modos de operação do chip.
+* **DEBOUNCE**: Define quantas leituras consecutivas são necessárias para validar toque ou liberação.
+* **TOUCH/RELEASE\_THR\_BASE**: Define sensibilidade de toque para cada eletrodo.
+
+---
+
+## 2️⃣ Construtor `__init__`
+
+```python
+def __init__(self, i2c, addr=0x5A, electrodes=12, touch_thr=12, release_thr=6):
+```
+
+### Parâmetros:
+
+1. **i2c** → objeto I2C do ESP32. É obrigatório para comunicar com o MPR121.
+2. **addr** → endereço I2C do MPR121. Normalmente:
+
+   * `0x5A` (ADDR=GND)
+   * `0x5B`/`0x5C`/`0x5D` dependendo da ligação do pino ADDR.
+3. **electrodes** → número de eletrodos que você quer usar (1–12).
+4. **touch\_thr** → limiar de toque (quanto menor, mais sensível).
+5. **release\_thr** → limiar de liberação (quanto menor, mais rápido o release é detectado).
+
+---
+
+### O que acontece dentro do `__init__`
+
+1. **Reset do chip**
+
+```python
+self._write8(self.REG_SOFTRESET, 0x63)
+time.sleep_ms(1)
+```
+
+* Reseta o MPR121 e limpa configurações anteriores.
+
+2. **Desativa todos os eletrodos durante configuração**
+
+```python
+self._write8(self.REG_ECR, 0x00)
+```
+
+3. **Configura debounce**
+
+```python
+self._write8(self.REG_DEBOUNCE, 0x11)
+```
+
+* Primeiro dígito = número de leituras consecutivas para **press**
+* Segundo dígito = número de leituras consecutivas para **release**
+* Ex.: `0x11` → 1 leitura para press e 1 para release.
+
+4. **Configura limiar de toque e liberação para cada eletrodo**
+
+```python
+for i in range(self.electrodes):
+    self._write8(self.REG_TOUCH_THR_BASE + 2*i, touch_thr)
+    self._write8(self.REG_RELEASE_THR_BASE + 2*i, release_thr)
+```
+
+* Cada eletrodo tem **2 registradores**: TOUCH\_THR e RELEASE\_THR
+* `touch_thr` → quanto de capacitância mínima para considerar toque
+* `release_thr` → quanto de capacitância mínima para considerar que o toque terminou
+
+5. **Ativa os eletrodos e o modo automático**
+
+```python
+enable_val = 0x80 | (self.electrodes & 0x0F)
+self._write8(self.REG_ECR, enable_val)
+```
+
+* Bit 7 (0x80) → ativa o modo de baseline automático
+* Bits 3–0 → número de eletrodos habilitados (1–12)
+
+---
+
+## 3️⃣ Métodos auxiliares
+
+```python
+def _write8(self, reg, val):
+    self.i2c.writeto(self.addr, bytes([reg, val & 0xFF]))
+```
+
+* Escreve 1 byte em um registrador do MPR121.
+
+```python
+def _read16(self, reg):
+    self.i2c.writeto(self.addr, bytes([reg]))
+    data = self.i2c.readfrom(self.addr, 2)
+    return data[0] | (data[1] << 8)
+```
+
+* Lê 2 bytes consecutivos (LSB e MSB).
+* Usado para ler os **12 bits de toque**.
+
+---
+
+## 4️⃣ Métodos de leitura de toque
+
+```python
+def get_touched_mask(self):
+    return self._read16(self.REG_TOUCH_STATUS_L) & 0x0FFF
+```
+
+* Retorna um **bitmap de 12 bits** indicando quais eletrodos estão tocados.
+* Ex.: `0b000000000101` → eletrodos 0 e 2 estão tocados.
+
+```python
+def is_touched(self, electrode):
+    return bool(self.get_touched_mask() & (1 << electrode))
+```
+
+* Retorna **True/False** se o eletrodo específico está tocado.
+
+---
+
+## 5️⃣ Parâmetros que você pode ajustar
+
+1. **electrodes** → quantos eletrodos usar
+2. **touch\_thr** → sensibilidade ao toque (menor = mais sensível, maior = menos sensível)
+3. **release\_thr** → sensibilidade à liberação (menor = detecta rápido, maior = demora mais)
+4. **debounce** → número de leituras consecutivas para press/release (`self._write8(REG_DEBOUNCE, 0x11)`):
+
+   * Ex.: `0x22` → 2 leituras para press, 2 para release
+
+---
+
+Se você quiser, posso fazer uma **versão da classe MPR121 com todos esses parâmetros expostos**, para você ajustar **sensibilidade, debounce e número de eletrodos** diretamente ao criar o objeto, sem mexer no código interno.
+
+Quer que eu faça isso?
+
+---
+
+Perfeito! 😄 Vou criar uma versão **mais flexível da classe MPR121**, onde você pode configurar:
+
+* Número de eletrodos (`electrodes`)
+* Limiar de toque (`touch_thr`)
+* Limiar de liberação (`release_thr`)
+* Debounce para press/release (`debounce_press` e `debounce_release`)
+
+---
+
+### Classe MPR121 ajustável
+
+```python
+class MPR121:
+    # Registros importantes
+    REG_TOUCH_STATUS_L = 0x00
+    REG_TOUCH_STATUS_H = 0x01
+    REG_ECR            = 0x5E
+    REG_DEBOUNCE       = 0x5B
+    REG_SOFTRESET      = 0x80
+    REG_TOUCH_THR_BASE = 0x41
+    REG_RELEASE_THR_BASE = 0x42
+
+    def __init__(self, i2c, addr=0x5A, electrodes=12,
+                 touch_thr=12, release_thr=6,
+                 debounce_press=1, debounce_release=1):
+        """
+        Inicializa o MPR121.
+
+        :param i2c: objeto I2C
+        :param addr: endereço I2C do MPR121 (0x5A-0x5D)
+        :param electrodes: número de eletrodos ativos (1-12)
+        :param touch_thr: limiar de toque (0-255)
+        :param release_thr: limiar de liberação (0-255)
+        :param debounce_press: leituras consecutivas para validar press (0-15)
+        :param debounce_release: leituras consecutivas para validar release (0-15)
+        """
+        self.i2c = i2c
+        self.addr = addr
+        self.electrodes = min(max(electrodes, 1), 12)
+
+        # Reset do chip
+        self._write8(self.REG_SOFTRESET, 0x63)
+        time.sleep_ms(1)
+
+        # Desliga todos os eletrodos
+        self._write8(self.REG_ECR, 0x00)
+
+        # Configura debounce
+        debounce_val = ((debounce_press & 0x0F) << 4) | (debounce_release & 0x0F)
+        self._write8(self.REG_DEBOUNCE, debounce_val)
+
+        # Configura limiares por eletrodo
+        for i in range(self.electrodes):
+            self._write8(self.REG_TOUCH_THR_BASE + 2*i, touch_thr)
+            self._write8(self.REG_RELEASE_THR_BASE + 2*i, release_thr)
+
+        # Ativa os eletrodos + modo automático
+        enable_val = 0x80 | (self.electrodes & 0x0F)
+        self._write8(self.REG_ECR, enable_val)
+
+    # -------------------------
+    # Métodos internos I2C
+    # -------------------------
+    def _write8(self, reg, val):
+        self.i2c.writeto(self.addr, bytes([reg, val & 0xFF]))
+
+    def _read16(self, reg):
+        self.i2c.writeto(self.addr, bytes([reg]))
+        data = self.i2c.readfrom(self.addr, 2)
+        return data[0] | (data[1] << 8)
+
+    # -------------------------
+    # Métodos de leitura
+    # -------------------------
+    def get_touched_mask(self):
+        """
+        Retorna um bitmap de 12 bits indicando quais eletrodos estão tocados.
+        Ex.: 0b000000000101 → eletrodos 0 e 2 tocados
+        """
+        return self._read16(self.REG_TOUCH_STATUS_L) & 0x0FFF
+
+    def is_touched(self, electrode):
+        """
+        Retorna True/False se o eletrodo específico está sendo tocado.
+        """
+        if electrode < 0 or electrode >= self.electrodes:
+            return False
+        return bool(self.get_touched_mask() & (1 << electrode))
+```
+
+---
+
+### ✅ O que mudou
+
+1. **Debounce configurável** → `debounce_press` e `debounce_release`
+2. **Sensibilidade configurável** → `touch_thr` e `release_thr`
+3. **Número de eletrodos configurável** → `electrodes`
+4. Mais documentação inline para cada parâmetro
+
+---
+
+### Exemplo de uso
+
+```python
+# I2C do ESP32
+i2c = I2C(0, scl=Pin(22), sda=Pin(21), freq=100000)
+
+# Cria o MPR121 com 8 eletrodos, mais sensível e debounce maior
+mpr = MPR121(i2c, electrodes=8, touch_thr=8, release_thr=4, debounce_press=2, debounce_release=2)
+
+while True:
+    mask = mpr.get_touched_mask()
+    ativos = [i for i in range(8) if mask & (1 << i)]
+    if ativos:
+        print("Eletrodos ativos:", ativos)
+    time.sleep(0.1)
+```
+
+---
+
+Se você quiser, posso agora **integrar essa versão ajustável do MPR121 com o MPU6050** para criar um **loop unificado completo**, onde você consegue testar os dois módulos juntos e ainda ajustar sensibilidade e debounce dos eletrodos na criação do objeto.
+
+Quer que eu faça isso?

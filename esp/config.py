@@ -49,13 +49,27 @@ else:
 NUMTSTSAMPLES = 2 # amostras test inicial
 
 CALIB_POTS_FILE = "pots_calib.json"
-MAD_MIN = 30 # limites de MAD para evitar thresholds muito colados
-MAD_MAX = 60 # limites de MAD para evitar thresholds muito colados
 SAMPLES_HYSTERESIS = 60 # amostras para calibrar os pots
 TIMEMS_SAMPLES = 70 # tempo ms para coleta de amostras
 K_SENSIBILIDADE = 3 # k: multiplicador para ajustar sensibilidade.
 ALPHA_SUAVIZACAO = 0.1 # alpha: fator de suavização para baseline (0.1 = mais rápido para se adaptar).
 DEBOUNCE_COUNT  = 2 # Leituras consecutivas para confirmar toque
+ 
+# ao tocar os pots o valor diminuie por ex de 320 para 100
+
+# 340-340*0.1 306.0
+# 340-340*0.2 272.0
+# 340-340*0.3 238.0
+# 340-340*0.4 204.0
+# 340-340*0.5 170.0
+# 340-340*0.6 136.0
+# 340-340*0.7 102.1
+# 340-340*0.8 68.0
+# 340-340*0.9 34.0
+
+MAD_MAX = 0.2 # -80 thresholds  ON 
+MAD_MIN = 0.8 # -40 thresholds OFF 
+
 
 
 # ============================================================

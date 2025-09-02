@@ -56,7 +56,6 @@ def check_pots(pots, abclevel, press_thresh, release_thresh, state: PotsState):
         else:
             state.pot_counter[i] = 0
 
-    print("check_pots returning:", type(state), state)
     # res_check_pots [[M, Y], pot, status, R/L]
     return local_res_check_pots, state
 

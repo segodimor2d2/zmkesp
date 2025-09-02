@@ -78,6 +78,7 @@ mpremote connect /dev/ttyUSB0 fs cp esp/actions.py :actions.py
 mpremote connect /dev/ttyUSB0 fs cp esp/dicctozmk.py :dicctozmk.py
 mpremote connect /dev/ttyUSB0 fs cp esp/hw.py :hw.py
 mpremote fs ls
+mpremote connect /dev/ttyUSB0 fs cp esp/mpr121.py :mpr121.py
 mpremote connect /dev/ttyUSB0 fs cp esp/mpu6050.py :mpu6050.py
 mpremote connect /dev/ttyUSB0 fs cp esp/printlogs.py :printlogs.py
 
@@ -5473,3 +5474,7 @@ while True:
 Se você quiser, posso agora **integrar essa versão ajustável do MPR121 com o MPU6050** para criar um **loop unificado completo**, onde você consegue testar os dois módulos juntos e ainda ajustar sensibilidade e debounce dos eletrodos na criação do objeto.
 
 Quer que eu faça isso?
+
+
+
+

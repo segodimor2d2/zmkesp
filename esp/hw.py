@@ -2,6 +2,7 @@ from machine import Pin, SoftI2C, TouchPad
 import time
 import config
 from printlogs import log
+from mpr121 import MPR121
 
 pinos = config.PINOS
 pinos_vib = config.PINOS_VIB
@@ -19,6 +20,13 @@ def init_mpu(i2c):
         return mpu
     except Exception as e:
         log("init_mpu erro:", e, 0)
+        return None
+
+def init_mpr121(i2c):
+    try:
+        return MPR121(i2c)
+    except Exception as e:
+        log("init_mpr121 erro:", e, 0)
         return None
 
 def init_vibrator(pin_no=(pinos_vib)):

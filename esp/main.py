@@ -1,36 +1,36 @@
 import time
 import config
-from hw import init_i2c, init_mpu, init_vibrator, init_pots, test_pots
+from hw import init_i2c, init_mpu, init_mpr121, init_vibrator #, init_pots, test_pots
 from actions import vibrar, send_charPs
 from printlogs import log
 from dicctozmk import potsgyrotozmk
 from calibration import calc_pots_hysteresis, calc_accl_hysteresis
-from pots import check_pots, tap_pots, tap_pots_test, check_timeout, PotsState
+# from pots import check_pots, tap_pots, tap_pots_test, check_timeout, PotsState
 from gyro import initial_buffer, average_and_slide, gyro_principal, accl_principal, GyroState, AcclState
 
-
-def start(i2c=None, mpu=None, pots=None, vib=None, force_calib=False):
+def start(i2c=None, mpu=None, mpr=None, pots=None, vib=None, force_calib=False):
     # Inicializa hardware se não passado
     if i2c is None: i2c = init_i2c()
     if mpu is None: mpu = init_mpu(i2c)
     if vib is None: vib = init_vibrator()
-    if pots is None: pots = init_pots()
+    # if pots is None: pots = init_pots()
+    if mpr is None: mpr = init_mpr121(i2c)
 
     vibrar(vib, 1)
 
     # Estado dos potenciômetros
-    pots_state = PotsState(len(pots))
+    # pots_state = PotsState(len(pots))
 
     # Estado do giroscópio
     gyro_state = GyroState()
     accl_state = AcclState()
 
     # Calcula thresholds de histerese
-    pots_thresh_on, pots_thresh_off = calc_pots_hysteresis(
-        pots, pots_state.num_pots, vib, force_calib
-    )
-    print("\nThresholds on:", pots_thresh_on)
-    print("Thresholds off:", pots_thresh_off)
+    # pots_thresh_on, pots_thresh_off = calc_pots_hysteresis(
+    #     pots, pots_state.num_pots, vib, force_calib
+    # )
+    # print("\nThresholds on:", pots_thresh_on)
+    # print("Thresholds off:", pots_thresh_off)
 
     # # Se quiser calibrar o acelerômetro:
     # acclthresholds = calc_accl_hysteresis(mpu, vib, force_calib)
@@ -77,6 +77,13 @@ def start(i2c=None, mpu=None, pots=None, vib=None, force_calib=False):
             # if res_check_pots[1] == 0 and res_check_pots[2] == 1:
             start(force_calib=True)
 
+        mask = mpr.get_touched_mask()
+        ativos = [i for i in range(12) if mask & (1 << i)]
+        if ativos:
+            print("Eletrodos ativos:", ativos)
+
+
+        '''
         res_check_pots, pots_state = check_pots( pots, abclevel,
             pots_thresh_on, pots_thresh_off,
             pots_state
@@ -91,7 +98,7 @@ def start(i2c=None, mpu=None, pots=None, vib=None, force_calib=False):
             # Processa evento vindo do check_pots
             if tap_hold: result, pots_state = tap_pots(*res_check_pots, pots_state)
 
-            result, pots_state = tap_pots_test(*res_check_pots, pots_state)
+            # result, pots_state = tap_pots_test(*res_check_pots, pots_state)
 
             # if res_check_pots[0][1] == -2:
             #     # if res_check_pots[1] == 0 and res_check_pots[2] == 1:
@@ -113,6 +120,7 @@ def start(i2c=None, mpu=None, pots=None, vib=None, force_calib=False):
                 # send_charPs(tozmk)
                 pass
             print()
+        '''
 
         # if tap_hold is False:
         #     # Se ainda não fechou ciclo, verifica timeout

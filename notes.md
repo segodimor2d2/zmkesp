@@ -5478,3 +5478,76 @@ Quer que eu faça isso?
 
 
 
+
+
+
+---
+
+
+Boa 👌, com o que você já tem dá pra adicionar facilmente a detecção de **eventos de toque (press)** e **soltura (release)**.
+
+Hoje a sua classe só sabe “quem está tocado agora” (`get_touched_mask`), mas não guarda o histórico anterior. Pra detectar mudanças, precisamos **comparar o estado atual com o estado anterior**.
+
+---
+
+### 🔧 Como estender sua classe
+
+Adicione um atributo `last_mask` para armazenar o último estado e um método `poll_events` que devolve os eventos de mudança:
+
+```python
+def __init__(self, i2c, addr=0x5A, electrodes=12,
+             touch_thr=12, release_thr=6,
+             debounce_press=1, debounce_release=1):
+    ...
+    self.last_mask = 0  # guarda o estado anterior
+```
+
+E crie um método assim:
+
+```python
+def poll_events(self):
+    """
+    Retorna uma lista de eventos desde a última leitura.
+    Cada evento é uma tupla: (electrode, "press") ou (electrode, "release")
+    """
+    events = []
+    current_mask = self.get_touched_mask()
+    changed = current_mask ^ self.last_mask  # bits que mudaram
+
+    for i in range(self.electrodes):
+        if changed & (1 << i):  # esse eletrodo mudou
+            if current_mask & (1 << i):
+                events.append((i, "press"))
+            else:
+                events.append((i, "release"))
+
+    self.last_mask = current_mask
+    return events
+```
+
+---
+
+### 🔄 Exemplo de uso
+
+```python
+i2c = init_i2c()
+mpr = init_mpr121(i2c)
+
+while True:
+    events = mpr.poll_events()
+    for electrode, ev in events:
+        print("Eletrodo", electrode, "->", ev)
+    time.sleep(0.05)
+```
+
+Saída típica quando você toca e solta no eletrodo 3:
+
+```
+Eletrodo 3 -> press
+Eletrodo 3 -> release
+```
+
+---
+
+👉 Isso resolve? Quer que eu já te entregue a **classe `MPR121` completa com o `poll_events` integrado** pra você substituir direto?
+

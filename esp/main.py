@@ -54,6 +54,8 @@ def start(i2c=None, mpu=None, mpr=None, pots=None, vib=None, force_calib=False):
 
     pot_test = 1
 
+    last_mask = 0
+
     # Loop principal
     vibrar(vib, 2)
     num = 0
@@ -73,14 +75,33 @@ def start(i2c=None, mpu=None, mpr=None, pots=None, vib=None, force_calib=False):
         abclevel = [gyro_state.stepX, gyro_state.stepY]
 
 
-        if gyro_state.stepY == -2:
-            # if res_check_pots[1] == 0 and res_check_pots[2] == 1:
-            start(force_calib=True)
+        # if gyro_state.stepY == -2:
+        #     # if res_check_pots[1] == 0 and res_check_pots[2] == 1:
+        #     start(force_calib=True)
 
-        mask = mpr.get_touched_mask()
-        ativos = [i for i in range(12) if mask & (1 << i)]
-        if ativos:
-            print("Eletrodos ativos:", ativos)
+
+        # mask = mpr.get_touched_mask()
+        # ativos = [i for i in range(12) if mask & (1 << i)]
+        # if ativos:
+        #     print("Eletrodos ativos:", ativos)
+
+
+        current_mask = mpr.get_touched_mask()
+        changed = current_mask ^ last_mask  # bits que mudaram
+
+        for i in range(mpr.electrodes):
+            if changed & (1 << i):  # esse eletrodo mudou
+                if current_mask & (1 << i):
+                    print([abclevel, i, 1, config.THIS_IS])
+                    wait2Zero = False
+                    cycle = 0
+                else:
+                    print([abclevel, i, 0, config.THIS_IS])
+                    wait2Zero = True
+
+        last_mask = current_mask
+
+        # res_check_pots [[M, Y], pot, status, R/L]
 
 
         '''

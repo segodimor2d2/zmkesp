@@ -14,7 +14,34 @@ class PotsState:
         self.tap_event = []          # histórico bruto de eventos (inclui abclevel)
         self.active_buttons = set()  # botões atualmente pressionados
 
-def check_pots(pots, abclevel, press_thresh, release_thresh, state: PotsState):
+def check_pots(pots, abclevel, current_mask, last_mask, state: PotsState):
+
+    """
+    Retorna uma lista de eventos desde a última leitura.
+    Cada evento é uma tupla: (electrode, "press") ou (electrode, "release")
+
+
+    current_mask = get_touched_mask()
+    changed = current_mask ^ last_mask  # bits que mudaram
+
+    for i in range(electrodes):
+        if changed & (1 << i):  # esse eletrodo mudou
+            if current_mask & (1 << i):
+                local_res_check_pots = [abclevel, i, 1, config.THIS_IS]
+                state.wait2Zero = False
+                state.cycle = 0
+            else:
+                local_res_check_pots = [abclevel, i, 0, config.THIS_IS]
+                state.wait2Zero = True
+
+    last_mask = current_mask
+
+    # res_check_pots [[M, Y], pot, status, R/L]
+    return local_res_check_pots, state
+
+    """
+
+
     """
     Verifica os potenciômetros e atualiza o estado.
     Retorna um evento (ou None) + estado atualizado.
@@ -38,20 +65,19 @@ def check_pots(pots, abclevel, press_thresh, release_thresh, state: PotsState):
         if not state.triggerPot[i] and val < press_thresh[i]:
             state.pot_counter[i] += 1
             if state.pot_counter[i] >= config.DEBOUNCE_COUNT:
-                local_res_check_pots = [abclevel, mapped_i, 1, config.THIS_IS]
-                state.triggerPot[i] = True
-                state.pot_counter[i] = 0
-                state.wait2Zero = False
-                state.cycle = 0
+            local_res_check_pots = [abclevel, mapped_i, 1, config.THIS_IS]
+            state.triggerPot[i] = True
+            state.pot_counter[i] = 0
+            state.wait2Zero = False
+            state.cycle = 0
 
         # Solto
         elif state.triggerPot[i] and val > release_thresh[i]:
             state.pot_counter[i] += 1
-            if state.pot_counter[i] >= config.DEBOUNCE_COUNT:
-                local_res_check_pots = [abclevel, mapped_i, 0, config.THIS_IS]
-                state.triggerPot[i] = False
-                state.pot_counter[i] = 0
-                state.wait2Zero = True
+            local_res_check_pots = [abclevel, mapped_i, 0, config.THIS_IS]
+            state.triggerPot[i] = False
+            state.pot_counter[i] = 0
+            state.wait2Zero = True
 
         else:
             state.pot_counter[i] = 0

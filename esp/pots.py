@@ -82,6 +82,7 @@ def tap_pots_test(abclevel, mapped_i, status, side, state: PotsState):
     Versão de teste sem timeout, só para debug.
     """
     event = [abclevel, mapped_i, status, side]
+    # print(f'event {event}')
     state.tap_event.append(event)
 
     if status == 1:  # pressionado
@@ -94,6 +95,7 @@ def tap_pots_test(abclevel, mapped_i, status, side, state: PotsState):
             state.tap_event.clear()
             return result, state
 
+    # print(f'state.tap_event {state.tap_event}')
     return None, state
 
 def tap_pots(abclevel, mapped_i, status, side, state: PotsState):

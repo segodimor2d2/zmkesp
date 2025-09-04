@@ -5567,3 +5567,72 @@ mpremote reset
 premote connect /dev/ttyUSB0 fs cp esp/main.py :main.py
 
 
+
+---
+no seguiente codigo eu consigo capturar os eventos de toque do mpr121
+agora eu quero transformar esse codigo em eventos
+os valores que aparecem em ativos saõ botões em pressionados
+e eu quero garantir que se o valor desaparece de ativos então ele some ele vai enviar um release ara o valor que sumiu
+
+aqui meu codigo:
+
+mask = mpr.get_touched_mask()
+ativos = [i for i in range(12) if mask & (1 << i)]
+if ativos:
+    print("ativos", ativos)
+    for i in ativos:
+        print(f"eletrodo {i} ativo")
+else:
+    print("ativos", ativos)
+
+
+esta é a saida:
+
+ativos []
+ativos []
+ativos []
+ativos []
+ativos [8, 10, 11]
+eletrodo 8 ativo
+eletrodo 10 ativo
+eletrodo 11 ativo
+ativos [7, 8, 9, 10, 11]
+eletrodo 7 ativo
+eletrodo 8 ativo
+eletrodo 9 ativo
+eletrodo 10 ativo
+eletrodo 11 ativo
+ativos [7, 8, 9, 10, 11]
+eletrodo 7 ativo
+eletrodo 8 ativo
+eletrodo 9 ativo
+eletrodo 10 ativo
+eletrodo 11 ativo
+ativos [8, 10]
+eletrodo 8 ativo
+eletrodo 10 ativo
+ativos []
+ativos []
+
+
+
+last_ativos = set()  # mantém o estado anterior
+
+while True:
+    mask = mpr.get_touched_mask()
+    ativos = {i for i in range(12) if mask & (1 << i)}  # conjunto dos ativos
+
+    # --- detectar "press" (novos ativos) ---
+    novos = ativos - last_ativos
+    for i in novos:
+        print(f"PRESS eletrodo {i}")
+
+    # --- detectar "release" (desapareceram) ---
+    liberados = last_ativos - ativos
+    for i in liberados:
+        print(f"RELEASE eletrodo {i}")
+
+    # atualiza estado
+    last_ativos = ativos
+
+    time.sleep(0.05)  # pequeno delay para evitar flood

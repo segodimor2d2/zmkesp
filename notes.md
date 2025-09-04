@@ -66,6 +66,8 @@ start(force_calib=True)
 ## RUN
 mpremote connect /dev/ttyUSB0
 mpremote connect auto
+mpremote reset
+mpremote kill
 
 mpremote connect /dev/ttyUSB0 fs cp esp/main.py :main.py
 mpremote connect /dev/ttyUSB0 fs cp esp/config.py :config.py
@@ -5550,4 +5552,18 @@ Eletrodo 3 -> release
 ---
 
 👉 Isso resolve? Quer que eu já te entregue a **classe `MPR121` completa com o `poll_events` integrado** pra você substituir direto?
+
+
+
+as vezes funciona com essa sequência:
+
+mpremote reset
+premote connect /dev/ttyUSB0 fs cp esp/main.py :main.py
+
+ou as vezes com essa sequência:
+
+mpremote kill
+mpremote reset
+premote connect /dev/ttyUSB0 fs cp esp/main.py :main.py
+
 

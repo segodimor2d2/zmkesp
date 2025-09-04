@@ -3,30 +3,23 @@ import config
 from printlogs import log
 
 class PotsState:
-    def __init__(self, num_pots: int):
-        self.num_pots = num_pots
-        self.pval = [0] * num_pots
-        self.triggerPot = [False] * num_pots
-        self.pot_counter = [0] * num_pots
+    def __init__(self):
         self.wait2Zero = False
         self.cycle = 0
+        self.current_mask = 0
+        self.last_mask = 0
 
         self.tap_event = []          # histórico bruto de eventos (inclui abclevel)
         self.active_buttons = set()  # botões atualmente pressionados
 
-def check_pots(pots, abclevel, current_mask, last_mask, state: PotsState):
+def check_pots(abclevel, num_electrodes, state: PotsState):
 
-    """
-    Retorna uma lista de eventos desde a última leitura.
-    Cada evento é uma tupla: (electrode, "press") ou (electrode, "release")
+    changed = state.current_mask ^ state.last_mask  # bits que mudaram
 
-
-    current_mask = get_touched_mask()
-    changed = current_mask ^ last_mask  # bits que mudaram
-
-    for i in range(electrodes):
+    local_res_check_pots = None
+    for i in range(num_electrodes):
         if changed & (1 << i):  # esse eletrodo mudou
-            if current_mask & (1 << i):
+            if state.current_mask & (1 << i):
                 local_res_check_pots = [abclevel, i, 1, config.THIS_IS]
                 state.wait2Zero = False
                 state.cycle = 0
@@ -34,18 +27,16 @@ def check_pots(pots, abclevel, current_mask, last_mask, state: PotsState):
                 local_res_check_pots = [abclevel, i, 0, config.THIS_IS]
                 state.wait2Zero = True
 
-    last_mask = current_mask
+    state.last_mask = state.current_mask
 
     # res_check_pots [[M, Y], pot, status, R/L]
     return local_res_check_pots, state
-
-    """
 
 
     """
     Verifica os potenciômetros e atualiza o estado.
     Retorna um evento (ou None) + estado atualizado.
-    """
+
     local_res_check_pots = None
 
     for i, pot in enumerate(pots):
@@ -84,6 +75,7 @@ def check_pots(pots, abclevel, current_mask, last_mask, state: PotsState):
 
     # res_check_pots [[M, Y], pot, status, R/L]
     return local_res_check_pots, state
+    """
 
 def tap_pots_test(abclevel, mapped_i, status, side, state: PotsState):
     """

@@ -37,38 +37,4 @@ def init_vibrator(pin_no=(pinos_vib)):
         pass
     return p
 
-def test_pots():
-    touch_pins = [4, 0, 2, 15, 13, 12, 14, 27, 33, 32]  # possíveis pinos touch no ESP32
-    erros = []  # lista para guardar pinos problemáticos
-    for pin in touch_pins:
-        try:
-            tp = TouchPad(Pin(pin))
-            vals = []
-            for _ in range(numsamples):
-                vals.append(tp.read())
-                time.sleep_ms(tsamples)
-            print(f"OK: TouchPad inicializado no pino {pin}, leituras = {vals}")
-        except Exception as e:
-            print(f"ERRO no pino {pin}: {e}")
-            erros.append(pin)
-
-    # Resumo final
-    if erros:
-        print("Pinos com problema:", ", ".join(str(p) for p in erros))
-        print("******************************\n")
-    else:
-        print("Todos os pinos testados estão funcionando!")
-        print("******************************\n")
-
-def init_pots(pins=(pinos)):
-    try:
-        test_pots()
-        pots = [TouchPad(Pin(p)) for p in pins]
-        return pots
-    except Exception as e:
-        # sys.exit("encerrando programa.")
-        # raise SystemExit
-        # raise KeyboardInterrupt("Parando programa!")
-        log("init_mpu erro:", e, 0)
-        return None
 

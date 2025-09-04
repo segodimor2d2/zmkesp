@@ -1,11 +1,11 @@
 import time
 import config
-from hw import init_i2c, init_mpu, init_mpr121, init_vibrator #, init_pots, test_pots
+from hw import init_i2c, init_mpu, init_mpr121, init_vibrator
 from actions import vibrar, send_charPs
 from printlogs import log
 from dicctozmk import potsgyrotozmk
 from calibration import calc_pots_hysteresis, calc_accl_hysteresis
-# from pots import check_pots, tap_pots, tap_pots_test, check_timeout, PotsState
+from pots import check_pots, tap_pots, tap_pots_test, check_timeout, PotsState
 from gyro import initial_buffer, average_and_slide, gyro_principal, accl_principal, GyroState, AcclState
 
 def start(i2c=None, mpu=None, mpr=None, pots=None, vib=None, force_calib=False):
@@ -13,24 +13,16 @@ def start(i2c=None, mpu=None, mpr=None, pots=None, vib=None, force_calib=False):
     if i2c is None: i2c = init_i2c()
     if mpu is None: mpu = init_mpu(i2c)
     if vib is None: vib = init_vibrator()
-    # if pots is None: pots = init_pots()
     if mpr is None: mpr = init_mpr121(i2c)
 
     vibrar(vib, 1)
 
     # Estado dos potenciômetros
-    # pots_state = PotsState(len(pots))
+    pots_state = PotsState()
 
     # Estado do giroscópio
     gyro_state = GyroState()
     accl_state = AcclState()
-
-    # Calcula thresholds de histerese
-    # pots_thresh_on, pots_thresh_off = calc_pots_hysteresis(
-    #     pots, pots_state.num_pots, vib, force_calib
-    # )
-    # print("\nThresholds on:", pots_thresh_on)
-    # print("Thresholds off:", pots_thresh_off)
 
     # # Se quiser calibrar o acelerômetro:
     # acclthresholds = calc_accl_hysteresis(mpu, vib, force_calib)
@@ -52,10 +44,6 @@ def start(i2c=None, mpu=None, mpr=None, pots=None, vib=None, force_calib=False):
     accl_states = [0, 0, 0] # 0 = neutro, 1 = positivo, -1 = negativo
     stable_count = [0, 0, 0]
 
-    pot_test = 1
-
-    last_mask = 0
-
     # Loop principal
     vibrar(vib, 2)
     num = 0
@@ -63,7 +51,6 @@ def start(i2c=None, mpu=None, mpr=None, pots=None, vib=None, force_calib=False):
         gyro, accl = average_and_slide(buffer, mpu)
         # x[P] Y[L] Z[V]
         # print(f'x{accl[0]},y{accl[1]},z{accl[2]}')
-        # print(pots_thresh_on[pot_test], pots_thresh_off[pot_test], f'pot_test {pot_test}', pots[pot_test].read())
 
         # Atualiza acelerômetro
         # accl_state = accl_principal(accl, acclthresholds, accl_state)
@@ -85,30 +72,10 @@ def start(i2c=None, mpu=None, mpr=None, pots=None, vib=None, force_calib=False):
         # if ativos:
         #     print("Eletrodos ativos:", ativos)
 
+        pots_state.current_mask = mpr.get_touched_mask()
+        num_electrodes = mpr.electrodes
 
-        current_mask = mpr.get_touched_mask()
-        changed = current_mask ^ last_mask  # bits que mudaram
-
-        for i in range(mpr.electrodes):
-            if changed & (1 << i):  # esse eletrodo mudou
-                if current_mask & (1 << i):
-                    print([abclevel, i, 1, config.THIS_IS])
-                    wait2Zero = False
-                    cycle = 0
-                else:
-                    print([abclevel, i, 0, config.THIS_IS])
-                    wait2Zero = True
-
-        last_mask = current_mask
-
-        # res_check_pots [[M, Y], pot, status, R/L]
-
-
-        '''
-        res_check_pots, pots_state = check_pots( pots, abclevel,
-            pots_thresh_on, pots_thresh_off,
-            pots_state
-        )
+        res_check_pots, pots_state = check_pots(abclevel, num_electrodes, pots_state)
 
         result = None
         if res_check_pots is not None:
@@ -117,7 +84,7 @@ def start(i2c=None, mpu=None, mpr=None, pots=None, vib=None, force_calib=False):
             log(f'res_check_pots {res_check_pots}', 0)
 
             # Processa evento vindo do check_pots
-            if tap_hold: result, pots_state = tap_pots(*res_check_pots, pots_state)
+            # if tap_hold: result, pots_state = tap_pots(*res_check_pots, pots_state)
 
             # result, pots_state = tap_pots_test(*res_check_pots, pots_state)
 
@@ -141,7 +108,6 @@ def start(i2c=None, mpu=None, mpr=None, pots=None, vib=None, force_calib=False):
                 # send_charPs(tozmk)
                 pass
             print()
-        '''
 
         # if tap_hold is False:
         #     # Se ainda não fechou ciclo, verifica timeout

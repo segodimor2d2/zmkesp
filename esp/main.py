@@ -44,8 +44,9 @@ def start(i2c=None, mpu=None, mpr=None, pots=None, vib=None, force_calib=False):
     accl_states = [0, 0, 0] # 0 = neutro, 1 = positivo, -1 = negativo
     stable_count = [0, 0, 0]
 
-
     last_ativos = set()  # mantém o estado anterior
+    last_abclevel = [0, 0]  # mantém o último abclevel
+    force_release = False
 
     # Loop principal
     vibrar(vib, 2)
@@ -64,93 +65,47 @@ def start(i2c=None, mpu=None, mpr=None, pots=None, vib=None, force_calib=False):
         # Atualiza potenciômetros
         abclevel = [gyro_state.stepX, gyro_state.stepY]
 
-
         # if gyro_state.stepY == -2:
         #     # if res_check_pots[1] == 0 and res_check_pots[2] == 1:
         #     start(force_calib=True)
 
         mask = mpr.get_touched_mask()
         num_electrodes = mpr.electrodes
-
-        res_check_pots = None
         ativos = {i for i in range(num_electrodes) if mask & (1 << i)}  # conjunto dos ativos
 
-        # --- detectar "press" (novos ativos) ---
+        eventos = []  # lista de eventos a enviar
+
+        # --- detecta mudança de abclevel ---
+        if abclevel != last_abclevel:
+            force_release = True
+
+        # --- se flag ativada, solta tudo ---
+        if force_release:
+            for i in last_ativos:
+                eventos.append([abclevel, i, 0, config.THIS_IS])
+            last_ativos = set()
+            force_release = False
+
+        # --- detectar press ---
         novos = ativos - last_ativos
         for i in novos:
-            res_check_pots = [abclevel, i, 1, config.THIS_IS]
+            eventos.append([abclevel, i, 1, config.THIS_IS])
 
-        # --- detectar "release" (desapareceram) ---
+        # --- detectar release ---
         liberados = last_ativos - ativos
         for i in liberados:
-            res_check_pots = [abclevel, i, 0, config.THIS_IS]
+            eventos.append([abclevel, i, 0, config.THIS_IS])
+
+        # --- envia todos os eventos ---
+        for ev in eventos:
+            print(f'evento {ev}')
+            tozmk = potsgyrotozmk(*ev)
+            # log(f'tozmk {tozmk}', 0)
+            # send_charPs(tozmk)
 
         # atualiza estado
         last_ativos = ativos
-
-        result = None
-        if res_check_pots is not None:
-            # print(f'res_check_pots {res_check_pots}')
-            tozmk = potsgyrotozmk(*res_check_pots )
-            log(f'tozmk {tozmk}', 0)
-            send_charPs(tozmk)
-
-
-        '''
-        pots_state.current_mask = mpr.get_touched_mask()
-        num_electrodes = mpr.electrodes
-
-        res_check_pots, pots_state = check_pots(abclevel, num_electrodes, pots_state)
-
-        result = None
-        if res_check_pots is not None:
-            ## pot [gx, gy] status [M,Y]  M=Moto, Y=Yave [M,Y]
-            # res_check_pots [[M, Y], pot, status, R/L]
-            # log(f'res_check_pots {res_check_pots}', 0)
-
-            # Processa evento vindo do check_pots
-            # if tap_hold: result, pots_state = tap_pots(*res_check_pots, pots_state)
-
-            result, pots_state = tap_pots_test(*res_check_pots, pots_state)
-            # print(f'result {result}')
-
-            # if res_check_pots[0][1] == -2:
-            #     # if res_check_pots[1] == 0 and res_check_pots[2] == 1:
-            #     start(force_calib=True)
-            #     # if res_check_pots[1] == 0:
-            #     #     start(force_calib=True)
- 
-        # Se ainda não fechou ciclo, verifica timeout
-        if not result and tap_hold:
-            result, pots_state = check_timeout(pots_state)
-
-        # Se um ciclo foi fechado → envia eventos
-        if result and result["tap_go"]:
-            for event in result["events"]:
-                print(f'event {event}')
-                # tozmk = potsgyrotozmk(*event)
-                # log(f'tozmk {tozmk}', 0)
-                # log(f'send_charPs {tozmk}', 0)
-                # send_charPs(tozmk)
-                pass
-            print()
-
-        '''
-
-        # if tap_hold is False:
-        #     # Se ainda não fechou ciclo, verifica timeout
-        #     if not result: result, pots_state = check_timeout(pots_state)
-        #
-        #     # Se um ciclo foi fechado → envia eventos
-        #     if result and result["tap_go"]:
-        #         for event in result["events"]:
-        #             print(f'event {event}')
-        #             # tozmk = potsgyrotozmk(*event)
-        #             # log(f'tozmk {tozmk}', 0)
-        #             # log(f'send_charPs {tozmk}', 0)
-        #             # send_charPs(tozmk)
-        #         print()
-
+        last_abclevel = abclevel[:]
 
         """FIM E LIMPEZA"""
         # Reset se parado

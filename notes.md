@@ -64,8 +64,8 @@ mpremote exec "start(force_calib=True)"
 test_pots()
 start(force_calib=True)
 ## RUN
-mpremote connect /dev/ttyUSB0
 mpremote connect auto
+mpremote connect /dev/ttyUSB0
 mpremote reset
 mpremote kill
 

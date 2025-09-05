@@ -90,12 +90,10 @@ def start(i2c=None, mpu=None, mpr=None, pots=None, vib=None, force_calib=False):
 
         result = None
         if res_check_pots is not None:
-            print(f'res_check_pots {res_check_pots}')
-
+            # print(f'res_check_pots {res_check_pots}')
             tozmk = potsgyrotozmk(*res_check_pots )
             log(f'tozmk {tozmk}', 0)
-            # log(f'send_charPs {tozmk}', 0)
-            # send_charPs(tozmk)
+            send_charPs(tozmk)
 
 
         '''

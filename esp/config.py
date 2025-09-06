@@ -9,13 +9,13 @@ import ubinascii
 # L 0G,1I,2C,3A,4M,5G
 # L 4G,3I,2C,1A,5M,0G
 PINOS_L = 12,13,14,27,4,33
-INDEX_MAP_L = 4,3,2,1,5,0
+INDEX_MAP_L = 3,2,1,0,4,5,6,8,9,10,11
 PINOS_VIB_L = 26
 
 # R 0G,1I,2C,3A,4M,5G
 # R 0G,5I,1C,2A,4M,3G
 PINOS_R = 12,13,14,27,4,33
-INDEX_MAP_R = 0,5,1,2,4,3
+INDEX_MAP_R = 0,1,2,3,6,5,4,8,9,10,11
 PINOS_VIB_R = 26
 
 # ============================================================

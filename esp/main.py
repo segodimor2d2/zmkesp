@@ -17,6 +17,10 @@ def start(i2c=None, mpu=None, mpr=None, pots=None, vib=None, force_calib=False):
 
     vibrar(vib, 1)
 
+
+    remap_list = config.INDEX_MAP_POTS 
+    remap = {i: remap_list[i] for i in range(len(remap_list))}
+
     # Estado dos potenciômetros
     pots_state = PotsState()
 
@@ -50,6 +54,7 @@ def start(i2c=None, mpu=None, mpr=None, pots=None, vib=None, force_calib=False):
 
     # Loop principal
     vibrar(vib, 2)
+    ready = False
     num = 0
     while True:
         gyro, accl = average_and_slide(buffer, mpu)
@@ -65,13 +70,21 @@ def start(i2c=None, mpu=None, mpr=None, pots=None, vib=None, force_calib=False):
         # Atualiza potenciômetros
         abclevel = [gyro_state.stepX, gyro_state.stepY]
 
-        # if gyro_state.stepY == -2:
-        #     # if res_check_pots[1] == 0 and res_check_pots[2] == 1:
-        #     start(force_calib=True)
 
         mask = mpr.get_touched_mask()
         num_electrodes = mpr.electrodes
-        ativos = {i for i in range(num_electrodes) if mask & (1 << i)}  # conjunto dos ativos
+        # conjunto dos ativos
+        # ativos = {i for i in range(num_electrodes) if mask & (1 << i)} 
+        # 3,2,1,0,4,5,6,8,9,10,11
+        # L 0,1,2,3,4,5,6,8,9,10,11
+        # R 0,1,2,3,6,5,4,8,9,10,11
+        ativos = {remap[i] for i in range(num_electrodes) if mask & (1 << i) and i in remap}
+
+        # --- toggle ready fora do loop de eventos ---
+        toggle_trigger = (gyro_state.stepY == 2 and 6 in ativos)
+        if toggle_trigger and not last_toggle_trigger:
+            ready = not ready
+        last_toggle_trigger = toggle_trigger
 
         eventos = []  # lista de eventos a enviar
 
@@ -83,6 +96,7 @@ def start(i2c=None, mpu=None, mpr=None, pots=None, vib=None, force_calib=False):
         if force_release:
             for i in last_ativos:
                 eventos.append([abclevel, i, 0, config.THIS_IS])
+            gyro_state.wait2Zero = True
             last_ativos = set()
             force_release = False
 
@@ -90,18 +104,24 @@ def start(i2c=None, mpu=None, mpr=None, pots=None, vib=None, force_calib=False):
         novos = ativos - last_ativos
         for i in novos:
             eventos.append([abclevel, i, 1, config.THIS_IS])
+            gyro_state.wait2Zero = False
+            gyro_state.cycle = 0
 
         # --- detectar release ---
         liberados = last_ativos - ativos
         for i in liberados:
             eventos.append([abclevel, i, 0, config.THIS_IS])
+            gyro_state.wait2Zero = True
 
         # --- envia todos os eventos ---
         for ev in eventos:
-            print(f'evento {ev}')
-            tozmk = potsgyrotozmk(*ev)
-            # log(f'tozmk {tozmk}', 0)
-            # send_charPs(tozmk)
+            # ev [[M, Y], pot, status, R/L]
+            print(f'evento {ev}, ready={ready}')
+
+            if ready:
+                tozmk = potsgyrotozmk(*ev)
+                # log(f'tozmk {tozmk}', 0)
+                send_charPs(tozmk)
 
         # atualiza estado
         last_ativos = ativos
@@ -113,7 +133,7 @@ def start(i2c=None, mpu=None, mpr=None, pots=None, vib=None, force_calib=False):
             gyro_state.cycle += 1
             if gyro_state.cycle == config.CYCLE_RESET_LIMIT:
                 gyro_state.stepX = gyro_state.stepY = 0
-                vibrar(vib, 2)
+                if ready: vibrar(vib, 2)
                 gyro_state.wait2Zero = False
                 gyro_state.cycle = 0
         

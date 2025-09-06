@@ -1,6 +1,7 @@
 $$$$
 
 
+
 - remapear puntos
 
 - modo Hold ou modo Tap
@@ -60,7 +61,6 @@ mpremote connect list
 ls /dev/tty*
 
 
-$$$$
 
 # ESP
 mpremote fs ls
@@ -78,6 +78,8 @@ mpremote exec "start(force_calib=True)"
 
 test_pots()
 start(force_calib=True)
+
+$$$$
 ## RUN
 mpremote connect auto
 mpremote connect /dev/ttyUSB0

@@ -15,8 +15,7 @@ def start(i2c=None, mpu=None, mpr=None, pots=None, vib=None, force_calib=False):
     if vib is None: vib = init_vibrator()
     if mpr is None: mpr = init_mpr121(i2c)
 
-    vibrar(vib, 1)
-
+    vibrar(vib, 3, 0, ready=True)
 
     remap_list = config.INDEX_MAP_POTS 
     remap = {i: remap_list[i] for i in range(len(remap_list))}
@@ -29,7 +28,7 @@ def start(i2c=None, mpu=None, mpr=None, pots=None, vib=None, force_calib=False):
     accl_state = AcclState()
 
     # # Se quiser calibrar o acelerômetro:
-    # acclthresholds = calc_accl_hysteresis(mpu, vib, force_calib)
+    # acclthresholds = calc_accl_hysteresis(mpu, vib, ready, force_calib)
     # print("\nThresholds Acelerometro", acclthresholds)
 
     # print("------------------------------------")
@@ -53,7 +52,6 @@ def start(i2c=None, mpu=None, mpr=None, pots=None, vib=None, force_calib=False):
     force_release = False
 
     # Loop principal
-    vibrar(vib, 2)
     ready = False
     num = 0
     while True:
@@ -65,7 +63,7 @@ def start(i2c=None, mpu=None, mpr=None, pots=None, vib=None, force_calib=False):
         # accl_state = accl_principal(accl, acclthresholds, accl_state)
 
         # Atualiza giroscópio
-        gyro_state = gyro_principal(gyro, gy1, gy2, vib, gyro_state)
+        gyro_state = gyro_principal(gyro, gy1, gy2, vib, ready, gyro_state)
 
         # Atualiza potenciômetros
         abclevel = [gyro_state.stepX, gyro_state.stepY]
@@ -81,9 +79,10 @@ def start(i2c=None, mpu=None, mpr=None, pots=None, vib=None, force_calib=False):
         ativos = {remap[i] for i in range(num_electrodes) if mask & (1 << i) and i in remap}
 
         # --- toggle ready fora do loop de eventos ---
-        toggle_trigger = (gyro_state.stepY == 2 and 6 in ativos)
+        toggle_trigger = (gyro_state.stepY == 0 and 5 in ativos and 6 in ativos)
         if toggle_trigger and not last_toggle_trigger:
             ready = not ready
+            vibrar(vib, 3, 0, ready=True)
         last_toggle_trigger = toggle_trigger
 
         eventos = []  # lista de eventos a enviar
@@ -133,7 +132,7 @@ def start(i2c=None, mpu=None, mpr=None, pots=None, vib=None, force_calib=False):
             gyro_state.cycle += 1
             if gyro_state.cycle == config.CYCLE_RESET_LIMIT:
                 gyro_state.stepX = gyro_state.stepY = 0
-                if ready: vibrar(vib, 2)
+                vibrar(vib, 2, ready=ready)
                 gyro_state.wait2Zero = False
                 gyro_state.cycle = 0
         
@@ -147,4 +146,4 @@ def start(i2c=None, mpu=None, mpr=None, pots=None, vib=None, force_calib=False):
 
 if __name__ == "__main__":
     start(force_calib=False)
-    vibrar(init_vibrator(), 4)
+    vibrar(init_vibrator(), 4, ready=True)

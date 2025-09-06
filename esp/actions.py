@@ -34,26 +34,27 @@ def tstpot(row, col, delay=0.1):
     send_charPs([row, col, False])
 
 
-def vibrar(pino_vibracao, n_pulsos, step=None):
+def vibrar(pino_vibracao, n_pulsos, step=None, ready=False):
     if pino_vibracao is None:
         log("vibrador não inicializado", 1)
         return
-    for _ in range(n_pulsos):
-        try:
-            pino_vibracao.on()
-        except Exception:
-            try: pino_vibracao.value(1)
-            except: pass
-        
-        # Usando as variáveis de configuração
-        if step == 0: time.sleep_ms(VIBRAR_LONGO)
-        if step == 1: time.sleep_ms(VIBRAR_ALERTA)
-        else: time.sleep_ms(VIBRAR_LIGADO)
-        
-        try:
-            pino_vibracao.off()
-        except Exception:
-            try: pino_vibracao.value(0)
-            except: pass
-        
-        time.sleep_ms(VIBRAR_DESLIGADO)
+    if ready:
+        for _ in range(n_pulsos):
+            try:
+                pino_vibracao.on()
+            except Exception:
+                try: pino_vibracao.value(1)
+                except: pass
+            
+            # Usando as variáveis de configuração
+            if step == 0: time.sleep_ms(VIBRAR_LONGO)
+            if step == 1: time.sleep_ms(VIBRAR_ALERTA)
+            else: time.sleep_ms(VIBRAR_LIGADO)
+            
+            try:
+                pino_vibracao.off()
+            except Exception:
+                try: pino_vibracao.value(0)
+                except: pass
+            
+            time.sleep_ms(VIBRAR_DESLIGADO)

@@ -4,8 +4,8 @@ import config
 from printlogs import log
 from mpr121 import MPR121
 
-pinos = config.PINOS
 pinos_vib = config.PINOS_VIB
+print("pinos_vib:", pinos_vib)
 numsamples = config.NUMTSTSAMPLES
 tsamples = config.TIMEMS_SAMPLES
 

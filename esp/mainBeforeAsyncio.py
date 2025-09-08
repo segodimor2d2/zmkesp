@@ -1,42 +1,12 @@
 import time
 import config
 from hw import init_i2c, init_mpu, init_mpr121, init_vibrator
-from actions import vibrar, send_charPs, tsttap
+from actions import vibrar, send_charPs, tstpot
 from printlogs import log
 from dicctozmk import potsgyrotozmk
 from calibration import calc_pots_hysteresis, calc_accl_hysteresis
 from pots import check_pots, tap_pots, tap_pots_test, check_timeout, PotsState
 from gyro import initial_buffer, average_and_slide, gyro_principal, accl_principal, GyroState, AcclState
-
-
-def liberar_repl(vib, segundos=3):
-    print(f"Liberando REPL por {segundos}s...")
-    inicio = time.time()
-    while time.time() - inicio < segundos:
-        vibrar(vib, 1, 1, ready=True)
-        time.sleep(0.1)
-    print("Loop retomado.")
-
-
-def toggle_ready(ready, vib):
-    ready = not ready
-    vibrar(vib, 3, 0, ready=True)
-    return ready
-
-
-# --- define triggers fora do start ---
-def process_triggers(ativos, gyro_state, triggers, ready, vib):
-    for trig in triggers:
-        current_state = all(b in ativos for b in trig["buttons"]) and trig["condition"](gyro_state)
-        if current_state and not trig["last_state"]:
-            # executa a ação, atualizando ready se necessário
-            if trig.get("returns_ready", False):
-                ready = trig["action"](ready, vib)
-            else:
-                trig["action"]()
-        trig["last_state"] = current_state
-    return ready
-
 
 def start(i2c=None, mpu=None, mpr=None, pots=None, vib=None, force_calib=False):
     # Inicializa hardware se não passado
@@ -84,26 +54,6 @@ def start(i2c=None, mpu=None, mpr=None, pots=None, vib=None, force_calib=False):
     # Loop principal
     ready = False
     num = 0
-
-    # --- triggers ---
-    triggers = [
-        {
-            "buttons": {4, 6},
-            "condition": lambda gs: gs.stepY == 0,
-            "action": toggle_ready,
-            "last_state": False,
-            "returns_ready": True  # indica que a função retorna ready
-        },
-        {
-            "buttons": {4, 5},
-            # "condition": lambda gs: True,
-            "condition": lambda gs: gs.stepY == 3,
-            "action": lambda: liberar_repl(vib, segundos=3),
-            "last_state": False,
-            "returns_ready": False
-        }
-    ]
-
     while True:
         gyro, accl = average_and_slide(buffer, mpu)
         # x[P] Y[L] Z[V]
@@ -128,8 +78,12 @@ def start(i2c=None, mpu=None, mpr=None, pots=None, vib=None, force_calib=False):
         # R 0,1,2,3,6,5,4,8,9,10,11
         ativos = {remap[i] for i in range(num_electrodes) if mask & (1 << i) and i in remap}
 
-        # --- processa triggers ---
-        ready = process_triggers(ativos, gyro_state, triggers, ready, vib)
+        # --- toggle ready fora do loop de eventos ---
+        toggle_trigger = (gyro_state.stepY == 0 and 5 in ativos and 6 in ativos)
+        if toggle_trigger and not last_toggle_trigger:
+            ready = not ready
+            vibrar(vib, 3, 0, ready=True)
+        last_toggle_trigger = toggle_trigger
 
         eventos = []  # lista de eventos a enviar
 
@@ -165,7 +119,7 @@ def start(i2c=None, mpu=None, mpr=None, pots=None, vib=None, force_calib=False):
 
             if ready:
                 tozmk = potsgyrotozmk(*ev)
-                log(f'tozmk {tozmk}', 0)
+                # log(f'tozmk {tozmk}', 0)
                 send_charPs(tozmk)
 
         # atualiza estado
@@ -191,8 +145,5 @@ def start(i2c=None, mpu=None, mpr=None, pots=None, vib=None, force_calib=False):
 
 
 if __name__ == "__main__":
-    vib = init_vibrator()
-    vibrar(vib, 4, ready=True)
-    liberar_repl(vib, 3)  # <-- vib passado aqui
     start(force_calib=False)
-
+    vibrar(init_vibrator(), 4, ready=True)

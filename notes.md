@@ -74,14 +74,52 @@ mpremote exec "raise KeyboardInterrupt"
 mpremote exec "import machine; machine.reset()"
 mpremote exec "start(force_calib=True)"
 
+mpremote exec "from actions import send_charPs; import time;
+send_charPs([2, 0, 1]);
+time.sleep(1);
+send_charPs([1, 4, 1]);
+send_charPs([1, 4, 0]);
+send_charPs([2, 0, 0]);
+"
+
+s-f
+mpremote exec "from actions import send_charPs; import time; send_charPs([2, 0, 1]); time.sleep(1); send_charPs([1, 4, 1]); send_charPs([1, 4, 0]); send_charPs([2, 0, 0]); "
+s-r
+mpremote exec "from actions import send_charPs; import time; send_charPs([2, 0, 1]); time.sleep(1); send_charPs([0, 4, 1]); send_charPs([0, 4, 0]); send_charPs([2, 0, 0]); "
+c-c
+mpremote exec "from actions import send_charPs; import time; send_charPs([1, 0, 1]); time.sleep(1); send_charPs([2, 3, 1]); send_charPs([2, 3, 0]); send_charPs([1, 0, 0]); "
+
+mpremote exec "from actions import send_charPs; import time;
+send_charPs([3, 2, 1]);
+time.sleep(1);
+send_charPs([0, 4, 1]);
+send_charPs([0, 4, 0]);
+time.sleep(0.5);
+send_charPs([3, 2, 0]);
+"
+
+mo1 3, 1 --- mo2 3, 4
 
 
-test_pots()
-start(force_calib=True)
+mpremote exec "
+tstpot(1, 0, delay=1) #shift
+tstpot(1, 2, delay=0.1) #s
+
+
+tstpot(row, col, delay=1)
+tstpot(3, 0, delay=0.1) #lgui
+tstpot(3, 1, delay=0.1) #mo1
+tstpot(3, 2, delay=0.1) #space 
+
+tstpot(3, 3, delay=0.1) #entrer
+tstpot(3, 4, delay=0.1) #mo2
+tstpot(3, 5, delay=0.1) #ralt
+
+tstpot(3, 0, delay=1) #lgui
+
 
 $$$$
 ## RUN
-mpremote connect auto
 mpremote connect /dev/ttyUSB0
 mpremote reset
 mpremote kill
@@ -101,7 +139,7 @@ mpremote connect /dev/ttyUSB0 fs cp esp/mpr121.py :mpr121.py
 mpremote connect /dev/ttyUSB0 fs cp esp/mpu6050.py :mpu6050.py
 mpremote connect /dev/ttyUSB0 fs cp esp/printlogs.py :printlogs.py
 
-
+dadasaaafffdsadffsdsa
 
 accl_calib.json
 actions.py
@@ -6050,3 +6088,127 @@ ativos = {remap[i] for i in range(num_electrodes) if mask & (1 << i) and i in re
 3. Dentro do loop, `ativos` é calculado usando `remap` sem precisar recriar nada.
 
 Se quiser, posso já integrar isso no **código completo que ajustamos com eventos** que te enviei antes, mantendo o remapeamento fora do loop. Quer que eu faça isso?
+
+---
+
+
+Boa pergunta 👌
+
+O que você quer é:
+
+* **rodar por alguns segundos**
+* durante esse tempo **liberar o REPL**
+* sem deixar o código poluído
+
+Dá pra fazer de dois jeitos limpos:
+
+---
+
+### Usando `while` (mais explícito, fácil de ler)
+
+```python
+def liberar_repl(segundos=10):
+    print(f"⏳ Liberando REPL por {segundos}s...")
+    inicio = time.time()
+    while time.time() - inicio < segundos:
+        time.sleep(0.1)
+    print("🔒 Loop retomado.")
+```
+
+👍 Vantagem: fácil entender que é baseado em tempo.
+👎 Pouco mais verboso.
+
+---
+
+### Usando `for` (mais compacto)
+
+```python
+def liberar_repl(segundos=10):
+    print(f"⏳ Liberando REPL por {segundos}s...")
+    for _ in range(int(segundos / 0.1)):
+        time.sleep(0.1)
+    print("🔒 Loop retomado.")
+```
+
+👍 Mais limpo, menos cálculos dentro do loop.
+👎 Não deixa tão claro que é baseado no tempo real (é baseado na quantidade de ciclos).
+
+---
+
+### Qual usar?
+
+* Se você quer **precisão de tempo real**, prefira o `while` (pois depende de `time.time()`).
+* Se você só precisa **“esperar em torno de X segundos”**, o `for` é mais limpo.
+
+---
+
+👉 Quer que eu te mostre também uma versão **uasyncio**, onde o REPL nunca trava e você nem precisaria dessa função de “liberar espaço”?
+
+
+---
+
+
+
+Aí sim 😃, com **uasyncio** você não precisa mais “abrir janelas” para o REPL respirar, porque o loop nunca bloqueia o interpretador: o MicroPython fica sempre alternando entre suas tarefas e o REPL.
+
+---
+
+### Estrutura básica com `uasyncio`
+
+```python
+import uasyncio as asyncio
+import hw
+import actions
+
+async def tarefa_principal():
+    while True:
+        # aqui vai seu código que precisa rodar continuamente
+        # exemplo: ler sensores, atualizar estado, etc.
+        # check_pots(), gyro_principal(), ...
+        print("Loop principal rodando...")
+        await asyncio.sleep(0.1)  # não bloqueia, dá espaço pro REPL
+
+async def outra_tarefa():
+    while True:
+        # você pode ter várias tarefas independentes
+        print("Outra tarefa...")
+        await asyncio.sleep(1)
+
+async def main():
+    # inicia as duas tarefas em paralelo
+    await asyncio.gather(
+        tarefa_principal(),
+        outra_tarefa(),
+    )
+
+# inicia o loop
+asyncio.run(main())
+```
+
+---
+
+### O que muda em relação ao seu `while True:`
+
+* No lugar de `time.sleep()`, você usa **`await asyncio.sleep()`** → isso devolve o controle ao interpretador, permitindo que o REPL aceite comandos externos (`mpremote exec`).
+* Você pode ter várias funções rodando em paralelo (sensores, lógica de movimento, etc.), cada uma “cooperando” com o loop principal.
+* O ESP32 continua responsivo sempre, não precisa de “pausas de 10 segundos”.
+
+---
+
+### Como chamar comandos com `mpremote exec`
+
+Você pode rodar normalmente:
+
+```bash
+mpremote exec "import actions; actions.tstpot(1, 3, delay=0.1)"
+```
+
+e o ESP32 vai obedecer, mesmo com seu loop infinito rodando.
+
+---
+
+👉 Quer que eu adapte o seu `main.py` atual (com `hw`, `pots`, `gyro`) para uma versão já pronta com `uasyncio`, onde cada parte roda como uma tarefa independente?
+
+---
+
+

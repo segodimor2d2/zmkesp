@@ -47,9 +47,10 @@ def vibrar(pino_vibracao, n_pulsos, step=None, ready=False):
                 except: pass
             
             # Usando as variáveis de configuração
-            if step == 0: time.sleep_ms(VIBRAR_LONGO)
-            if step == 1: time.sleep_ms(VIBRAR_ALERTA)
-            else: time.sleep_ms(VIBRAR_LIGADO)
+            if step == 0: time.sleep_ms(VIBRAR_LIGADO)
+            if step == 1: time.sleep_ms(VIBRAR_LONGO)
+            if step == 2: time.sleep_ms(VIBRAR_ALERTA)
+            else: time.sleep_ms(VIBRAR_DESLIGADO)
             
             try:
                 pino_vibracao.off()

@@ -10,6 +10,8 @@ from gyro import initial_buffer, average_and_slide, gyro_principal, accl_princip
 
 
 def liberar_repl(vib, segundos=3):
+    vibrar(vib, 1, 2, ready=True)
+
     import webrepl
     import network
 
@@ -38,15 +40,29 @@ def liberar_repl(vib, segundos=3):
     if not station.isconnected():
         print('xxxxxx Error WiFi Connected xxxxxx')
         station.active(False)
-    webrepl.start()
+
+    try:
+        if webrepl.is_running():
+            print("WebREPL já ativo")
+            vibrar(vib, 1, 2, ready=True)
+        else:
+            webrepl.start()
+
+    except AttributeError:
+        # fallback se a função não existir
+        if getattr(webrepl, "_webrepl", None):
+            print("WebREPL já rodando")
+        else:
+            webrepl.start()
+
     print("\n*****************************")
 
-    print(f"Liberando REPL por {segundos}s...")
-    inicio = time.time()
-    while time.time() - inicio < segundos:
-        vibrar(vib, 1, 1, ready=True)
-        time.sleep(1)
-    print("Loop retomado.")
+    # print(f"Liberando REPL por {segundos}s...")
+    # inicio = time.time()
+    # while time.time() - inicio < segundos:
+    #     vibrar(vib, 1, 1, ready=True)
+    #     time.sleep(1)
+    # print("Loop retomado.")
 
 def toggle_ready(ready, vib):
     ready = not ready
@@ -118,14 +134,14 @@ def start(i2c=None, mpu=None, mpr=None, pots=None, vib=None, force_calib=False):
     # --- triggers ---
     triggers = [
         {
-            "buttons": {4, 6},
+            "buttons": {5, 6},
             "condition": lambda gs: gs.stepY == 0,
             "action": toggle_ready,
             "last_state": False,
             "returns_ready": True  # indica que a função retorna ready
         },
         {
-            "buttons": {5, 6},
+            "buttons": {4, 6},
             "condition": lambda gs: True,
             # "condition": lambda gs: gs.stepY == 3,
             "action": lambda: liberar_repl(vib, segundos=20),

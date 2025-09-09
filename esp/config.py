@@ -122,10 +122,10 @@ TCLEAR  = 10000   # Intervalo para reset de contador
 # ============================================================
 # Motor Vib 
 # ============================================================
-VIBRAR_LIGADO = 150     # 101 default
 VIBRAR_DESLIGADO = 70   # 70 default
-VIBRAR_LONGO = 250      # 200 para step == 0
-VIBRAR_ALERTA = 300     # 300 para step == 1
+VIBRAR_LIGADO = 150     # 101 default == 0
+VIBRAR_LONGO = 250      # 200 para step == 1
+VIBRAR_ALERTA = 300     # 300 para step == 2
 
 
 

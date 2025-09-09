@@ -129,8 +129,8 @@ como posso enviar um arquivo para webrepl
 
 WebREPL server started on http://192.168.31.148:8266/
 
-- testar breack
-- enviar com senha
+- testar break
+- boton de restart
 
 $$$$
 ## RUN
@@ -157,8 +157,15 @@ mpremote connect /dev/ttyUSB0 fs cp esp/printlogs.py :printlogs.py
 python webrepl_cli.py main.py 192.168.4.1:/main.py
 python webrepl_cli.py main.py 192.168.31.148:8266/main.py
 
-python webrepl_cli.py -p 105474 main.py 192.168.31.148:8266:/main.py
-python webrepl_cli.py -p 105474 main.py 192.168.31.148:8266:/main.py
+$$$$
+
+python esp/webrepl_cli.py -p 105474 192.168.31.148
+python esp/webrepl_cli.py -p 105474 192.168.31.148
+
+# python webrepl_cli.py -p 105474 main.py 192.168.31.148:8266:/main.py
+python esp/webrepl_cli.py -p 105474 esp/main.py 192.168.31.148:8266:/main.py
+python esp/webrepl_cli.py -p 105474 esp/config.py 192.168.31.148:8266:/config.py
+python esp/webrepl_cli.py -p 105474 esp/dicctozmk.py 192.168.31.148:8266:/dicctozmk.py
 
 
 accl_calib.json

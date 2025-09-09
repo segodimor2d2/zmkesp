@@ -10,13 +10,43 @@ from gyro import initial_buffer, average_and_slide, gyro_principal, accl_princip
 
 
 def liberar_repl(vib, segundos=3):
+    import webrepl
+    import network
+
+    print("\nBoot...")
+    station = network.WLAN(network.STA_IF)
+
+    red = [
+        ["MIR2D2", "3e4r5t6y7u"],
+        ["wff5", "3e4r5t6y7u"],
+    ]
+
+    for i in red:
+        station.active(True)
+        print(f'Connecting to WiFi {i[0]}...')
+        station.connect(i[0], i[1])
+        time.sleep_ms(10000)
+
+        if station.isconnected():
+            print(f'\nConnected to {i[0]} with success.')
+            print(f'Config: {station.ifconfig()}')
+            time.sleep_ms(3000)
+            break
+        else:
+            station.active(False)
+        
+    if not station.isconnected():
+        print('xxxxxx Error WiFi Connected xxxxxx')
+        station.active(False)
+    webrepl.start()
+    print("\n*****************************")
+
     print(f"Liberando REPL por {segundos}s...")
     inicio = time.time()
     while time.time() - inicio < segundos:
         vibrar(vib, 1, 1, ready=True)
-        time.sleep(0.1)
+        time.sleep(1)
     print("Loop retomado.")
-
 
 def toggle_ready(ready, vib):
     ready = not ready
@@ -95,10 +125,10 @@ def start(i2c=None, mpu=None, mpr=None, pots=None, vib=None, force_calib=False):
             "returns_ready": True  # indica que a função retorna ready
         },
         {
-            "buttons": {4, 5},
-            # "condition": lambda gs: True,
-            "condition": lambda gs: gs.stepY == 3,
-            "action": lambda: liberar_repl(vib, segundos=3),
+            "buttons": {5, 6},
+            "condition": lambda gs: True,
+            # "condition": lambda gs: gs.stepY == 3,
+            "action": lambda: liberar_repl(vib, segundos=20),
             "last_state": False,
             "returns_ready": False
         }
@@ -193,6 +223,6 @@ def start(i2c=None, mpu=None, mpr=None, pots=None, vib=None, force_calib=False):
 if __name__ == "__main__":
     vib = init_vibrator()
     vibrar(vib, 4, ready=True)
-    liberar_repl(vib, 3)  # <-- vib passado aqui
+    # liberar_repl(vib, 3)  # <-- vib passado aqui
     start(force_calib=False)
 

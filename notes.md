@@ -118,6 +118,20 @@ tstpot(3, 5, delay=0.1) #ralt
 tstpot(3, 0, delay=1) #lgui
 
 
+import webrepl_setup
+
+192.168.31.148
+Config: ('192.168.31.148', '255.255.255.0', '192.168.31.1', '192.168.31.1')
+
+eu posso enviar um arquivo para um esp 32 usando webrepl?
+mpremote
+como posso enviar um arquivo para webrepl
+
+WebREPL server started on http://192.168.31.148:8266/
+
+- testar breack
+- enviar com senha
+
 $$$$
 ## RUN
 mpremote connect /dev/ttyUSB0
@@ -139,7 +153,13 @@ mpremote connect /dev/ttyUSB0 fs cp esp/mpr121.py :mpr121.py
 mpremote connect /dev/ttyUSB0 fs cp esp/mpu6050.py :mpu6050.py
 mpremote connect /dev/ttyUSB0 fs cp esp/printlogs.py :printlogs.py
 
-dadasaaafffdsadffsdsa
+
+python webrepl_cli.py main.py 192.168.4.1:/main.py
+python webrepl_cli.py main.py 192.168.31.148:8266/main.py
+
+python webrepl_cli.py -p 105474 main.py 192.168.31.148:8266:/main.py
+python webrepl_cli.py -p 105474 main.py 192.168.31.148:8266:/main.py
+
 
 accl_calib.json
 actions.py

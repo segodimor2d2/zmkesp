@@ -66,7 +66,8 @@ def liberar_repl(vib, segundos=3):
             webrepl.start()
 
     if station.isconnected():
-        url = "http://192.168.31.127:5050"
+        # url = "http://192.168.31.127:5050"
+        url = "http://192.168.31.13:5050"
         post_data(url,f'config: {station.ifconfig()}')
 
     print("\n*****************************")

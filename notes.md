@@ -164,18 +164,22 @@ import webrepl_setup
 
 # python webrepl_cli.py -p 105474 main.py 192.168.31.148:8266:/main.py
 
-
+espL
+python esp/webrepl_cli.py -p 105474 192.168.197.135
 python esp/webrepl_cli.py -p 105474 192.168.31.148
 s/192.168.31.148/192.168.31.203/g
 python esp/webrepl_cli.py -p 105474 esp/main.py 192.168.31.148:8266:/main.py
 python esp/webrepl_cli.py -p 105474 esp/config.py 192.168.31.148:8266:/config.py
 python esp/webrepl_cli.py -p 105474 esp/dicctozmk.py 192.168.31.148:8266:/dicctozmk.py
 
+espR
+python esp/webrepl_cli.py -p 105474 192.168.197.44
 python esp/webrepl_cli.py -p 105474 192.168.31.203
 s/192.168.31.148/192.168.31.203/g
 python esp/webrepl_cli.py -p 105474 esp/main.py 192.168.31.203:8266:/main.py
 python esp/webrepl_cli.py -p 105474 esp/config.py 192.168.31.203:8266:/config.py
 python esp/webrepl_cli.py -p 105474 esp/dicctozmk.py 192.168.31.203:8266:/dicctozmk.py
+
 
 
 

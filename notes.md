@@ -129,8 +129,9 @@ como posso enviar um arquivo para webrepl
 
 WebREPL server started on http://192.168.31.148:8266/
 
-- testar break
-- boton de restart
+- mpremote exec "raise KeyboardInterrupt"
+- mpremote exec "import machine; machine.reset()"
+- ter um server para recivir la IP 
 
 $$$$
 ## RUN
@@ -159,13 +160,31 @@ python webrepl_cli.py main.py 192.168.31.148:8266/main.py
 
 $$$$
 
-python esp/webrepl_cli.py -p 105474 192.168.31.148
-python esp/webrepl_cli.py -p 105474 192.168.31.148
+import webrepl_setup
 
 # python webrepl_cli.py -p 105474 main.py 192.168.31.148:8266:/main.py
+
+
+python esp/webrepl_cli.py -p 105474 192.168.31.148
+s/192.168.31.148/192.168.31.203/g
 python esp/webrepl_cli.py -p 105474 esp/main.py 192.168.31.148:8266:/main.py
 python esp/webrepl_cli.py -p 105474 esp/config.py 192.168.31.148:8266:/config.py
 python esp/webrepl_cli.py -p 105474 esp/dicctozmk.py 192.168.31.148:8266:/dicctozmk.py
+
+python esp/webrepl_cli.py -p 105474 192.168.31.203
+s/192.168.31.148/192.168.31.203/g
+python esp/webrepl_cli.py -p 105474 esp/main.py 192.168.31.203:8266:/main.py
+python esp/webrepl_cli.py -p 105474 esp/config.py 192.168.31.203:8266:/config.py
+python esp/webrepl_cli.py -p 105474 esp/dicctozmk.py 192.168.31.203:8266:/dicctozmk.py
+
+
+
+$$$$
+
+python serverflask.py
+
+
+
 
 
 accl_calib.json

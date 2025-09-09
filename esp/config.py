@@ -135,6 +135,7 @@ VIBRAR_ALERTA = 300     # 300 para step == 2
 # ============================================================
 DEBUG = 0
 """
+# testando
 | Você Quer...                  | Configuração        | Comportamento          |
 |-------------------------------|---------------------|------------------------|
 | Só logs de nível X            | DEBUG = X           | Ignora tudo ≠ X        |

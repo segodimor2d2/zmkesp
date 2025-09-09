@@ -9,6 +9,16 @@ from pots import check_pots, tap_pots, tap_pots_test, check_timeout, PotsState
 from gyro import initial_buffer, average_and_slide, gyro_principal, accl_principal, GyroState, AcclState
 
 
+def post_data(url, data):
+    import urequests
+    try:
+        r = urequests.post(url, json=data)  # envia como JSON
+        print("Status:", r.status_code)
+        print("Resposta:", r.text)
+        r.close()
+    except Exception as e:
+        print("Erro no POST:", e)
+
 def liberar_repl(vib, segundos=3):
     vibrar(vib, 1, 2, ready=True)
 
@@ -19,8 +29,8 @@ def liberar_repl(vib, segundos=3):
     station = network.WLAN(network.STA_IF)
 
     red = [
-        ["MIR2D2", "3e4r5t6y7u"],
         ["wff5", "3e4r5t6y7u"],
+        ["MIR2D2", "3e4r5t6y7u"],
     ]
 
     for i in red:
@@ -54,6 +64,10 @@ def liberar_repl(vib, segundos=3):
             print("WebREPL já rodando")
         else:
             webrepl.start()
+
+    if station.isconnected():
+        url = "http://192.168.31.127:5050"
+        post_data(url,f'config: {station.ifconfig()}')
 
     print("\n*****************************")
 

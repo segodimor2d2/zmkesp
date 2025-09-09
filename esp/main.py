@@ -28,11 +28,8 @@ def liberar_repl(vib, segundos=3):
     print("\nBoot...")
     station = network.WLAN(network.STA_IF)
 
-    red = [
-        ["wff5", "3e4r5t6y7u"],
-        ["MIR2D2", "3e4r5t6y7u"],
-    ]
-
+    red = config.REDES
+    indexid = 0
     for i in red:
         station.active(True)
         print(f'Connecting to WiFi {i[0]}...')
@@ -41,6 +38,7 @@ def liberar_repl(vib, segundos=3):
 
         if station.isconnected():
             print(f'\nConnected to {i[0]} with success.')
+            indexid = i
             print(f'Config: {station.ifconfig()}')
             time.sleep_ms(3000)
             break
@@ -67,7 +65,9 @@ def liberar_repl(vib, segundos=3):
 
     if station.isconnected():
         # url = "http://192.168.31.127:5050"
-        url = "http://192.168.31.13:5050"
+        # url = "http://192.168.31.13:5050"
+        print("indexid:", indexid)
+        url = indexid[2]
         post_data(url,f'config: {station.ifconfig()}')
 
     print("\n*****************************")

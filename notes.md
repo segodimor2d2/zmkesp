@@ -168,11 +168,11 @@ espL
 10.50.126.135
 192.168.31.148
 192.168.197.135
-s/192.168.197.135/192.168.197.135/g
-python esp/webrepl_cli.py -p 105474 192.168.197.135
-python esp/webrepl_cli.py -p 105474 esp/main.py 192.168.197.135:8266:/main.py
-python esp/webrepl_cli.py -p 105474 esp/config.py 192.168.197.135:8266:/config.py
-python esp/webrepl_cli.py -p 105474 esp/dicctozmk.py 192.168.197.135:8266:/dicctozmk.py
+s/192.168.31.148/192.168.31.148/g
+python esp/webrepl_cli.py -p 105474 192.168.31.148
+python esp/webrepl_cli.py -p 105474 esp/main.py 192.168.31.148:8266:/main.py
+python esp/webrepl_cli.py -p 105474 esp/config.py 192.168.31.148:8266:/config.py
+python esp/webrepl_cli.py -p 105474 esp/dicctozmk.py 192.168.31.148:8266:/dicctozmk.py
 
 espR
 192.168.197.44

@@ -149,14 +149,14 @@ def start(i2c=None, mpu=None, mpr=None, pots=None, vib=None, force_calib=False):
     # --- triggers ---
     triggers = [
         {
-            "buttons": {5, 6},
+            "buttons": {7, 8},
             "condition": lambda gs: gs.stepY == 0,
             "action": toggle_ready,
             "last_state": False,
             "returns_ready": True  # indica que a função retorna ready
         },
         {
-            "buttons": {4, 6},
+            "buttons": {6, 8},
             "condition": lambda gs: True,
             # "condition": lambda gs: gs.stepY == 3,
             "action": lambda: liberar_repl(vib, segundos=20),
@@ -184,10 +184,8 @@ def start(i2c=None, mpu=None, mpr=None, pots=None, vib=None, force_calib=False):
         num_electrodes = mpr.electrodes
         # conjunto dos ativos
         # ativos = {i for i in range(num_electrodes) if mask & (1 << i)} 
-        # 3,2,1,0,4,5,6,8,9,10,11
-        # L 0,1,2,3,4,5,6,8,9,10,11
-        # R 0,1,2,3,6,5,4,8,9,10,11
         ativos = {remap[i] for i in range(num_electrodes) if mask & (1 << i) and i in remap}
+        # print(f'ativos: {ativos}')
 
         # --- processa triggers ---
         ready = process_triggers(ativos, gyro_state, triggers, ready, vib)

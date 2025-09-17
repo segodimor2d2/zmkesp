@@ -36,4 +36,12 @@ def init_vibrator(pin_no=(pinos_vib)):
         pass
     return p
 
+def init_led(pino_led=2):
+    pino_led = Pin(pino_led, Pin.OUT)
+    try:
+        pino_led.off()
+    except Exception:
+        pass
+    return pino_led
+
 

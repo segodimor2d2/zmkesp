@@ -77,7 +77,7 @@ def check_gyro_axis(gyro, axis_index, step, event_pos, event_neg, vib, ready, wa
     if not event_pos and gyro[axis_index] > pos_thresh:
         step += -1 if invert else 1
         # vibrar(vib, 1, step, ready=ready)
-        vibrar(vib, 1, step=1, ready=ready)
+        vibrar(vib, 1, step=config.VIBRAR_DESLIGADO, ready=ready)
         event_pos = True
         wait2Zero = True
         cycle = 0
@@ -87,7 +87,7 @@ def check_gyro_axis(gyro, axis_index, step, event_pos, event_neg, vib, ready, wa
     if not event_neg and gyro[axis_index] < neg_thresh:
         step += 1 if invert else -1
         # vibrar(vib, 1, step, ready=ready)
-        vibrar(vib, 1, step=1, ready=ready)
+        vibrar(vib, 1, step=config.VIBRAR_DESLIGADO, ready=ready)
         event_neg = True
         wait2Zero = True
         cycle = 0
@@ -102,7 +102,7 @@ def check_step_wait(event_triggered, step_wait, step, delta, vib, ready):
     if step_wait >= config.STEP_WAIT_LIMIT:
         step += delta
         # vibrar(vib, 1, step, ready=ready)
-        vibrar(vib, 1, step=1, ready=ready)
+        vibrar(vib, 1, step=config.VIBRAR_DESLIGADO, ready=ready)
         step_wait = 0
     return step_wait, step
 

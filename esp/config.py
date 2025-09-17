@@ -59,21 +59,8 @@ ALPHA_SUAVIZACAO = 0.1 # alpha: fator de suavização para baseline (0.1 = mais 
 DEBOUNCE_COUNT  = 2 # Leituras consecutivas para confirmar toque
  
 # ao tocar os pots o valor diminuie por ex de 320 para 100
-
-# 340-340*0.1 306.0
-# 340-340*0.2 272.0
-# 340-340*0.3 238.0
-# 340-340*0.4 204.0
-# 340-340*0.5 170.0
-# 340-340*0.6 136.0
-# 340-340*0.7 102.1
-# 340-340*0.8 68.0
-# 340-340*0.9 34.0
-
 MAD_MAX = 0.2 # -80 thresholds  ON 
 MAD_MIN = 0.8 # -40 thresholds OFF 
-
-
 
 # ============================================================
 # CONFIGURAÇÕES DO GIROSCÓPIO
@@ -110,37 +97,31 @@ ACCL_SENS = {
     "Z_neg": 1.0
 }
 
-
-
 # ============================================================
 # CONTROLE DE PASSOS / RESET
 # ============================================================
 STEP_WAIT_LIMIT   = 5     # Ciclos antes de repetir passo
 CYCLE_RESET_LIMIT = 10    # Ciclos parado até resetar stepX/stepY
 
-
 # ============================================================
 # LOOP PRINCIPAL
 # ============================================================
 TSLEEP  = 50      # Delay entre loops (ms)
-TCLEAR  = 10000   # Intervalo para reset de contador
-
+TCLEAR  = 15000   # Intervalo para reset de contador
 
 # ============================================================
 # Motor Vib 
 # ============================================================
-VIBRAR_DESLIGADO = 70   # 70 default
-VIBRAR_LIGADO = 150     # 101 default == 0
+VIBRAR_DESLIGADO = 90   # 70 default
+VIBRAR_LIGADO = 120     # 101 default == 0
 VIBRAR_LONGO = 250      # 200 para step == 1
 VIBRAR_ALERTA = 300     # 300 para step == 2
-
-
-
 
 # ============================================================
 # DEBUG
 # ============================================================
 DEBUG = 0
+
 """
 # testando
 | Você Quer...                  | Configuração        | Comportamento          |

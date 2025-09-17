@@ -1,7 +1,7 @@
 import time
 import config
-from hw import init_i2c, init_mpu, init_mpr121, init_vibrator
-from actions import vibrar, send_charPs, tsttap
+from hw import init_i2c, init_mpu, init_mpr121, init_vibrator, init_led
+from actions import vibrar, send_charPs, tsttap, piscaled
 from printlogs import log
 from dicctozmk import potsgyrotozmk
 from calibration import calc_pots_hysteresis, calc_accl_hysteresis
@@ -25,7 +25,7 @@ def restart(vib, segundos=3):
     import machine
     machine.reset()
 
-def liberar_repl(vib, segundos=3):
+def liberar_repl(vib, led, segundos=3):
     vibrar(vib, 1, 2, ready=True)
 
     import webrepl
@@ -33,23 +33,40 @@ def liberar_repl(vib, segundos=3):
 
     print("\nBoot...")
     station = network.WLAN(network.STA_IF)
+    station.active(True)
 
     red = config.REDES
     indexid = 0
     for i in red:
-        station.active(True)
         print(f'Connecting to WiFi {i[0]}...')
+
+        try:
+            station.disconnect()
+            time.sleep_ms(200)
+        except:
+            pass
+
         station.connect(i[0], i[1])
-        time.sleep_ms(10000)
+
+        # time.sleep_ms(10000)
+
+        # espera no máximo 5 segundos
+        for _ in range(50):
+            if station.isconnected():
+                break
+            time.sleep_ms(100)  # 0.1s
+            piscaled(led, 50, 1)
 
         if station.isconnected():
             print(f'\nConnected to {i[0]} with success.')
             indexid = i
             print(f'Config: {station.ifconfig()}')
-            time.sleep_ms(3000)
+            time.sleep_ms(1000)
+            piscaled(led, 100, 6)
             break
+
         else:
-            station.active(False)
+            print(f'Falha ao conectar em {i[0]}')
         
     if not station.isconnected():
         print('xxxxxx Error WiFi Connected xxxxxx')
@@ -75,6 +92,7 @@ def liberar_repl(vib, segundos=3):
         print("indexid:", indexid)
         url = indexid[2]
         post_data(url,f'config: {station.ifconfig()}')
+        piscaled(led, 100, 6)
 
     print("\n*****************************")
 
@@ -105,14 +123,16 @@ def process_triggers(ativos, gyro_state, triggers, ready, vib):
     return ready
 
 
-def start(i2c=None, mpu=None, mpr=None, pots=None, vib=None, force_calib=False):
+def start(i2c=None, mpu=None, mpr=None, pots=None, vib=None, led=None, force_calib=False):
     # Inicializa hardware se não passado
     if i2c is None: i2c = init_i2c()
     if mpu is None: mpu = init_mpu(i2c)
     if vib is None: vib = init_vibrator()
     if mpr is None: mpr = init_mpr121(i2c)
+    if led is None: led = init_led(2)
 
     vibrar(vib, 3, 0, ready=True)
+    piscaled(led, 100, 2)
 
     remap_list = config.INDEX_MAP_POTS 
     remap = {i: remap_list[i] for i in range(len(remap_list))}
@@ -162,15 +182,15 @@ def start(i2c=None, mpu=None, mpr=None, pots=None, vib=None, force_calib=False):
             "returns_ready": True  # indica que a função retorna ready
         },
         {
-            "buttons": {6, 8},
+            "buttons": {4, 6, 8},
             "condition": lambda gs: True,
             # "condition": lambda gs: gs.stepY == 3,
-            "action": lambda: liberar_repl(vib, segundos=20),
+            "action": lambda: liberar_repl(vib, led, segundos=20),
             "last_state": False,
             "returns_ready": False
         },
         {
-            "buttons": {5, 8},
+            "buttons": {4, 5, 8},
             "condition": lambda gs: True,
             # "condition": lambda gs: gs.stepY == 3,
             "action": lambda: restart(vib, segundos=20),
@@ -264,8 +284,7 @@ def start(i2c=None, mpu=None, mpr=None, pots=None, vib=None, force_calib=False):
 
 
 if __name__ == "__main__":
-    vib = init_vibrator()
-    vibrar(vib, 4, ready=True)
-    # liberar_repl(vib, 3)  # <-- vib passado aqui
+    vibrar(init_vibrator(), 4, ready=True)
+    liberar_repl(init_vibrator(), init_led(2), 3)  # <-- webrepl ativado
     start(force_calib=False)
 

@@ -198,6 +198,60 @@ $$$$
 python serverflask.py
 
 
+zmk-promicronRF52840
+
+rm -rf build
+west build -t pristine
+
+# LEFT
+west build -p always -s app -b nice_nano_v2 -- -DSHIELD=corne_left -DZMK_CONFIG=/home/segodimo/zmkpromicro/config
+sudo mount /dev/sdd /mnt/corne         
+sudo cp build/zephyr/zmk.uf2 /mnt/corne
+<!-- cp build/zephyr/zmk.uf2 ../corne/promicro_out/corne_left-nice_nano_v2-zmk.uf2 -->
+cp build/zephyr/zmk.uf2 ../zmkesp/firmwar/corne_left.uf2
+
+# RIGHT
+west build -p always -s app -b nice_nano_v2 -- -DSHIELD=corne_right -DZMK_CONFIG=/home/segodimo/zmkpromicro/config
+sudo mount /dev/sdd /mnt/corne         
+sudo cp build/zephyr/zmk.uf2 /mnt/corne
+<!-- cp build/zephyr/zmk.uf2 ../corne/promicro_out/corne_right-nice_nano_v2-zmk.uf2 -->
+cp build/zephyr/zmk.uf2 ../zmkesp/firmwar/corne_right.uf2
+
+# RESET
+west build -p always -s app -b nice_nano_v2 -- -DSHIELD=settings_reset -DZMK_CONFIG=/home/segodimo/zmkpromicro/config
+
+
+➜  zmkpromicro git:(master) ✗ tree
+.
+├── boards
+│   └── shields
+├── build.yaml
+├── config
+│   ├── corne.keymap
+│   ├── corne_left.conf
+│   ├── corne_left.overlay
+│   ├── corne_right.conf
+│   ├── corne_right.overlay
+│   ├── include
+│   │   └── zmk
+│   │       ├── uart_switch_left.h
+│   │       └── uart_switch_right.h
+│   ├── src
+│   │   ├── CMakeLists.txt
+│   │   ├── uart_receiver_left.c
+│   │   ├── uart_receiver_right.c
+│   │   ├── uart_switch_left.c
+│   │   └── uart_switch_right.c
+│   └── west.yml
+├── README.md
+└── zephyr
+    └── module.yml
+
+
+
+
+
+
 
 
 
@@ -6270,5 +6324,202 @@ e o ESP32 vai obedecer, mesmo com seu loop infinito rodando.
 👉 Quer que eu adapte o seu `main.py` atual (com `hw`, `pots`, `gyro`) para uma versão já pronta com `uasyncio`, onde cada parte roda como uma tarefa independente?
 
 ---
+
+
+
+
+´´´c
+
+/*
+ * Copyright (c) 2020 The ZMK Contributors
+ *
+ * SPDX-License-Identifier: MIT
+ */
+
+#include <behaviors.dtsi>
+#include <dt-bindings/zmk/keys.h>
+#include <dt-bindings/zmk/bt.h>
+
+/ {
+
+    behaviors {
+        td0: td0 {
+            compatible = "zmk,behavior-tap-dance";
+            display-name = "Shift/Caps Lock Tap Dance";
+            #binding-cells = <0>;
+            bindings = <&kp LEFT_SHIFT>, <&kp CAPS>;
+        };
+
+        parenthesis: parenthesis {
+            compatible = "zmk,behavior-tap-dance";
+            label = "PARENTHESIS";
+            #binding-cells = <0>;
+            bindings = <&kp LEFT_PARENTHESIS>, <&kp RIGHT_PARENTHESIS>;
+        };
+
+        bracket: bracket {
+            compatible = "zmk,behavior-tap-dance";
+            label = "BRACKET";
+            #binding-cells = <0>;
+            bindings = <&kp RBKT>, <&kp LA(PIPE)>;
+        };
+
+        brace: brace {
+            compatible = "zmk,behavior-tap-dance";
+            label = "BRACE";
+            #binding-cells = <0>;
+            bindings = <&kp RBRC>, <&kp PIPE>;
+        };
+    };
+
+    rgb_encoder: rgb_encoder {
+        compatible = "zmk,behavior-sensor-rotate";
+        #sensor-binding-cells = <0>;
+        bindings = <&rgb_ug RGB_BRI>, <&rgb_ug RGB_BRD>;
+    };
+
+    scroll_encoder: scroll_encoder {
+        compatible = "zmk,behavior-sensor-rotate";
+        #sensor-binding-cells = <0>;
+        bindings = <&msc SCRL_DOWN>, <&msc SCRL_UP>;
+
+        tap-ms = <100>;
+    };
+
+    combos {
+        compatible = "zmk,combos";
+
+        device1 {
+            bindings = <&bt BT_SEL 0>;
+            key-positions = <4 44>;
+            layers = <3>;
+        };
+
+        device2 {
+            bindings = <&bt BT_SEL 1>;
+            key-positions = <3 44>;
+            layers = <3>;
+        };
+
+        device3 {
+            bindings = <&bt BT_SEL 2>;
+            key-positions = <2 44>;
+            layers = <3>;
+        };
+
+        device4 {
+            bindings = <&bt BT_SEL 3>;
+            key-positions = <17 44>;
+            layers = <3>;
+        };
+
+        device5 {
+            bindings = <&bt BT_SEL 4>;
+            key-positions = <16 44>;
+            layers = <3>;
+        };
+
+        lsysreset {
+            bindings = <&sys_reset>;
+            key-positions = <44 28>;
+        };
+
+        rsysreset {
+            bindings = <&sys_reset>;
+            key-positions = <45 41>;
+        };
+
+        lbootloader {
+            bindings = <&bootloader>;
+            key-positions = <44 13>;
+        };
+
+        rbootloader {
+            bindings = <&bootloader>;
+            key-positions = <27 45>;
+        };
+
+        sutudiounlock {
+            bindings = <&studio_unlock>;
+            key-positions = <44 0>;
+        };
+
+        outble {
+            bindings = <&out OUT_BLE>;
+            key-positions = <44 14>;
+            layers = <3>;
+        };
+
+        outusb {
+            bindings = <&out OUT_USB>;
+            key-positions = <44 29>;
+            layers = <3>;
+        };
+    };
+
+    keymap {
+        compatible = "zmk,keymap";
+
+        default_layer {
+            display-name = "QWERTY";
+            bindings = <
+&kp ESC    &kp Q  &kp W  &kp E     &kp R  &kp T         &kp Y        &kp U  &kp I            &kp O    &kp P     &kp BSPC
+&kp LSHFT  &kp A  &kp S  &kp D     &kp F  &kp G         &kp H        &kp J  &kp K            &kp L    &kp SEMI  &kp ENTER
+&kp LCTRL  &kp Z  &kp X  &kp C     &kp V  &kp B         &kp N        &kp M  &kp COMMA        &kp DOT  &kp FSLH  &kp RSHIFT
+                         &kp LALT  &mo 2  &lt 4 SPACE   &lt 3 ENTER  &mo 1  &kp RIGHT_SHIFT
+            >;
+        };
+
+                lower_layer {
+            display-name = "NUMBER";
+            bindings = <
+&kp TAB  &none  &kp N9  &kp N8  &kp N7  &none     &kp HOME        &kp PG_DN       &kp PG_UP     &kp END          &parenthesis  &kp LBKT
+&trans   &none  &kp N6  &kp N5  &kp N4  &none     &mmv MOVE_LEFT  &mmv MOVE_DOWN  &mmv MOVE_UP  &mmv MOVE_RIGHT  &bracket      &kp SQT
+&trans   &none  &kp N3  &kp N2  &kp N1  &kp N0    &kp LEFT        &kp DOWN        &kp UP        &kp RIGHT        &brace        &kp MINUS
+                        &none   &none   &none     &kp RSHIFT      &none           &kp LALT
+            >;
+        };
+
+                raise_layer {
+            display-name = "SYMBOL";
+            bindings = <
+&kp LA(TAB)  &trans  &trans  &trans  &trans  &trans    &kp BSLH   &kp MINUS  &kp PLUS  &kp PRCNT  &kp EXCL       &kp LA(DELETE)
+&trans       &trans  &trans  &trans  &trans  &trans    &kp N0     &kp STAR   &kp HASH  &kp DLLR   &kp KP_DIVIDE  &kp GRAVE
+&trans       &trans  &trans  &trans  &trans  &trans    &kp EQUAL  &kp AT     &kp EXCL  &kp RA(W)  &kp RA(W)      &kp AMPS
+                             &trans  &none   &trans    &kp RET    &trans     &trans
+            >;
+          };
+
+        fn_layer {
+            display-name = "FN";
+            bindings = <
+&none  &none  &none  &none  &none  &none   &kp F7  &kp F8  &kp F9    &kp F10  &none  &none
+&none  &none  &none  &none  &none  &none   &kp F4  &kp F5  &kp F6    &kp F11  &none  &none
+&none  &none  &none  &none  &none  &none   &kp F1  &kp F2  &kp F3    &kp F12  &none  &none
+                     &none  &none  &none   &none   &none   &kp RALT
+            >;
+        };
+
+        rec_layer {
+            bindings = <
+&trans  &trans  &trans  &trans        &trans        &trans      &msc SCRL_LEFT  &msc SCRL_DOWN  &msc SCRL_UP  &msc SCRL_RIGHT  &trans  &trans
+&trans  &trans  &trans  &mkp MCLK     &mkp RCLK     &mkp LCLK   &mmv MOVE_LEFT  &mmv MOVE_DOWN  &mmv MOVE_UP  &mmv MOVE_RIGHT  &trans  &kp PG_UP
+&none   &trans  &trans  &kp C_VOL_DN  &kp C_VOL_UP  &kp C_MUTE  &kp LEFT_ARROW  &kp DOWN        &kp UP        &kp RIGHT        &trans  &kp PG_DN
+                        &trans        &trans        &none       &trans          &trans          &trans
+            >;
+
+            label = "REC";
+        };
+
+    };
+};
+
+´´´
+
+&kp TAB  &none  &kp N9  &kp N8  &kp N7  &none    &kp HOME        &kp PG_DN       &kp PG_UP     &kp END          &parenthesis  &kp LBKT
+&trans   &none  &kp N6  &kp N5  &kp N4  &none    &mmv MOVE_LEFT  &mmv MOVE_DOWN  &mmv MOVE_UP  &mmv MOVE_RIGHT  &bracket      &kp SQT
+&trans   &none  &kp N3  &kp N2  &kp N1  &kp N0   &kp LEFT        &kp DOWN        &kp UP        &kp RIGHT        &brace        &kp MINUS
+                        &none   &none   &none    &kp RSHIFT      &none           &kp LALT
+
 
 

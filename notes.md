@@ -173,15 +173,17 @@ python esp/webrepl_cli.py -p 105474 192.168.31.148
 python esp/webrepl_cli.py -p 105474 esp/main.py 192.168.31.148:8266:/main.py
 python esp/webrepl_cli.py -p 105474 esp/config.py 192.168.31.148:8266:/config.py
 python esp/webrepl_cli.py -p 105474 esp/dicctozmk.py 192.168.31.148:8266:/dicctozmk.py
+python esp/webrepl_cli.py -p 105474 esp/gyro.py 192.168.31.148:8266:/gyro.py
 
 espR
 192.168.197.44
 192.168.31.203
-s/192.168.197.44/192.168.197.44/g
-python esp/webrepl_cli.py -p 105474 192.168.197.44
-python esp/webrepl_cli.py -p 105474 esp/main.py 192.168.197.44:8266:/main.py
-python esp/webrepl_cli.py -p 105474 esp/config.py 192.168.197.44:8266:/config.py
-python esp/webrepl_cli.py -p 105474 esp/dicctozmk.py 192.168.197.44:8266:/dicctozmk.py
+s/192.168.31.203/192.168.31.203/g
+python esp/webrepl_cli.py -p 105474 192.168.31.203
+python esp/webrepl_cli.py -p 105474 esp/main.py 192.168.31.203:8266:/main.py
+python esp/webrepl_cli.py -p 105474 esp/config.py 192.168.31.203:8266:/config.py
+python esp/webrepl_cli.py -p 105474 esp/dicctozmk.py 192.168.31.203:8266:/dicctozmk.py
+python esp/webrepl_cli.py -p 105474 esp/gyro.py 192.168.31.203:8266:/gyro.py
 
 
 

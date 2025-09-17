@@ -19,6 +19,12 @@ def post_data(url, data):
     except Exception as e:
         print("Erro no POST:", e)
 
+def restart(vib, segundos=3):
+    vibrar(vib, 1, 2, ready=True)
+
+    import machine
+    machine.reset()
+
 def liberar_repl(vib, segundos=3):
     vibrar(vib, 1, 2, ready=True)
 
@@ -160,6 +166,14 @@ def start(i2c=None, mpu=None, mpr=None, pots=None, vib=None, force_calib=False):
             "condition": lambda gs: True,
             # "condition": lambda gs: gs.stepY == 3,
             "action": lambda: liberar_repl(vib, segundos=20),
+            "last_state": False,
+            "returns_ready": False
+        },
+        {
+            "buttons": {5, 8},
+            "condition": lambda gs: True,
+            # "condition": lambda gs: gs.stepY == 3,
+            "action": lambda: restart(vib, segundos=20),
             "last_state": False,
             "returns_ready": False
         }

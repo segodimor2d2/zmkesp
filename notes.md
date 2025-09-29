@@ -158,6 +158,7 @@ mpremote connect /dev/ttyUSB0 fs cp esp/gyro.py :gyro.py
 mpremote connect /dev/ttyUSB0 fs cp esp/calibration.py :calibration.py
 mpremote connect /dev/ttyUSB0 fs cp esp/actions.py :actions.py
 mpremote connect /dev/ttyUSB0 fs cp esp/dicctozmk.py :dicctozmk.py
+
 mpremote connect /dev/ttyUSB0 fs cp esp/hw.py :hw.py
 mpremote fs ls
 mpremote connect /dev/ttyUSB0 fs cp esp/mpr121.py :mpr121.py
@@ -227,7 +228,8 @@ sudo mount /dev/sdd /mnt/corne
 sudo cp build/zephyr/zmk.uf2 /mnt/corne
 
 # RESET
-west build -p always -s app -b nice_nano_v2 -- -DSHIELD=settings_reset -DZMK_CONFIG=/home/segodimo/zmkpromicro/config
+/home/segodimo/zmkesp/firmwar
+sudo cp reset-zmk.uf2 /mnt/corne  
 
 
 ➜  zmkpromicro git:(master) ✗ tree
@@ -7974,3 +7976,1845 @@ int uart_switch_simulate_left(uint8_t row, uint8_t col, bool pressed) {
 ---
 
 Quer que eu já te mostre como ficaria o **fluxo UART → ZMK event bus → keymap** depois dessa mudança, para visualizar o que acontece no peripheral e no central?
+
+
+
+---
+
+agora eu gostaria de enviar eventos do mouse para zmk, então o que eu deveria fazer para se ja consigo enviar essos dados do sensor para o uart_switch_left.c?
+
+# a versão de `uart_switch_left.c`:
+
+```c
+#include <zephyr/kernel.h>
+#include <zephyr/logging/log.h>
+#include <zmk/keymap.h>
+#include <zmk/behavior.h>
+#include <zmk/uart_switch_left.h>
+#include <zmk/events/position_state_changed.h>  // necessário para raise_zmk_position_state_changed
+
+LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
+
+// Número de colunas da matriz lógica (Corne = 12 colunas)
+#define MATRIX_COLS 12
+
+// Calcula índice linear a partir de (row, col)
+#define ZMK_KEYMAP_POSITION(row, col) ((row) * MATRIX_COLS + (col))
+
+int uart_switch_simulate_left(uint8_t row, uint8_t col, bool pressed) {
+    uint32_t position = ZMK_KEYMAP_POSITION(row, col);
+
+    struct zmk_position_state_changed event = {
+        .source = ZMK_POSITION_STATE_CHANGE_SOURCE_LOCAL,
+        .state = pressed,
+        .position = position,
+        .timestamp = k_uptime_get(),
+    };
+
+    int ret = raise_zmk_position_state_changed(event);
+    LOG_DBG("uart_switch LEFT %s at (row=%d, col=%d) => position %d, result: %d",
+            pressed ? "press" : "release", row, col, position, ret);
+
+    return ret;
+}
+```
+
+
+Boa, agora ficou claro 👍.
+
+O que você tem hoje (`uart_switch_left.c`) simula eventos de **teclas** no ZMK chamando `raise_zmk_position_state_changed()`. Isso funciona porque o ZMK já conhece esse tipo de evento (teclado = matriz de posições).
+
+👉 Para **mouse** é diferente:
+O ZMK não trata movimento de mouse como posições da keymap, mas sim como **eventos HID de tipo `mouse_report`**.
+
+### O que você precisa:
+
+1. **Incluir o cabeçalho certo**
+   O ZMK já tem suporte a mouse via `zmk/endpoints.h` e `zmk/hid.h`.
+
+   ```c
+   #include <zmk/hid.h>
+   #include <zmk/endpoints.h>
+   ```
+
+2. **Criar um report de mouse**
+   O report HID do mouse é do tipo `struct zmk_hid_mouse_report_body`. Ele tem campos como `x`, `y`, `scroll_x`, `scroll_y` e `buttons`.
+
+   Exemplo de envio de movimento:
+
+   ```c
+   struct zmk_hid_mouse_report_body report = {
+       .x = dx,         // deslocamento no eixo X (-127 a 127)
+       .y = dy,         // deslocamento no eixo Y (-127 a 127)
+       .scroll_x = 0,
+       .scroll_y = 0,
+       .buttons = 0     // clique nenhum
+   };
+
+   zmk_endpoints_send_mouse_report(&report);
+   ```
+
+3. **Criar uma função parecida com sua `uart_switch_simulate_left()` mas para mouse**
+   Algo assim:
+
+   ```c
+   int uart_switch_mouse_move(int8_t dx, int8_t dy) {
+       struct zmk_hid_mouse_report_body report = {
+           .x = dx,
+           .y = dy,
+           .scroll_x = 0,
+           .scroll_y = 0,
+           .buttons = 0
+       };
+
+       int ret = zmk_endpoints_send_mouse_report(&report);
+       LOG_DBG("uart_switch LEFT mouse move (dx=%d, dy=%d), result: %d", dx, dy, ret);
+
+       return ret;
+   }
+   ```
+
+4. **Para cliques de botão**
+   Basta setar `report.buttons`. Por exemplo:
+
+   ```c
+   report.buttons = MOUSE_BUTTON_LEFT;   // clique esquerdo
+   ```
+
+   e depois enviar o report.
+
+---
+
+✅ Resumindo:
+
+* Eventos de **teclado** → `raise_zmk_position_state_changed()`
+* Eventos de **mouse** → `zmk_endpoints_send_mouse_report()` com `struct zmk_hid_mouse_report_body`
+
+---
+
+Quer que eu já te monte um **`uart_switch_mouse.c` completo** no mesmo estilo do seu `uart_switch_left.c`, com funções para **mover o cursor** e **clicar botões**?
+
+---
+
+
+aqui esta o código que recebe os dados via UART,
+
+eu vou receber uma flag para identificar se é um clique ou um movimento de mouse.
+se for um clique eu usaria a função uart_switch_simulate_left como eu já fiz,
+mas se for um movimento de mouse eu quero ler os dados x e y e botões
+para usar uma nova função que se vau chamar uart_mouse_move
+
+como poderia ser a parte em que eu recebo a flag no meu arquivo uart_receiver_left.c?
+
+aqui meu código uart_receiver_left.c:
+
+
+#include <zephyr/kernel.h>
+#include <zephyr/device.h>
+#include <zephyr/drivers/uart.h>
+#include <zephyr/init.h>
+#include <zmk/uart_switch_left.h>
+
+// UART device
+static const struct device *uart = DEVICE_DT_GET(DT_NODELABEL(uart0));
+
+// Pacote UART: [0xAA][event_type][row][col][checksum]
+static uint8_t buf[5];
+static int buf_pos = 0;
+
+// Estrutura para armazenar evento UART
+struct uart_event_t {
+    uint8_t event_type;
+    uint8_t row;
+    uint8_t col;
+};
+
+// Aumentei a fila para suportar mais eventos sem perda
+#define UART_EVENT_QUEUE_SIZE 32
+K_MSGQ_DEFINE(uart_event_msgq, sizeof(struct uart_event_t), UART_EVENT_QUEUE_SIZE, 4);
+
+// Stack e thread para processar eventos UART
+K_THREAD_STACK_DEFINE(uart_stack, 1024);
+static struct k_thread uart_thread_data;
+
+void uart_event_thread(void *a, void *b, void *c)
+{
+    struct uart_event_t event;
+
+    while (1) {
+        // Espera por eventos na fila
+        k_msgq_get(&uart_event_msgq, &event, K_FOREVER);
+
+        bool pressed = event.event_type == 0x01;
+        uart_switch_simulate_left(event.row, event.col, pressed);
+    }
+}
+
+static void uart_cb(const struct device *dev, void *user_data)
+{
+    uint8_t c;
+
+    while (uart_fifo_read(dev, &c, 1) > 0) {
+        if (buf_pos == 0 && c != 0xAA) {
+            continue; // espera byte inicial
+        }
+
+        buf[buf_pos++] = c;
+
+        if (buf_pos == 5) {
+            uint8_t event_type = buf[1];
+            uint8_t row = buf[2];
+            uint8_t col = buf[3];
+            uint8_t checksum = buf[4];
+            uint8_t expected_checksum = event_type ^ row ^ col;
+
+            if (checksum != expected_checksum) {
+                buf_pos = 0;
+                continue; // descarta pacote inválido
+            }
+
+            struct uart_event_t event = {
+                .event_type = event_type,
+                .row = row,
+                .col = col
+            };
+
+            k_msgq_put(&uart_event_msgq, &event, K_NO_WAIT);
+            buf_pos = 0;
+        }
+    }
+}
+
+void uart_receiver_init(void)
+{
+    if (!device_is_ready(uart)) {
+        return;
+    }
+
+    uart_irq_callback_user_data_set(uart, uart_cb, NULL);
+    uart_irq_rx_enable(uart);
+
+    k_thread_create(&uart_thread_data, uart_stack, K_THREAD_STACK_SIZEOF(uart_stack),
+                    uart_event_thread, NULL, NULL, NULL,
+                    7, 0, K_NO_WAIT);
+}
+
+static int uart_receiver_sys_init(void)
+{
+    uart_receiver_init();
+    return 0;
+}
+
+SYS_INIT(uart_receiver_sys_init, APPLICATION, CONFIG_APPLICATION_INIT_PRIORITY);
+
+
+
+
+
+
+Boa, agora fechou o cenário 👌
+
+Hoje o seu `uart_receiver_left.c` só entende pacotes de **teclado** no formato:
+
+```
+[0xAA][event_type][row][col][checksum]
+```
+
+👉 Mas você quer que exista uma **flag** no `event_type` que diga se o evento é de **teclado** (row/col) ou de **mouse** (dx/dy/buttons).
+
+---
+
+### 1. Definir tipos de evento
+
+No `uart_receiver_left.c`, você pode reservar valores do `event_type`:
+
+```c
+#define EVT_KEYBOARD 0x01
+#define EVT_MOUSE    0x02
+```
+
+---
+
+### 2. Ajustar a estrutura de evento
+
+Hoje você só tem `row` e `col`.
+Para o mouse, você vai precisar de `dx`, `dy` e `buttons`.
+Pode fazer uma `union`:
+
+```c
+struct uart_event_t {
+    uint8_t event_type;
+    union {
+        struct {
+            uint8_t row;
+            uint8_t col;
+        } key;
+        struct {
+            int8_t dx;
+            int8_t dy;
+            uint8_t buttons;
+        } mouse;
+    };
+};
+```
+
+---
+
+### 3. Ajustar o tamanho do pacote
+
+Teclado: 5 bytes (já está).
+Mouse: precisa de mais. Exemplo:
+
+```
+[0xAA][event_type][dx][dy][buttons][checksum]
+```
+
+→ 6 bytes.
+
+Então no `uart_cb()` você precisa decidir **quantos bytes ler** dependendo do `event_type`.
+
+---
+
+### 4. Adaptar `uart_cb()`
+
+Um exemplo adaptado:
+
+```c
+static uint8_t buf[6];
+static int buf_pos = 0;
+static int expected_len = 0;
+
+static void uart_cb(const struct device *dev, void *user_data)
+{
+    uint8_t c;
+
+    while (uart_fifo_read(dev, &c, 1) > 0) {
+        if (buf_pos == 0 && c != 0xAA) {
+            continue; // espera byte inicial
+        }
+
+        buf[buf_pos++] = c;
+
+        // Se estamos no 2º byte, já dá pra saber o tipo
+        if (buf_pos == 2) {
+            if (buf[1] == EVT_KEYBOARD) {
+                expected_len = 5;
+            } else if (buf[1] == EVT_MOUSE) {
+                expected_len = 6;
+            } else {
+                buf_pos = 0; // tipo inválido
+                continue;
+            }
+        }
+
+        // Só processa quando o pacote inteiro chegou
+        if (expected_len > 0 && buf_pos == expected_len) {
+            uint8_t checksum = 0;
+            for (int i = 1; i < expected_len - 1; i++) {
+                checksum ^= buf[i];
+            }
+
+            if (checksum != buf[expected_len - 1]) {
+                buf_pos = 0;
+                expected_len = 0;
+                continue; // pacote inválido
+            }
+
+            struct uart_event_t event = { .event_type = buf[1] };
+
+            if (event.event_type == EVT_KEYBOARD) {
+                event.key.row = buf[2];
+                event.key.col = buf[3];
+            } else if (event.event_type == EVT_MOUSE) {
+                event.mouse.dx = (int8_t)buf[2];
+                event.mouse.dy = (int8_t)buf[3];
+                event.mouse.buttons = buf[4];
+            }
+
+            k_msgq_put(&uart_event_msgq, &event, K_NO_WAIT);
+
+            buf_pos = 0;
+            expected_len = 0;
+        }
+    }
+}
+```
+
+---
+
+### 5. Adaptar a thread
+
+Na `uart_event_thread()`, agora você decide o que fazer:
+
+```c
+void uart_event_thread(void *a, void *b, void *c)
+{
+    struct uart_event_t event;
+
+    while (1) {
+        k_msgq_get(&uart_event_msgq, &event, K_FOREVER);
+
+        switch (event.event_type) {
+        case EVT_KEYBOARD: {
+            bool pressed = (event.key.row & 0x80) == 0; // ou outra flag de "pressed"
+            uart_switch_simulate_left(event.key.row, event.key.col, pressed);
+            break;
+        }
+        case EVT_MOUSE:
+            uart_mouse_move(event.mouse.dx, event.mouse.dy, event.mouse.buttons);
+            break;
+        }
+    }
+}
+```
+
+---
+
+✅ Agora você tem suporte tanto para **teclado** quanto **mouse** via UART.
+
+Quer que eu já te monte o `uart_mouse_move.c` com funções para **mover** e **clicar** (igual ao `uart_switch_left.c`, mas para mouse)?
+
+
+como ficaria meu arquivo completo do uart_receiver_left.c com os todos os ajustes?
+
+
+
+Show, vou te devolver o arquivo `uart_receiver_left.c` já **completo e corrigido** para suportar os dois casos:
+
+* **Teclado** (usa `uart_switch_simulate_left`)
+* **Mouse** (usa `uart_mouse_move`)
+
+Aqui está:
+
+```c
+#include <zephyr/kernel.h>
+#include <zephyr/device.h>
+#include <zephyr/drivers/uart.h>
+#include <zephyr/init.h>
+#include <zmk/uart_switch_left.h>
+
+// UART device
+static const struct device *uart = DEVICE_DT_GET(DT_NODELABEL(uart0));
+
+// Tipos de evento
+#define EVT_KEYBOARD 0x01
+#define EVT_MOUSE    0x02
+
+// Estrutura de evento
+struct uart_event_t {
+    uint8_t event_type;
+    union {
+        struct {
+            uint8_t row;
+            uint8_t col;
+        } key;
+        struct {
+            int8_t dx;
+            int8_t dy;
+            uint8_t buttons;
+        } mouse;
+    };
+};
+
+// Buffer de recepção
+static uint8_t buf[6];
+static int buf_pos = 0;
+static int expected_len = 0;
+
+// Fila de eventos
+#define UART_EVENT_QUEUE_SIZE 32
+K_MSGQ_DEFINE(uart_event_msgq, sizeof(struct uart_event_t), UART_EVENT_QUEUE_SIZE, 4);
+
+// Thread para processar eventos UART
+K_THREAD_STACK_DEFINE(uart_stack, 1024);
+static struct k_thread uart_thread_data;
+
+// Processa eventos vindos da fila
+void uart_event_thread(void *a, void *b, void *c)
+{
+    struct uart_event_t event;
+
+    while (1) {
+        k_msgq_get(&uart_event_msgq, &event, K_FOREVER);
+
+        switch (event.event_type) {
+        case EVT_KEYBOARD: {
+            // Aqui você pode decidir se pressed é codificado no row/col ou vem separado
+            bool pressed = true; // ajuste conforme seu protocolo
+            uart_switch_simulate_left(event.key.row, event.key.col, pressed);
+            break;
+        }
+        case EVT_MOUSE:
+            uart_mouse_move(event.mouse.dx, event.mouse.dy, event.mouse.buttons);
+            break;
+        }
+    }
+}
+
+// Callback UART para montagem dos pacotes
+static void uart_cb(const struct device *dev, void *user_data)
+{
+    uint8_t c;
+
+    while (uart_fifo_read(dev, &c, 1) > 0) {
+        if (buf_pos == 0 && c != 0xAA) {
+            continue; // espera byte inicial
+        }
+
+        buf[buf_pos++] = c;
+
+        // Assim que lê o tipo de evento, define o tamanho esperado
+        if (buf_pos == 2) {
+            if (buf[1] == EVT_KEYBOARD) {
+                expected_len = 5; // [AA][type][row][col][checksum]
+            } else if (buf[1] == EVT_MOUSE) {
+                expected_len = 6; // [AA][type][dx][dy][buttons][checksum]
+            } else {
+                buf_pos = 0; // tipo inválido
+                continue;
+            }
+        }
+
+        // Se pacote completo chegou
+        if (expected_len > 0 && buf_pos == expected_len) {
+            uint8_t checksum = 0;
+            for (int i = 1; i < expected_len - 1; i++) {
+                checksum ^= buf[i];
+            }
+
+            if (checksum != buf[expected_len - 1]) {
+                buf_pos = 0;
+                expected_len = 0;
+                continue; // pacote inválido
+            }
+
+            struct uart_event_t event = { .event_type = buf[1] };
+
+            if (event.event_type == EVT_KEYBOARD) {
+                event.key.row = buf[2];
+                event.key.col = buf[3];
+            } else if (event.event_type == EVT_MOUSE) {
+                event.mouse.dx = (int8_t)buf[2];
+                event.mouse.dy = (int8_t)buf[3];
+                event.mouse.buttons = buf[4];
+            }
+
+            k_msgq_put(&uart_event_msgq, &event, K_NO_WAIT);
+
+            buf_pos = 0;
+            expected_len = 0;
+        }
+    }
+}
+
+void uart_receiver_init(void)
+{
+    if (!device_is_ready(uart)) {
+        return;
+    }
+
+    uart_irq_callback_user_data_set(uart, uart_cb, NULL);
+    uart_irq_rx_enable(uart);
+
+    k_thread_create(&uart_thread_data, uart_stack, K_THREAD_STACK_SIZEOF(uart_stack),
+                    uart_event_thread, NULL, NULL, NULL,
+                    7, 0, K_NO_WAIT);
+}
+
+static int uart_receiver_sys_init(void)
+{
+    uart_receiver_init();
+    return 0;
+}
+
+SYS_INIT(uart_receiver_sys_init, APPLICATION, CONFIG_APPLICATION_INIT_PRIORITY);
+```
+
+---
+
+👉 Resumindo as mudanças:
+
+1. Adicionei `EVT_KEYBOARD` e `EVT_MOUSE`.
+2. Estrutura `uart_event_t` agora tem `union` para separar dados de teclado e mouse.
+3. O `uart_cb()` monta pacotes diferentes:
+
+   * Teclado → 5 bytes
+   * Mouse → 6 bytes
+4. Na `uart_event_thread()` ele chama:
+
+   * `uart_switch_simulate_left()` para teclado
+   * `uart_mouse_move()` para mouse
+
+---
+
+Você quer que eu já escreva o **`uart_mouse_move.c`** que levanta eventos `zmk/endpoints/mouse_move` no ZMK, igual ao que o `uart_switch_left.c` faz para teclado?
+
+me passa alguns exemplos de como seria a entrada de dados 
+
+Boa, ótima pergunta 👌
+Com o formato que montamos no `uart_cb()`, cada pacote UART tem a estrutura:
+
+---
+
+### 📌 Estrutura geral
+
+* **Todos os pacotes** começam com `0xAA`
+* Em seguida vem o `event_type` (`0x01` = teclado, `0x02` = mouse)
+* Depois os **dados específicos do evento**
+* Por último, o **checksum** (XOR de todos os bytes entre `[event_type ... dados]`)
+
+---
+
+### 🖥️ Exemplo 1 – Evento de **teclado**
+
+Pacote:
+
+```
+[0xAA][0x01][row][col][checksum]
+```
+
+Se for `row = 1`, `col = 5`:
+
+```
+AA 01 01 05 05
+```
+
+Explicação:
+
+* `0xAA` → start byte
+* `0x01` → evento de teclado
+* `0x01` → linha 1
+* `0x05` → coluna 5
+* `0x05` → checksum (`0x01 ^ 0x05 = 0x04`, opa, vou refazer...)
+
+✔️ Correto:
+
+* XOR = `0x01 ^ 0x01 ^ 0x05 = 0x05`
+* Então pacote completo:
+
+```
+AA 01 01 05 05
+```
+
+---
+
+### 🖱️ Exemplo 2 – Evento de **mouse movimento**
+
+Pacote:
+
+```
+[0xAA][0x02][dx][dy][buttons][checksum]
+```
+
+Se for `dx = +10`, `dy = -5`, `buttons = 0x01` (clique esquerdo):
+
+```
+AA 02 0A FB 01 F0
+```
+
+Explicação:
+
+* `0xAA` → start
+* `0x02` → evento de mouse
+* `0x0A` → deslocamento em X (+10)
+* `0xFB` → deslocamento em Y (-5 em complemento de 2)
+* `0x01` → botão esquerdo
+* Checksum: `0x02 ^ 0x0A ^ 0xFB ^ 0x01 = 0xF0`
+
+---
+
+### 🖱️ Exemplo 3 – Evento de **mouse sem clique (só mover)**
+
+Mover `dx = -3`, `dy = +4`, `buttons = 0x00`:
+
+```
+AA 02 FD 04 00 FB
+```
+
+Explicação:
+
+* XOR = `0x02 ^ 0xFD ^ 0x04 ^ 0x00 = 0xFB`
+
+---
+
+### 🖱️ Exemplo 4 – Clique sem movimento
+
+Clique direito (`buttons = 0x02`, dx = 0, dy = 0):
+
+```
+AA 02 00 00 02 00
+```
+
+Explicação:
+
+* XOR = `0x02 ^ 0x00 ^ 0x00 ^ 0x02 = 0x00`
+
+---
+
+⚡ Então, resumindo:
+
+* **Keyboard:** sempre 5 bytes → `[AA][01][row][col][checksum]`
+* **Mouse:** sempre 6 bytes → `[AA][02][dx][dy][buttons][checksum]`
+
+---
+
+Quer que eu monte também um **snippet em Python** que gera esses pacotes automaticamente (pra você testar no PC/serial)?
+
+
+
+me ajuda a criar um arquivo chamado uart_move_mouse.c
+ele via ter a função uart_mouse_move que sería responavel por recever (event.mouse.dx, event.mouse.dy, event.mouse.buttons);
+e vai excec
+
+
+1. **Incluir o cabeçalho certo**
+   O ZMK já tem suporte a mouse via `zmk/endpoints.h` e `zmk/hid.h`.
+
+   ```c
+   #include <zmk/hid.h>
+   #include <zmk/endpoints.h>
+   ```
+
+2. **Criar um report de mouse**
+   O report HID do mouse é do tipo `struct zmk_hid_mouse_report_body`. Ele tem campos como `x`, `y`, `scroll_x`, `scroll_y` e `buttons`.
+
+   Exemplo de envio de movimento:
+
+   ```c
+   struct zmk_hid_mouse_report_body report = {
+       .x = dx,         // deslocamento no eixo X (-127 a 127)
+       .y = dy,         // deslocamento no eixo Y (-127 a 127)
+       .scroll_x = 0,
+       .scroll_y = 0,
+       .buttons = 0     // clique nenhum
+   };
+
+   zmk_endpoints_send_mouse_report(&report);
+   ```
+
+3. **Criar uma função parecida com sua `uart_switch_simulate_left()` mas para mouse**
+   Algo assim:
+
+   ```c
+   int uart_switch_mouse_move(int8_t dx, int8_t dy) {
+       struct zmk_hid_mouse_report_body report = {
+           .x = dx,
+           .y = dy,
+           .scroll_x = 0,
+           .scroll_y = 0,
+           .buttons = 0
+       };
+
+       int ret = zmk_endpoints_send_mouse_report(&report);
+       LOG_DBG("uart_switch LEFT mouse move (dx=%d, dy=%d), result: %d", dx, dy, ret);
+
+       return ret;
+   }
+   ```
+
+4. **Para cliques de botão**
+   Basta setar `report.buttons`. Por exemplo:
+
+   ```c
+   report.buttons = MOUSE_BUTTON_LEFT;   // clique esquerdo
+   ```
+
+   e depois enviar o report.
+
+
+
+/**
+ * Envia um movimento ou clique de mouse via HID para o central.
+ *
+ * @param dx Deslocamento no eixo X (-127 a 127).
+ * @param dy Deslocamento no eixo Y (-127 a 127).
+ * @param buttons Máscara de botões (bitfield, ex: 1 = left, 2 = right, 4 = middle).
+ *
+ * @return 0 em sucesso, ou código de erro.
+ */
+
+
+
+Aí ficou claro 👍
+
+Agora o compilador reclamou de novo:
+
+```
+error: 'struct zmk_hid_mouse_report_body' has no member named 'd_wheel'
+```
+
+👉 Ou seja: na **versão do ZMK/Zephyr que você está usando**, a struct `zmk_hid_mouse_report_body` **não tem `d_wheel` nem `d_pan`**.
+
+---
+
+### 📌 O que acontece?
+
+O layout dessa struct mudou entre versões do ZMK.
+Em algumas builds recentes, ela é:
+
+```c
+struct zmk_hid_mouse_report_body {
+    int8_t buttons;
+    int8_t d_x;
+    int8_t d_y;
+} __packed;
+```
+
+Ou seja, **apenas `buttons`, `d_x`, `d_y`**.
+Nada de `wheel` ou `pan`.
+
+---
+
+### ✅ Ajuste no seu `uart_move_mouse.c`
+
+Faz assim:
+
+```c
+#include <zephyr/kernel.h>
+#include <zephyr/logging/log.h>
+#include <zmk/hid.h>
+#include <zmk/endpoints.h>
+#include <zmk/uart_move_mouse.h>
+
+LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
+
+int uart_mouse_move(int8_t dx, int8_t dy, uint8_t buttons) {
+    struct zmk_hid_mouse_report_body report = {
+        .buttons = buttons,
+        .d_x = dx,
+        .d_y = dy
+    };
+
+    int ret = zmk_endpoints_send_mouse_report(&report);
+    LOG_DBG("UART mouse move dx=%d dy=%d buttons=0x%02X ret=%d",
+            dx, dy, buttons, ret);
+
+    return ret;
+}
+```
+
+---
+
+### 📌 Resumindo
+
+* Use **apenas `buttons`, `d_x`, `d_y`**.
+* Tire `d_wheel` e `d_pan` porque na sua versão **eles não existem**.
+
+---
+
+👉 Se no futuro você quiser **scroll ou pan**, a gente teria que checar a versão exata do ZMK que você está rodando e implementar outra forma (provavelmente via *consumer HID report*).
+
+Quer que eu monte também um **exemplo de pacote UART (lado direito → esquerdo)** com `dx, dy, buttons` para você já testar no split?
+
+---
+
+como ficaria a função para enviar dados de teclado desde micropython se minha função era assim:
+de acordo com o novo ajuste: * **Keyboard:** sempre 5 bytes → `[AA][01][row][col][checksum]`
+
+
+from machine import Pin, UART
+import time
+from printlogs import log
+from config import VIBRAR_LIGADO, VIBRAR_DESLIGADO, VIBRAR_LONGO, VIBRAR_ALERTA
+
+# UART - ajuste TX e RX conforme o seu hardware
+uart = UART(1, baudrate=115200, tx=17, rx=16)
+
+def send_charPs(zmkcodes):
+    if zmkcodes is not None:
+        log('send_charPs', zmkcodes, 4)
+        row = zmkcodes[0]
+        col = zmkcodes[1]
+
+        # Proteção: valores devem estar entre 0 e 255
+        if not (0 <= row <= 255 and 0 <= col <= 255):
+            log(f"[WARNING] row/col fora do range: row={row}, col={col}", 0)
+            return
+
+        if zmkcodes[2] == 0:
+            event_type = 0x00
+        else:
+            event_type = 0x01
+
+        checksum = event_type ^ row ^ col
+        packet = bytes([0xAA, event_type, row, col, checksum])
+        log('packet', packet, 5)
+        uart.write(packet)
+
+
+
+aqui o código que recebe os dados:
+
+#include <zephyr/kernel.h>
+#include <zephyr/device.h>
+#include <zephyr/drivers/uart.h>
+#include <zephyr/init.h>
+#include <zmk/uart_switch_left.h>
+#include <zmk/uart_move_mouse.h>
+
+// UART device
+static const struct device *uart = DEVICE_DT_GET(DT_NODELABEL(uart0));
+
+// Tipos de evento
+#define EVT_KEYBOARD 0x01
+#define EVT_MOUSE    0x02
+
+// Estrutura de evento
+struct uart_event_t {
+    uint8_t event_type;
+    union {
+        struct {
+            uint8_t row;
+            uint8_t col;
+        } key;
+        struct {
+            int8_t dx;
+            int8_t dy;
+            uint8_t buttons;
+        } mouse;
+    };
+};
+
+// Buffer de recepção
+static uint8_t buf[6];
+static int buf_pos = 0;
+static int expected_len = 0;
+
+// Fila de eventos
+#define UART_EVENT_QUEUE_SIZE 32
+K_MSGQ_DEFINE(uart_event_msgq, sizeof(struct uart_event_t), UART_EVENT_QUEUE_SIZE, 4);
+
+// Thread para processar eventos UART
+K_THREAD_STACK_DEFINE(uart_stack, 1024);
+static struct k_thread uart_thread_data;
+
+// Processa eventos vindos da fila
+void uart_event_thread(void *a, void *b, void *c)
+{
+    struct uart_event_t event;
+
+    while (1) {
+        k_msgq_get(&uart_event_msgq, &event, K_FOREVER);
+
+        switch (event.event_type) {
+        case EVT_KEYBOARD: {
+            // Aqui você pode decidir se pressed é codificado no row/col ou vem separado
+            bool pressed = true; // ajuste conforme seu protocolo
+            uart_switch_simulate_left(event.key.row, event.key.col, pressed);
+            break;
+        }
+        case EVT_MOUSE:
+            uart_mouse_move(event.mouse.dx, event.mouse.dy, event.mouse.buttons);
+            break;
+        }
+    }
+}
+
+// Callback UART para montagem dos pacotes
+static void uart_cb(const struct device *dev, void *user_data)
+{
+    uint8_t c;
+
+    while (uart_fifo_read(dev, &c, 1) > 0) {
+        if (buf_pos == 0 && c != 0xAA) {
+            continue; // espera byte inicial
+        }
+
+        buf[buf_pos++] = c;
+
+        // Assim que lê o tipo de evento, define o tamanho esperado
+        if (buf_pos == 2) {
+            if (buf[1] == EVT_KEYBOARD) {
+                expected_len = 5; // [AA][type][row][col][checksum]
+            } else if (buf[1] == EVT_MOUSE) {
+                expected_len = 6; // [AA][type][dx][dy][buttons][checksum]
+            } else {
+                buf_pos = 0; // tipo inválido
+                continue;
+            }
+        }
+
+        // Se pacote completo chegou
+        if (expected_len > 0 && buf_pos == expected_len) {
+            uint8_t checksum = 0;
+            for (int i = 1; i < expected_len - 1; i++) {
+                checksum ^= buf[i];
+            }
+
+            if (checksum != buf[expected_len - 1]) {
+                buf_pos = 0;
+                expected_len = 0;
+                continue; // pacote inválido
+            }
+
+            struct uart_event_t event = { .event_type = buf[1] };
+
+            if (event.event_type == EVT_KEYBOARD) {
+                event.key.row = buf[2];
+                event.key.col = buf[3];
+            } else if (event.event_type == EVT_MOUSE) {
+                event.mouse.dx = (int8_t)buf[2];
+                event.mouse.dy = (int8_t)buf[3];
+                event.mouse.buttons = buf[4];
+            }
+
+            k_msgq_put(&uart_event_msgq, &event, K_NO_WAIT);
+
+            buf_pos = 0;
+            expected_len = 0;
+        }
+    }
+}
+
+void uart_receiver_init(void)
+{
+    if (!device_is_ready(uart)) {
+        return;
+    }
+
+    uart_irq_callback_user_data_set(uart, uart_cb, NULL);
+    uart_irq_rx_enable(uart);
+
+    k_thread_create(&uart_thread_data, uart_stack, K_THREAD_STACK_SIZEOF(uart_stack),
+                    uart_event_thread, NULL, NULL, NULL,
+                    7, 0, K_NO_WAIT);
+}
+
+static int uart_receiver_sys_init(void)
+{
+    uart_receiver_init();
+    return 0;
+}
+
+SYS_INIT(uart_receiver_sys_init, APPLICATION, CONFIG_APPLICATION_INIT_PRIORITY);
+
+
+---
+
+
+# no codigo que recebe os dados, ele esta preparado para receber o press e release do teclado?
+
+
+Boa 👌 — se você quer adicionar um campo extra para o **pressed**, o pacote de teclado vai passar a ter **6 bytes fixos**:
+
+```
+[AA][01][row][col][pressed][checksum]
+```
+
+* `AA` → header fixo
+* `01` → tipo de evento = teclado
+* `row` → índice da linha
+* `col` → índice da coluna
+* `pressed` → `0x01` (pressionado) ou `0x00` (solto)
+* `checksum` → XOR de todos os bytes depois do header, exceto o próprio checksum
+
+---
+
+### 1. Código **MicroPython** (sender)
+
+Aqui ajustei sua função `send_charPs` para sempre mandar o campo extra `pressed`:
+
+```python
+from machine import Pin, UART
+from printlogs import log
+from config import VIBRAR_LIGADO, VIBRAR_DESLIGADO, VIBRAR_LONGO, VIBRAR_ALERTA
+
+# UART - ajuste TX e RX conforme o seu hardware
+uart = UART(1, baudrate=115200, tx=17, rx=16)
+
+def send_charPs(zmkcodes):
+    if zmkcodes is not None:
+        log('send_charPs', zmkcodes, 4)
+        row = zmkcodes[0]
+        col = zmkcodes[1]
+        pressed = 1 if zmkcodes[2] else 0
+
+        # Proteção: valores devem estar entre 0 e 255
+        if not (0 <= row <= 255 and 0 <= col <= 255):
+            log(f"[WARNING] row/col fora do range: row={row}, col={col}", 0)
+            return
+
+        checksum = 0
+        for b in (0x01, row, col, pressed):
+            checksum ^= b
+
+        packet = bytes([0xAA, 0x01, row, col, pressed, checksum])
+        log('packet', packet, 6)
+        uart.write(packet)
+```
+
+---
+
+### 2. Código **C (receiver ZMK)**
+
+Aqui o `EVT_KEYBOARD` agora espera **6 bytes** em vez de 5.
+Adicionei o campo `pressed` na `struct`.
+
+```c
+#include <zephyr/kernel.h>
+#include <zephyr/device.h>
+#include <zephyr/drivers/uart.h>
+#include <zephyr/init.h>
+#include <zmk/uart_switch_left.h>
+#include <zmk/uart_move_mouse.h>
+
+// UART device
+static const struct device *uart = DEVICE_DT_GET(DT_NODELABEL(uart0));
+
+// Tipos de evento
+#define EVT_KEYBOARD 0x01
+#define EVT_MOUSE    0x02
+
+// Estrutura de evento
+struct uart_event_t {
+    uint8_t event_type;
+    union {
+        struct {
+            uint8_t row;
+            uint8_t col;
+            uint8_t pressed;
+        } key;
+        struct {
+            int8_t dx;
+            int8_t dy;
+            uint8_t buttons;
+        } mouse;
+    };
+};
+
+// Buffer de recepção
+static uint8_t buf[7];
+static int buf_pos = 0;
+static int expected_len = 0;
+
+// Fila de eventos
+#define UART_EVENT_QUEUE_SIZE 32
+K_MSGQ_DEFINE(uart_event_msgq, sizeof(struct uart_event_t), UART_EVENT_QUEUE_SIZE, 4);
+
+// Thread para processar eventos UART
+K_THREAD_STACK_DEFINE(uart_stack, 1024);
+static struct k_thread uart_thread_data;
+
+// Processa eventos vindos da fila
+void uart_event_thread(void *a, void *b, void *c)
+{
+    struct uart_event_t event;
+
+    while (1) {
+        k_msgq_get(&uart_event_msgq, &event, K_FOREVER);
+
+        switch (event.event_type) {
+        case EVT_KEYBOARD:
+            uart_switch_simulate_left(
+                event.key.row,
+                event.key.col,
+                event.key.pressed ? true : false
+            );
+            break;
+
+        case EVT_MOUSE:
+            uart_mouse_move(event.mouse.dx, event.mouse.dy, event.mouse.buttons);
+            break;
+        }
+    }
+}
+
+// Callback UART para montagem dos pacotes
+static void uart_cb(const struct device *dev, void *user_data)
+{
+    uint8_t c;
+
+    while (uart_fifo_read(dev, &c, 1) > 0) {
+        if (buf_pos == 0 && c != 0xAA) {
+            continue; // espera byte inicial
+        }
+
+        buf[buf_pos++] = c;
+
+        // Assim que lê o tipo de evento, define o tamanho esperado
+        if (buf_pos == 2) {
+            if (buf[1] == EVT_KEYBOARD) {
+                expected_len = 6; // [AA][type][row][col][pressed][checksum]
+            } else if (buf[1] == EVT_MOUSE) {
+                expected_len = 6; // [AA][type][dx][dy][buttons][checksum]
+            } else {
+                buf_pos = 0; // tipo inválido
+                continue;
+            }
+        }
+
+        // Se pacote completo chegou
+        if (expected_len > 0 && buf_pos == expected_len) {
+            uint8_t checksum = 0;
+            for (int i = 1; i < expected_len - 1; i++) {
+                checksum ^= buf[i];
+            }
+
+            if (checksum != buf[expected_len - 1]) {
+                buf_pos = 0;
+                expected_len = 0;
+                continue; // pacote inválido
+            }
+
+            struct uart_event_t event = { .event_type = buf[1] };
+
+            if (event.event_type == EVT_KEYBOARD) {
+                event.key.row = buf[2];
+                event.key.col = buf[3];
+                event.key.pressed = buf[4];
+            } else if (event.event_type == EVT_MOUSE) {
+                event.mouse.dx = (int8_t)buf[2];
+                event.mouse.dy = (int8_t)buf[3];
+                event.mouse.buttons = buf[4];
+            }
+
+            k_msgq_put(&uart_event_msgq, &event, K_NO_WAIT);
+
+            buf_pos = 0;
+            expected_len = 0;
+        }
+    }
+}
+
+void uart_receiver_init(void)
+{
+    if (!device_is_ready(uart)) {
+        return;
+    }
+
+    uart_irq_callback_user_data_set(uart, uart_cb, NULL);
+    uart_irq_rx_enable(uart);
+
+    k_thread_create(&uart_thread_data, uart_stack, K_THREAD_STACK_SIZEOF(uart_stack),
+                    uart_event_thread, NULL, NULL, NULL,
+                    7, 0, K_NO_WAIT);
+}
+
+static int uart_receiver_sys_init(void)
+{
+    uart_receiver_init();
+    return 0;
+}
+
+SYS_INIT(uart_receiver_sys_init, APPLICATION, CONFIG_APPLICATION_INIT_PRIORITY);
+```
+
+---
+
+✅ Agora:
+
+* O **sender** manda pacotes de **6 bytes** para teclado (inclui `pressed`).
+* O **receiver** reconhece e passa `true/false` para `uart_switch_simulate_left`.
+* O protocolo de mouse continua igual (6 bytes também, só que com outro layout).
+
+---
+
+Quer que eu faça também o ajuste no **mouse sender em MicroPython** para seguir o mesmo padrão de 6 bytes fixos?
+
+o uart_receiver_right.c também poderia receber os dados de mouse
+então eu poderia usar o mesmo codigo do uart_receiver_left.c?
+
+aqui está o codigo do uart_receiver_right.c:
+
+
+#include <zephyr/kernel.h>
+#include <zephyr/device.h>
+#include <zephyr/drivers/uart.h>
+#include <zephyr/init.h>
+#include <zmk/uart_switch_left.h>
+
+// UART device
+static const struct device *uart = DEVICE_DT_GET(DT_NODELABEL(uart0));
+
+// Pacote UART: [0xAA][event_type][row][col][checksum]
+static uint8_t buf[5];
+static int buf_pos = 0;
+
+// Estrutura para armazenar evento UART
+struct uart_event_t {
+    uint8_t event_type;
+    uint8_t row;
+    uint8_t col;
+};
+
+// Aumentei a fila para suportar mais eventos sem perda
+#define UART_EVENT_QUEUE_SIZE 32
+K_MSGQ_DEFINE(uart_event_msgq, sizeof(struct uart_event_t), UART_EVENT_QUEUE_SIZE, 4);
+
+// Stack e thread para processar eventos UART
+K_THREAD_STACK_DEFINE(uart_stack, 1024);
+static struct k_thread uart_thread_data;
+
+void uart_event_thread(void *a, void *b, void *c)
+{
+    struct uart_event_t event;
+
+    while (1) {
+        // Espera por eventos na fila
+        k_msgq_get(&uart_event_msgq, &event, K_FOREVER);
+
+        bool pressed = event.event_type == 0x01;
+        uart_switch_simulate_left(event.row, event.col, pressed);
+    }
+}
+
+static void uart_cb(const struct device *dev, void *user_data)
+{
+    uint8_t c;
+
+    while (uart_fifo_read(dev, &c, 1) > 0) {
+        if (buf_pos == 0 && c != 0xAA) {
+            continue; // espera byte inicial
+        }
+
+        buf[buf_pos++] = c;
+
+        if (buf_pos == 5) {
+            uint8_t event_type = buf[1];
+            uint8_t row = buf[2];
+            uint8_t col = buf[3];
+            uint8_t checksum = buf[4];
+            uint8_t expected_checksum = event_type ^ row ^ col;
+
+            if (checksum != expected_checksum) {
+                buf_pos = 0;
+                continue; // descarta pacote inválido
+            }
+
+            struct uart_event_t event = {
+                .event_type = event_type,
+                .row = row,
+                .col = col
+            };
+
+            k_msgq_put(&uart_event_msgq, &event, K_NO_WAIT);
+            buf_pos = 0;
+        }
+    }
+}
+
+void uart_receiver_init(void)
+{
+    if (!device_is_ready(uart)) {
+        return;
+    }
+
+    uart_irq_callback_user_data_set(uart, uart_cb, NULL);
+    uart_irq_rx_enable(uart);
+
+    k_thread_create(&uart_thread_data, uart_stack, K_THREAD_STACK_SIZEOF(uart_stack),
+                    uart_event_thread, NULL, NULL, NULL,
+                    7, 0, K_NO_WAIT);
+}
+
+static int uart_receiver_sys_init(void)
+{
+    uart_receiver_init();
+    return 0;
+}
+
+SYS_INIT(uart_receiver_sys_init, APPLICATION, CONFIG_APPLICATION_INIT_PRIORITY);
+
+
+---
+
+# parece que eu tenho um problema com o uart_receiver_right ao receber os dados de teclado,
+# mestrais que o uart_receiver_left esta funcionando bem,
+# a diferença é muito pouca mas me ajuda revisar meus arquivos para ver se falta alguma coisa:
+
+
+uart_receiver_left.c:
+
+#include <zephyr/kernel.h>
+#include <zephyr/device.h>
+#include <zephyr/drivers/uart.h>
+#include <zephyr/init.h>
+#include <zmk/uart_switch_left.h>
+#include <zmk/uart_move_mouse.h>
+
+// UART device
+static const struct device *uart = DEVICE_DT_GET(DT_NODELABEL(uart0));
+
+// Tipos de evento
+#define EVT_KEYBOARD 0x01
+#define EVT_MOUSE    0x02
+
+// Estrutura de evento
+struct uart_event_t {
+    uint8_t event_type;
+    union {
+        struct {
+            uint8_t row;
+            uint8_t col;
+            uint8_t pressed;
+        } key;
+        struct {
+            int8_t dx;
+            int8_t dy;
+            uint8_t buttons;
+        } mouse;
+    };
+};
+
+// Buffer de recepção
+static uint8_t buf[7];
+static int buf_pos = 0;
+static int expected_len = 0;
+
+// Fila de eventos
+#define UART_EVENT_QUEUE_SIZE 32
+K_MSGQ_DEFINE(uart_event_msgq, sizeof(struct uart_event_t), UART_EVENT_QUEUE_SIZE, 4);
+
+// Thread para processar eventos UART
+K_THREAD_STACK_DEFINE(uart_stack, 1024);
+static struct k_thread uart_thread_data;
+
+// Processa eventos vindos da fila
+void uart_event_thread(void *a, void *b, void *c)
+{
+    struct uart_event_t event;
+
+    while (1) {
+        k_msgq_get(&uart_event_msgq, &event, K_FOREVER);
+
+        switch (event.event_type) {
+        case EVT_KEYBOARD:
+            uart_switch_simulate_left(
+                event.key.row,
+                event.key.col,
+                event.key.pressed ? true : false
+            );
+            break;
+
+        case EVT_MOUSE:
+            uart_mouse_move(event.mouse.dx, event.mouse.dy, event.mouse.buttons);
+            break;
+        }
+    }
+}
+
+// Callback UART para montagem dos pacotes
+static void uart_cb(const struct device *dev, void *user_data)
+{
+    uint8_t c;
+
+    while (uart_fifo_read(dev, &c, 1) > 0) {
+        if (buf_pos == 0 && c != 0xAA) {
+            continue; // espera byte inicial
+        }
+
+        buf[buf_pos++] = c;
+
+        // Assim que lê o tipo de evento, define o tamanho esperado
+        if (buf_pos == 2) {
+            if (buf[1] == EVT_KEYBOARD) {
+                expected_len = 6; // [AA][type][row][col][pressed][checksum]
+            } else if (buf[1] == EVT_MOUSE) {
+                expected_len = 6; // [AA][type][dx][dy][buttons][checksum]
+            } else {
+                buf_pos = 0; // tipo inválido
+                continue;
+            }
+        }
+
+        // Se pacote completo chegou
+        if (expected_len > 0 && buf_pos == expected_len) {
+            uint8_t checksum = 0;
+            for (int i = 1; i < expected_len - 1; i++) {
+                checksum ^= buf[i];
+            }
+
+            if (checksum != buf[expected_len - 1]) {
+                buf_pos = 0;
+                expected_len = 0;
+                continue; // pacote inválido
+            }
+
+            struct uart_event_t event = { .event_type = buf[1] };
+
+            if (event.event_type == EVT_KEYBOARD) {
+                event.key.row = buf[2];
+                event.key.col = buf[3];
+                event.key.pressed = buf[4];
+            } else if (event.event_type == EVT_MOUSE) {
+                event.mouse.dx = (int8_t)buf[2];
+                event.mouse.dy = (int8_t)buf[3];
+                event.mouse.buttons = buf[4];
+            }
+
+            k_msgq_put(&uart_event_msgq, &event, K_NO_WAIT);
+
+            buf_pos = 0;
+            expected_len = 0;
+        }
+    }
+}
+
+void uart_receiver_init(void)
+{
+    if (!device_is_ready(uart)) {
+        return;
+    }
+
+    uart_irq_callback_user_data_set(uart, uart_cb, NULL);
+    uart_irq_rx_enable(uart);
+
+    k_thread_create(&uart_thread_data, uart_stack, K_THREAD_STACK_SIZEOF(uart_stack),
+                    uart_event_thread, NULL, NULL, NULL,
+                    7, 0, K_NO_WAIT);
+}
+
+static int uart_receiver_sys_init(void)
+{
+    uart_receiver_init();
+    return 0;
+}
+
+SYS_INIT(uart_receiver_sys_init, APPLICATION, CONFIG_APPLICATION_INIT_PRIORITY);
+
+
+
+uart_receiver_right.c:
+
+
+#include <zephyr/kernel.h>
+#include <zephyr/device.h>
+#include <zephyr/drivers/uart.h>
+#include <zephyr/init.h>
+#include <zmk/uart_switch_right.h>
+
+// UART device
+static const struct device *uart = DEVICE_DT_GET(DT_NODELABEL(uart0));
+
+// Pacote UART: [0xAA][event_type][row][col][checksum]
+static uint8_t buf[5];
+static int buf_pos = 0;
+
+// Estrutura para armazenar evento UART
+struct uart_event_t {
+    uint8_t event_type;
+    uint8_t row;
+    uint8_t col;
+};
+
+// Aumentei a fila para suportar mais eventos sem perda
+#define UART_EVENT_QUEUE_SIZE 32
+K_MSGQ_DEFINE(uart_event_msgq, sizeof(struct uart_event_t), UART_EVENT_QUEUE_SIZE, 4);
+
+// Stack e thread para processar eventos UART
+K_THREAD_STACK_DEFINE(uart_stack, 1024);
+static struct k_thread uart_thread_data;
+
+void uart_event_thread(void *a, void *b, void *c)
+{
+    struct uart_event_t event;
+
+    while (1) {
+        // Espera por eventos na fila
+        k_msgq_get(&uart_event_msgq, &event, K_FOREVER);
+
+        bool pressed = event.event_type == 0x01;
+       uart_switch_simulate_right(event.row, event.col, pressed);
+    }
+}
+
+static void uart_cb(const struct device *dev, void *user_data)
+{
+    uint8_t c;
+
+    while (uart_fifo_read(dev, &c, 1) > 0) {
+        if (buf_pos == 0 && c != 0xAA) {
+            continue; // espera byte inicial
+        }
+
+        buf[buf_pos++] = c;
+
+        if (buf_pos == 5) {
+            uint8_t event_type = buf[1];
+            uint8_t row = buf[2];
+            uint8_t col = buf[3];
+            uint8_t checksum = buf[4];
+            uint8_t expected_checksum = event_type ^ row ^ col;
+
+            if (checksum != expected_checksum) {
+                buf_pos = 0;
+                continue; // descarta pacote inválido
+            }
+
+            struct uart_event_t event = {
+                .event_type = event_type,
+                .row = row,
+                .col = col
+            };
+
+            k_msgq_put(&uart_event_msgq, &event, K_NO_WAIT);
+            buf_pos = 0;
+        }
+    }
+}
+
+void uart_receiver_init(void)
+{
+    if (!device_is_ready(uart)) {
+        return;
+    }
+
+    uart_irq_callback_user_data_set(uart, uart_cb, NULL);
+    uart_irq_rx_enable(uart);
+
+    k_thread_create(&uart_thread_data, uart_stack, K_THREAD_STACK_SIZEOF(uart_stack),
+                    uart_event_thread, NULL, NULL, NULL,
+                    7, 0, K_NO_WAIT);
+}
+
+static int uart_receiver_sys_init(void)
+{
+    uart_receiver_init();
+    return 0;
+}
+
+SYS_INIT(uart_receiver_sys_init, APPLICATION, CONFIG_APPLICATION_INIT_PRIORITY);
+
+
+
+aqui o teste de desdos que o uart_receiver_left esta recebendo:
+
+evento [[0, 0], 0, 1, 1], ready=True
+tozmk (1, 6, 1)
+packet b'\xaa\x01\x01\x06\x01\x07'
+evento [[0, 0], 0, 0, 1], ready=True
+tozmk (1, 6, 0)
+packet b'\xaa\x01\x01\x06\x00\x06'
+
+
+aqui o teste de desdos que o uart_receiver_right esta recebendo:
+
+evento [[0, 0], 0, 1, 0], ready=True
+tozmk (1, 5, 1)
+packet b'\xaa\x01\x01\x05\x01\x04'
+evento [[0, 0], 0, 0, 0], ready=True
+tozmk (1, 5, 0)
+packet b'\xaa\x01\x01\x05\x00\x05'
+
+---
+
+Boa — obrigado pelos arquivos e pelos logs, isso já ajuda muito. Achei duas causas prováveis para o comportamento diferente entre *left* e *right*:
+
+**Resumo rápido dos problemas**
+
+1. **Formato de pacote diferente**: o `uart_receiver_left` espera pacotes de **6 bytes** (`[0xAA][type][row][col][pressed][checksum]`) — e seus logs mostram que o emissor está enviando exatamente esse formato.
+   O `uart_receiver_right` **espera 5 bytes** (`[AA][type][row][col][checksum]`) e não trata o byte `pressed`. Por isso o cálculo do checksum e a interpretação do pacote ficam errados (ou o código processa bytes deslocados).
+2. **Nomes duplicados / símbolos conflitantes**: os dois ficheiros definem nomes iguais (por exemplo `uart_event_msgq`, `uart_stack`, `uart_thread_data`, `uart_receiver_init`, `uart_receiver_sys_init`). Se ambos forem linkados no mesmo firmware isto causa conflitos/compilação errática — ou comportamentos inesperados. Mesmo que compilados separadamente, convém prefixar/tornear nomes para evitar problemas futuros.
+3. **Buffer/overflow**: `uart_receiver_right` tem `buf[5]` mas está recebendo 6 bytes — risco de overflow ou leituras deslocadas.
+
+---
+
+Abaixo eu já preparei uma versão corrigida do `uart_receiver_right.c` que:
+
+* assume o mesmo formato de pacote que o left (6 bytes),
+* calcula o checksum do mesmo modo (XOR dos bytes `type,row,col,pressed`),
+* usa nomes com sufixo `_right` para evitar colisões,
+* trata o envio à fila de forma idêntica ao left (usando struct similar),
+* adiciona logs para ajudar debugar.
+
+Cole e substitua pelo seu `uart_receiver_right.c` e compile/teste.
+
+```c
+/* uart_receiver_right.c - versão corrigida */
+#include <zephyr/kernel.h>
+#include <zephyr/device.h>
+#include <zephyr/drivers/uart.h>
+#include <zephyr/init.h>
+#include <zephyr/logging/log.h>
+#include <zmk/uart_switch_right.h>
+
+LOG_MODULE_REGISTER(uart_receiver_right, LOG_LEVEL_INF);
+
+/* UART device (ajuste se o nodelabel for diferente) */
+static const struct device *uart_right = DEVICE_DT_GET(DT_NODELABEL(uart0));
+
+/* Tipos (mesmo que no left) */
+#define EVT_KEYBOARD 0x01
+#define EVT_MOUSE    0x02
+
+/* Pacote esperado: [0xAA][event_type][row][col][pressed][checksum] => 6 bytes */
+static uint8_t buf_right[7];
+static int buf_pos_right = 0;
+static int expected_len_right = 0;
+
+/* Estrutura de evento (parecida com left, mas apenas teclado aqui) */
+struct uart_event_right_t {
+    uint8_t event_type;
+    union {
+        struct {
+            uint8_t row;
+            uint8_t col;
+            uint8_t pressed;
+        } key;
+        struct {
+            int8_t dx;
+            int8_t dy;
+            uint8_t buttons;
+        } mouse;
+    };
+};
+
+#define UART_EVENT_QUEUE_SIZE_RIGHT 32
+K_MSGQ_DEFINE(uart_event_msgq_right, sizeof(struct uart_event_right_t),
+             UART_EVENT_QUEUE_SIZE_RIGHT, 4);
+
+/* Thread */
+K_THREAD_STACK_DEFINE(uart_stack_right, 1024);
+static struct k_thread uart_thread_data_right;
+
+/* Processa eventos vindos da fila */
+void uart_event_thread_right(void *a, void *b, void *c)
+{
+    struct uart_event_right_t event;
+
+    while (1) {
+        k_msgq_get(&uart_event_msgq_right, &event, K_FOREVER);
+
+        switch (event.event_type) {
+        case EVT_KEYBOARD:
+            uart_switch_simulate_right(
+                event.key.row,
+                event.key.col,
+                event.key.pressed ? true : false
+            );
+            break;
+
+        case EVT_MOUSE:
+            /* se precisar suportar mouse também, habilitar chamada apropriada */
+            break;
+
+        default:
+            LOG_WRN("evento desconhecido: %02x", event.event_type);
+            break;
+        }
+    }
+}
+
+/* Callback UART - monta pacotes */
+static void uart_cb_right(const struct device *dev, void *user_data)
+{
+    uint8_t c;
+
+    ARG_UNUSED(user_data);
+
+    while (uart_fifo_read(dev, &c, 1) > 0) {
+        if (buf_pos_right == 0 && c != 0xAA) {
+            continue; /* espera byte inicial */
+        }
+
+        if (buf_pos_right < (int)sizeof(buf_right)) {
+            buf_right[buf_pos_right++] = c;
+        } else {
+            /* proteção: se por algum motivo overflow, reset */
+            LOG_ERR("buffer overflow detectado, resetando");
+            buf_pos_right = 0;
+            expected_len_right = 0;
+            continue;
+        }
+
+        /* Assim que lê o tipo de evento, define o tamanho esperado */
+        if (buf_pos_right == 2) {
+            if (buf_right[1] == EVT_KEYBOARD) {
+                expected_len_right = 6; /* [AA][type][row][col][pressed][checksum] */
+            } else if (buf_right[1] == EVT_MOUSE) {
+                expected_len_right = 6; /* se usar mouse com 3 bytes de payload */
+            } else {
+                /* tipo inválido */
+                LOG_WRN("tipo inválido recebido: 0x%02x", buf_right[1]);
+                buf_pos_right = 0;
+                expected_len_right = 0;
+                continue;
+            }
+        }
+
+        /* Se pacote completo chegou */
+        if (expected_len_right > 0 && buf_pos_right == expected_len_right) {
+            uint8_t checksum = 0;
+            /* XOR dos bytes de índice 1 até expected_len-2 (inclui pressed) */
+            for (int i = 1; i < expected_len_right - 1; i++) {
+                checksum ^= buf_right[i];
+            }
+
+            if (checksum != buf_right[expected_len_right - 1]) {
+                LOG_WRN("checksum inválido: esperado 0x%02x recebido 0x%02x",
+                        checksum, buf_right[expected_len_right - 1]);
+                buf_pos_right = 0;
+                expected_len_right = 0;
+                continue; /* pacote inválido */
+            }
+
+            struct uart_event_right_t event = { .event_type = buf_right[1] };
+
+            if (event.event_type == EVT_KEYBOARD) {
+                event.key.row = buf_right[2];
+                event.key.col = buf_right[3];
+                event.key.pressed = buf_right[4];
+            } else if (event.event_type == EVT_MOUSE) {
+                event.mouse.dx = (int8_t)buf_right[2];
+                event.mouse.dy = (int8_t)buf_right[3];
+                event.mouse.buttons = buf_right[4];
+            }
+
+            int ret = k_msgq_put(&uart_event_msgq_right, &event, K_NO_WAIT);
+            if (ret != 0) {
+                LOG_ERR("fila cheia, evento descartado");
+            }
+
+            buf_pos_right = 0;
+            expected_len_right = 0;
+        }
+    }
+}
+
+void uart_receiver_right_init(void)
+{
+    if (!device_is_ready(uart_right)) {
+        LOG_ERR("UART device not ready");
+        return;
+    }
+
+    uart_irq_callback_user_data_set(uart_right, uart_cb_right, NULL);
+    uart_irq_rx_enable(uart_right);
+
+    k_thread_create(&uart_thread_data_right, uart_stack_right,
+                    K_THREAD_STACK_SIZEOF(uart_stack_right),
+                    uart_event_thread_right, NULL, NULL, NULL,
+                    7, 0, K_NO_WAIT);
+
+    LOG_INF("uart_receiver_right init done");
+}
+
+static int uart_receiver_right_sys_init(const struct device *dev)
+{
+    ARG_UNUSED(dev);
+    uart_receiver_right_init();
+    return 0;
+}
+
+/* inicialização no boot (evitar colisão de nomes) */
+SYS_INIT(uart_receiver_right_sys_init, APPLICATION, CONFIG_APPLICATION_INIT_PRIORITY);
+```
+
+---
+
+**Outros pontos / dicas de debug**
+
+* Certifique-se que **emissor** e **receptor** usam exatamente o mesmo *frame format*. Pelos logs, o emissor está enviando 6 bytes (incluindo o `pressed`) — então o receptor deve aceitar 6 bytes e incluir `pressed` no cálculo do checksum.
+* Use `LOG_INF` / `LOG_DBG` (como acima) para ver os bytes brutos lidos no callback, por exemplo imprimir `buf_right` quando detectar bytes inválidos — ajuda a ver deslocamentos.
+* Verifique o `DT_NODELABEL(uart0)` — se tiver dois UARTs físicos e você esperava `uart1` para o lado direito, confirme. Em muitos projetos split, cada metade tem seu próprio controller/UART; se ambos apontam para o mesmo node, pode haver conflito.
+* Evite nomes globais idênticos entre módulos (use `_right` / `_left`), ou torne entidades `static`/renomeadas para limitar escopo.
+* Se suspeitar de perda de bytes quando vários bytes chegam muito rápido, considere aumentar a fila (`UART_EVENT_QUEUE_SIZE_RIGHT`) ou processar com prioridade de thread diferente, ou trabalhar com buffers maiores e timeout de montagem de pacote (por exemplo, resetar `buf_pos` se intervalo entre bytes > X ms).
+* Se quiser, eu posso também:
+
+  * gerar um *sniffer* simples que imprime cada byte recebido (útil para ver exatamente o fluxo), ou
+  * adaptar o `right` para também suportar `EVT_MOUSE` (está preparado, só decodificar e chamar a função apropriada).
+
+---
+
+Se quiser eu já aplico outras melhorias (p.ex. timeout para resetar `buf_pos` se pacote incompleto por muito tempo, ou versão que compartilha o mesmo parser com left para evitar divergências). Quer que eu adapte o `uart_receiver_right.c` para incluir timeout e logs de bytes recebidos?
+

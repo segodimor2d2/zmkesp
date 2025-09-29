@@ -11,22 +11,21 @@ def send_charPs(zmkcodes):
         log('send_charPs', zmkcodes, 4)
         row = zmkcodes[0]
         col = zmkcodes[1]
+        pressed = 1 if zmkcodes[2] else 0
 
         # Proteção: valores devem estar entre 0 e 255
         if not (0 <= row <= 255 and 0 <= col <= 255):
             log(f"[WARNING] row/col fora do range: row={row}, col={col}", 0)
             return
 
-        if zmkcodes[2] == 0:
-            event_type = 0x00
-        else:
-            event_type = 0x01
+        checksum = 0
+        for b in (0x01, row, col, pressed):
+            checksum ^= b
 
-        checksum = event_type ^ row ^ col
-        packet = bytes([0xAA, event_type, row, col, checksum])
-        log('packet', packet, 5)
+        packet = bytes([0xAA, 0x01, row, col, pressed, checksum])
+        # log('packet', packet, 6)
+        print('packet', packet)
         uart.write(packet)
-
 
 def tsttap(row, col, delay=0.1):
     send_charPs([row, col, True])

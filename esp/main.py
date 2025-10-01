@@ -1,7 +1,7 @@
 import time
 import config
 from hw import init_i2c, init_mpu, init_mpr121, init_vibrator, init_led
-from actions import vibrar, send_charPs, tsttap, piscaled
+from actions import vibrar, send_charPs, reset_mouse_center, gyromouse, send_mouse, testmouse, tsttap, piscaled
 from printlogs import log
 from dicctozmk import potsgyrotozmk
 from calibration import calc_pots_hysteresis, calc_accl_hysteresis
@@ -91,7 +91,7 @@ def liberar_repl(vib, led, segundos=3):
         # url = "http://192.168.31.13:5050"
         print("indexid:", indexid)
         url = indexid[2]
-        post_data(url,f'config: {station.ifconfig()}')
+        # post_data(url,f'config: {station.ifconfig()}')
         piscaled(led, 100, 6)
 
     print("\n*****************************")
@@ -108,20 +108,28 @@ def toggle_ready(ready, vib):
     vibrar(vib, 3, 0, ready=True)
     return ready
 
+def toggle_mouse(mouse_ready, vib, gyro=None):
+    new_state = not mouse_ready
+    vibrar(vib, 3, 0, ready=True)
+    if new_state and gyro is not None:
+        reset_mouse_center(gyro[0], gyro[1])  # aqui define novo centro
+    return new_state
+
 
 # --- define triggers fora do start ---
-def process_triggers(ativos, gyro_state, triggers, ready, vib):
+
+def process_triggers(ativos, gyro_state, triggers, ready, mouse_ready, vib):
     for trig in triggers:
         current_state = all(b in ativos for b in trig["buttons"]) and trig["condition"](gyro_state)
         if current_state and not trig["last_state"]:
-            # executa a ação, atualizando ready se necessário
             if trig.get("returns_ready", False):
                 ready = trig["action"](ready, vib)
+            elif trig.get("returns_mouse", False):
+                mouse_ready = trig["action"](mouse_ready, vib)
             else:
                 trig["action"]()
         trig["last_state"] = current_state
-    return ready
-
+    return ready, mouse_ready
 
 def start(i2c=None, mpu=None, mpr=None, pots=None, vib=None, led=None, force_calib=False):
     # Inicializa hardware se não passado
@@ -170,22 +178,32 @@ def start(i2c=None, mpu=None, mpr=None, pots=None, vib=None, led=None, force_cal
 
     # Loop principal
     ready = False
+    mouse_ready = False 
     num = 0
 
     # --- triggers ---
     triggers = [
+
         {
-            "buttons": {7, 8},
+            "buttons": {4, 8},
             "condition": lambda gs: gs.stepY == 0,
             "action": toggle_ready,
             "last_state": False,
-            "returns_ready": True  # indica que a função retorna ready
+            "returns_ready": True
+        },
+        {
+            "buttons": {7, 8},
+            "condition": lambda gs: gs.stepY == 0,
+            "action": toggle_mouse,
+            "last_state": False,
+            "returns_mouse": True
         },
         {
             "buttons": {4, 6, 8},
             "condition": lambda gs: True,
             # "condition": lambda gs: gs.stepY == 3,
-            "action": lambda: liberar_repl(vib, led, segundos=20),
+            # "action": lambda: liberar_repl(vib, led, segundos=20),
+            "action": lambda: testmouse(),
             "last_state": False,
             "returns_ready": False
         },
@@ -203,6 +221,11 @@ def start(i2c=None, mpu=None, mpr=None, pots=None, vib=None, led=None, force_cal
         gyro, accl = average_and_slide(buffer, mpu)
         # x[P] Y[L] Z[V]
         # print(f'x{accl[0]},y{accl[1]},z{accl[2]}')
+
+        if mouse_ready:
+            dx, dy = gyromouse(gyro[0], gyro[1])
+            if dx != 0 or dy != 0:
+                send_mouse(dx, dy, 0, 0, 0)
 
         # Atualiza acelerômetro
         # accl_state = accl_principal(accl, acclthresholds, accl_state)
@@ -222,7 +245,8 @@ def start(i2c=None, mpu=None, mpr=None, pots=None, vib=None, led=None, force_cal
         # print(f'ativos: {ativos}')
 
         # --- processa triggers ---
-        ready = process_triggers(ativos, gyro_state, triggers, ready, vib)
+        ready, mouse_ready = process_triggers(ativos, gyro_state, triggers, ready, mouse_ready, vib)
+
 
         eventos = []  # lista de eventos a enviar
 
@@ -254,7 +278,7 @@ def start(i2c=None, mpu=None, mpr=None, pots=None, vib=None, led=None, force_cal
         # --- envia todos os eventos ---
         for ev in eventos:
             # ev [[M, Y], pot, status, R/L]
-            print(f'evento {ev}, ready={ready}')
+            print(f'evento {ev}, ready={ready}, ready_mouse={mouse_ready}')
 
             if ready:
                 tozmk = potsgyrotozmk(*ev)

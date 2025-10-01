@@ -181,8 +181,8 @@ espL
 s/192.168.31.148/192.168.31.148/g
 python esp/webrepl_cli.py -p 105474 192.168.31.148
 
-python esp/webrepl_cli.py -p 105474 esp/main.py 192.168.31.148:8266:/main.py
-python esp/webrepl_cli.py -p 105474 esp/config.py 192.168.31.148:8266:/config.py
+python esp/webrepl_cli.py -p 105473 esp/main.py 192.168.31.148:8266:/main.py
+python esp/webrepl_cli.py -p 105473 esp/config.py 192.168.31.148:8266:/config.py
 python esp/webrepl_cli.py -p 105474 esp/dicctozmk.py 192.168.31.148:8266:/dicctozmk.py
 
 python esp/webrepl_cli.py -p 105474 esp/gyro.py 192.168.31.148:8266:/gyro.py
@@ -9818,3 +9818,4538 @@ SYS_INIT(uart_receiver_right_sys_init, APPLICATION, CONFIG_APPLICATION_INIT_PRIO
 
 Se quiser eu já aplico outras melhorias (p.ex. timeout para resetar `buf_pos` se pacote incompleto por muito tempo, ou versão que compartilha o mesmo parser com left para evitar divergências). Quer que eu adapte o `uart_receiver_right.c` para incluir timeout e logs de bytes recebidos?
 
+
+
+---
+
+
+
+Boa! 🚀 O teu `uart_receiver_left.c` já está preparado para interpretar pacotes de **mouse** no formato:
+
+```
+[0xAA][EVT_MOUSE=0x02][dx][dy][buttons][checksum]
+```
+
+Ou seja:
+
+* `dx` → deslocamento em X (signed 8-bit → -128 a +127)
+* `dy` → deslocamento em Y (signed 8-bit → -128 a +127)
+* `buttons` → estado dos botões do mouse (bitmask: `0x01 = botão esquerdo`, `0x02 = direito`, `0x04 = do meio`, etc.)
+* `checksum` → XOR de todos os bytes entre `[event_type ... buttons]`
+
+A função Python equivalente à tua `send_charPs` para mouse pode ser assim:
+
+```python
+def send_mouse(dx, dy, buttons):
+
+    # Garante que dx e dy estão no range de int8 (-128 a 127)
+    if not (-128 <= dx <= 127 and -128 <= dy <= 127):
+        log(f"[WARNING] dx/dy fora do range: dx={dx}, dy={dy}", 0)
+        return
+
+    # Garante que buttons está entre 0 e 255
+    if not (0 <= buttons <= 255):
+        log(f"[WARNING] buttons fora do range: buttons={buttons}", 0)
+        return
+
+    # Calcula checksum (XOR dos bytes: type, dx, dy, buttons)
+    checksum = 0
+    for b in (0x02, dx & 0xFF, dy & 0xFF, buttons):
+        checksum ^= b
+
+    # Monta pacote no formato esperado
+    packet = bytes([0xAA, 0x02, dx & 0xFF, dy & 0xFF, buttons, checksum])
+
+    # Debug e envio
+    log("send_mouse", (dx, dy, buttons), 4)
+    print("packet", packet)
+    uart.write(packet)
+```
+
+👉 Exemplo de uso:
+
+```python
+# mover o mouse 10px para a direita, 5px para cima, botão esquerdo pressionado
+send_mouse(10, -5, 0x01)
+
+# mover o mouse sem clique
+send_mouse(20, 0, 0x00)
+```
+
+Assim o **periférico** envia os pacotes e o teu código `uart_receiver_left.c` interpreta e chama `uart_mouse_move(dx, dy, buttons)` no central.
+
+Quer que eu também te ajude a escrever a versão **C** correspondente para o lado que **envia** (tipo `uart_sender_right.c` mas para mouse)?
+
+
+---
+
+
+
+Boa pergunta 👌
+
+No protocolo que você montou, o **campo `buttons`** é um *bitmask* para representar os botões do mouse.
+Se nenhum botão estiver clicado → **basta enviar `buttons = 0x00`**.
+
+### Exemplo em Python com tua função `send_mouse`:
+
+```python
+# mover o mouse 15px para a direita e 7px para baixo sem clicar em nada
+send_mouse(15, 7, 0x00)
+```
+
+### Pacote enviado:
+
+```
+[0xAA][0x02][0x0F][0x07][0x00][checksum]
+```
+
+* `0xAA` → byte inicial
+* `0x02` → tipo = EVT_MOUSE
+* `0x0F` → dx = 15
+* `0x07` → dy = 7
+* `0x00` → nenhum botão pressionado
+* `checksum` → XOR de `0x02 ^ 0x0F ^ 0x07 ^ 0x00`
+
+---
+
+⚡ Resumindo:
+
+* `buttons = 0x00` → nenhum botão clicado
+* `buttons = 0x01` → botão esquerdo
+* `buttons = 0x02` → botão direito
+* `buttons = 0x04` → botão do meio
+* (pode combinar: ex. `0x03 = esquerdo+direito`)
+
+Quer que eu faça uma tabelinha pronta com os pacotes (em hex) para os movimentos básicos (cima, baixo, esquerda, direita, sem clique)?
+
+---
+
+mpremote connect /dev/ttyUSB0
+
+mpremote exec "from actions import send_mouse; import time;
+send_mouse(15, 7, 0x00);
+"
+
+
+mpremote exec "
+from actions import send_mouse, testmouse
+import time
+send_mouse(15, 7, 0x00)
+send_mouse(15, 7, 0)
+testmouse()
+"
+
+mpremote exec "from actions import send_mouse; import time; send_mouse(15, 7, '0x00')"
+
+
+mpremote exec "from actions import send_mouse; import time; send_mouse(15, 7, \"0x00\")"
+
+
+mpremote exec "import actions; actions.send_mouse(15, 7, '0x00')"
+
+
+mpremote exec "import actions; actions.send_mouse(15, 7, 0)"
+
+
+---
+
+estou fazendo um teste para enviar o send_mouse(15, 7, 0)
+
+ele parece que consegue enviar mas parece que o codigo não está funcionando ao receber
+
+aqui o teste:
+>>> send_mouse(15, 7, 0)
+oioioioio
+packet b'\xaa\x02\x0f\x07\x00\n'
+>>> send_mouse(15, 7, 0)
+oioioioio
+packet b'\xaa\x02\x0f\x07\x00\n'
+>>> 
+
+aqui a função send_mouse:
+
+def send_mouse(dx, dy, buttons):
+
+    # Garante que dx e dy estão no range de int8 (-128 a 127)
+    if not (-128 <= dx <= 127 and -128 <= dy <= 127):
+        log(f"[WARNING] dx/dy fora do range: dx={dx}, dy={dy}", 0)
+        return
+
+    # Garante que buttons está entre 0 e 255
+    if not (0 <= buttons <= 255):
+        log(f"[WARNING] buttons fora do range: buttons={buttons}", 0)
+        return
+
+    print("oioioioio")
+    # Calcula checksum (XOR dos bytes: type, dx, dy, buttons)
+    checksum = 0
+    for b in (0x02, dx & 0xFF, dy & 0xFF, buttons):
+        checksum ^= b
+
+    # Monta pacote no formato esperado
+    packet = bytes([0xAA, 0x02, dx & 0xFF, dy & 0xFF, buttons, checksum])
+
+    # Debug e envio
+    log("send_mouse", (dx, dy, buttons), 4)
+    print("packet", packet)
+    uart.write(packet)
+
+aqui a função uart_receiver_left.c
+
+/* uart_receiver_left.c - versão corrigida */
+#include <zephyr/kernel.h>
+#include <zephyr/device.h>
+#include <zephyr/drivers/uart.h>
+#include <zephyr/init.h>
+#include <zephyr/logging/log.h>
+#include <zmk/uart_switch_left.h>
+#include <zmk/uart_move_mouse.h>
+
+LOG_MODULE_REGISTER(uart_receiver_left, LOG_LEVEL_INF);
+
+/* UART device (ajuste se o nodelabel for diferente) */
+static const struct device *uart_left = DEVICE_DT_GET(DT_NODELABEL(uart0));
+
+/* Tipos (mesmo que no right) */
+#define EVT_KEYBOARD 0x01
+#define EVT_MOUSE    0x02
+
+/* Pacote esperado: [0xAA][event_type][row][col][pressed][checksum] => 6 bytes */
+static uint8_t uart_left_buf[7];
+static int uart_left_buf_pos = 0;
+static int uart_left_expected_len = 0;
+
+/* Estrutura de evento (igual ao right, mas suporta mouse também) */
+struct uart_left_event_t {
+    uint8_t event_type;
+    union {
+        struct {
+            uint8_t row;
+            uint8_t col;
+            uint8_t pressed;
+        } key;
+        struct {
+            int8_t dx;
+            int8_t dy;
+            uint8_t buttons;
+        } mouse;
+    };
+};
+
+#define UART_LEFT_EVENT_QUEUE_SIZE 32
+K_MSGQ_DEFINE(uart_left_event_msgq, sizeof(struct uart_left_event_t), UART_LEFT_EVENT_QUEUE_SIZE, 4);
+
+/* Thread */
+K_THREAD_STACK_DEFINE(uart_left_stack, 1024);
+static struct k_thread uart_left_thread_data;
+
+/* Processa eventos vindos da fila */
+void uart_left_event_thread(void *a, void *b, void *c)
+{
+    struct uart_left_event_t event;
+
+    while (1) {
+        k_msgq_get(&uart_left_event_msgq, &event, K_FOREVER);
+
+        switch (event.event_type) {
+        case EVT_KEYBOARD:
+            uart_switch_simulate_left(
+                event.key.row,
+                event.key.col,
+                event.key.pressed ? true : false
+            );
+            break;
+
+        case EVT_MOUSE:
+            uart_mouse_move(event.mouse.dx, event.mouse.dy, event.mouse.buttons);
+            break;
+
+        default:
+            LOG_WRN("evento desconhecido: %02x", event.event_type);
+            break;
+        }
+    }
+}
+
+/* Callback UART - monta pacotes */
+static void uart_left_cb(const struct device *dev, void *user_data)
+{
+    uint8_t c;
+
+    ARG_UNUSED(user_data);
+
+    while (uart_fifo_read(dev, &c, 1) > 0) {
+        if (uart_left_buf_pos == 0 && c != 0xAA) {
+            continue; /* espera byte inicial */
+        }
+
+        if (uart_left_buf_pos < (int)sizeof(uart_left_buf)) {
+            uart_left_buf[uart_left_buf_pos++] = c;
+        } else {
+            /* proteção: overflow */
+            LOG_ERR("buffer overflow detectado, resetando");
+            uart_left_buf_pos = 0;
+            uart_left_expected_len = 0;
+            continue;
+        }
+
+        /* Assim que lê o tipo de evento, define o tamanho esperado */
+        if (uart_left_buf_pos == 2) {
+            if (uart_left_buf[1] == EVT_KEYBOARD) {
+                uart_left_expected_len = 6; /* [AA][type][row][col][pressed][checksum] */
+            } else if (uart_left_buf[1] == EVT_MOUSE) {
+                uart_left_expected_len = 6; /* [AA][type][dx][dy][buttons][checksum] */
+            } else {
+                /* tipo inválido */
+                LOG_WRN("tipo inválido recebido: 0x%02x", uart_left_buf[1]);
+                uart_left_buf_pos = 0;
+                uart_left_expected_len = 0;
+                continue;
+            }
+        }
+
+        /* Se pacote completo chegou */
+        if (uart_left_expected_len > 0 && uart_left_buf_pos == uart_left_expected_len) {
+            uint8_t checksum = 0;
+            for (int i = 1; i < uart_left_expected_len - 1; i++) {
+                checksum ^= uart_left_buf[i];
+            }
+
+            if (checksum != uart_left_buf[uart_left_expected_len - 1]) {
+                LOG_WRN("checksum inválido: esperado 0x%02x recebido 0x%02x",
+                        checksum, uart_left_buf[uart_left_expected_len - 1]);
+                uart_left_buf_pos = 0;
+                uart_left_expected_len = 0;
+                continue; /* pacote inválido */
+            }
+
+            struct uart_left_event_t event = { .event_type = uart_left_buf[1] };
+
+            if (event.event_type == EVT_KEYBOARD) {
+                event.key.row = uart_left_buf[2];
+                event.key.col = uart_left_buf[3];
+                event.key.pressed = uart_left_buf[4];
+            } else if (event.event_type == EVT_MOUSE) {
+                event.mouse.dx = (int8_t)uart_left_buf[2];
+                event.mouse.dy = (int8_t)uart_left_buf[3];
+                event.mouse.buttons = uart_left_buf[4];
+            }
+
+            int ret = k_msgq_put(&uart_left_event_msgq, &event, K_NO_WAIT);
+            if (ret != 0) {
+                LOG_ERR("fila cheia, evento descartado");
+            }
+
+            uart_left_buf_pos = 0;
+            uart_left_expected_len = 0;
+        }
+    }
+}
+
+void uart_left_receiver_init(void)
+{
+    if (!device_is_ready(uart_left)) {
+        LOG_ERR("UART device not ready");
+        return;
+    }
+
+    uart_irq_callback_user_data_set(uart_left, uart_left_cb, NULL);
+    uart_irq_rx_enable(uart_left);
+
+    k_thread_create(&uart_left_thread_data, uart_left_stack,
+                    K_THREAD_STACK_SIZEOF(uart_left_stack),
+                    uart_left_event_thread, NULL, NULL, NULL,
+                    7, 0, K_NO_WAIT);
+
+    LOG_INF("uart_receiver_left init done");
+}
+
+static int uart_left_receiver_sys_init(void)
+{
+    uart_left_receiver_init();
+    return 0;
+}
+
+/* inicialização no boot (evitar colisão de nomes) */
+SYS_INIT(uart_left_receiver_sys_init, APPLICATION, CONFIG_APPLICATION_INIT_PRIORITY);
+
+
+---
+
+minha função para mover o mouse usando zmk não esta funcionado:
+
+#include <zephyr/kernel.h>
+#include <zephyr/logging/log.h>
+#include <zmk/hid.h>
+#include <zmk/endpoints.h>
+#include <zmk/uart_move_mouse.h>
+
+/**
+ * Envia um movimento ou clique de mouse via HID para o central.
+ *
+ * @param dx Deslocamento no eixo X (-127 a 127).
+ * @param dy Deslocamento no eixo Y (-127 a 127).
+ * @param buttons Máscara de botões (bitfield, ex: 1 = left, 2 = right, 4 = middle).
+ *
+ * @return 0 em sucesso, ou código de erro.
+ */
+
+// #error "!!!!VERIFICANDO SE ESTÁ SENDO COMPILADO!!!!"
+
+
+LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
+
+int uart_mouse_move(int8_t dx, int8_t dy, uint8_t buttons) {
+    struct zmk_hid_mouse_report_body report = {
+        .buttons = buttons,
+        .d_x = dx,
+        .d_y = dy
+    };
+
+    int ret = zmk_endpoints_send_mouse_report(&report);
+    LOG_DBG("UART mouse move dx=%d dy=%d buttons=0x%02X ret=%d",
+            dx, dy, buttons, ret);
+
+    return ret;
+}
+
+
+---
+
+Boa, você já montou o `uart_mouse_move` direitinho 👍
+
+Vamos checar os pontos que normalmente fazem ele “não funcionar” no ZMK:
+
+---
+
+### 1. Estrutura usada (`zmk_hid_mouse_report_body`)
+
+No ZMK, a struct de **mouse report** geralmente está definida em `include/zmk/hid.h` como algo parecido com:
+
+```c
+struct zmk_hid_mouse_report_body {
+    uint8_t buttons;
+    int8_t d_x;
+    int8_t d_y;
+    int8_t d_wheel;
+    int8_t d_pan;
+};
+```
+
+👉 Se você inicializar só com `{ .buttons, .d_x, .d_y }`, os campos `d_wheel` e `d_pan` podem ficar com **lixo de memória**, e o report não é aceito corretamente pelo host.
+
+🔧 Solução: inicializar todos os campos explicitamente:
+
+```c
+struct zmk_hid_mouse_report_body report = {
+    .buttons = buttons,
+    .d_x = dx,
+    .d_y = dy,
+    .d_wheel = 0,
+    .d_pan = 0
+};
+```
+
+---
+
+### 2. Envio do report
+
+Você está chamando:
+
+```c
+zmk_endpoints_send_mouse_report(&report);
+```
+
+Isso está correto — mas confirme que:
+
+* O peripheral está pareado como **HID com suporte a mouse** (nem todo central aceita teclado+mouse no mesmo HID sem configuração).
+* `CONFIG_ZMK_MOUSE` e `CONFIG_ZMK_HID_REPORT_TYPE_MOUSE` estão habilitados no seu `.conf`.
+
+---
+
+### 3. Debug para saber se chega
+
+O teu `LOG_DBG` só aparece se você compilar com `CONFIG_LOG=y` e nível `debug`.
+Pra ter certeza que está rodando, muda pra `LOG_INF` no começo:
+
+```c
+LOG_INF("UART mouse move dx=%d dy=%d buttons=0x%02X ret=%d",
+        dx, dy, buttons, ret);
+```
+
+Assim você sabe se a função realmente é chamada.
+
+---
+
+### 4. Teste rápido de movimento
+
+Depois de corrigir a struct, você pode forçar no `main.c` ou numa thread de teste:
+
+```c
+#include <zmk/uart_move_mouse.h>
+#include <zephyr/kernel.h>
+
+void main(void) {
+    while (1) {
+        uart_mouse_move(10, 0, 0);  // direita
+        k_msleep(100);
+        uart_mouse_move(-10, 0, 0); // esquerda
+        k_msleep(100);
+    }
+}
+```
+
+Se mesmo assim não mexer, é sinal de que o report não está sendo aceito pelo host (aí pode ser configuração do `hid.c` no ZMK).
+
+---
+
+👉 Quer que eu monte uma versão revisada do seu `uart_mouse_move.c` já com `d_wheel` e `d_pan` zerados e logs mais detalhados (mostrando também os bytes brutos do report antes de enviar)?
+
+---
+
+
+# como eu posso validar se existe a função zmk_endpoints_send_mouse_report no zmk?
+# ou eu gostaria sabe que função o zmk esta usando para poder executar eventos do mouse
+
+
+Boa pergunta 👌.
+No ZMK, as funções de HID (mouse, teclado, consumer, etc.) ficam centralizadas nos **endpoints** (`zmk/endpoints.h` + `zmk/endpoints.c`). É lá que você descobre se existe uma função pública exposta como `zmk_endpoints_send_mouse_report` ou similar.
+
+### Passos para validar se a função existe
+
+1. **Procurar no código do ZMK**
+   No repositório do ZMK, rode um `grep` ou `rg` dentro do código-fonte:
+
+   ```bash
+   rg "zmk_endpoints_send_mouse_report" app/include app/src
+   ```
+
+   ou
+
+   ```bash
+   grep -R "zmk_endpoints_send_mouse_report" zmk/
+   ```
+
+   * Se existir, você vai achar o protótipo no header (`.h`) e a implementação no `.c`.
+   * Se não existir, significa que o ZMK está usando outra função para mandar relatórios de mouse.
+
+2. **Verificar headers disponíveis**
+   O arquivo principal é:
+
+   ```
+   app/include/zmk/endpoints.h
+   ```
+
+   Ele declara funções como:
+
+   ```c
+   int zmk_endpoints_send_report(const uint8_t *report, size_t len);
+   ```
+
+   Para teclado, consumer e mouse, normalmente há wrappers específicos.
+
+3. **Funções HID do mouse no ZMK**
+   O envio de eventos de mouse no ZMK passa pela **HID Report**.
+
+   * O struct usado costuma ser `struct mouse_report` ou similar, definido em `zmk/hid.h`.
+   * A função que geralmente envia é algo como:
+
+     ```c
+     int zmk_endpoints_send_mouse_report(struct zmk_hid_mouse_report *report);
+     ```
+
+   ou, se não tiver wrapper específico, o ZMK usa a função genérica:
+
+   ```c
+   int zmk_endpoints_send_report(uint8_t *report, size_t len);
+   ```
+
+   passando o report do mouse como payload.
+
+4. **Confirmando qual está em uso**
+   O caminho do envio geralmente é:
+
+   * Você cria/preenche o `zmk_hid_mouse_report` →
+   * chama `zmk_endpoints_send_mouse_report()` (se existir) ou `zmk_endpoints_send_report()` →
+   * isso dispara o evento via USB/Bluetooth para o host.
+
+---
+
+👉 Se quiser, eu posso olhar direto no código do ZMK e confirmar **qual função existe hoje** (`zmk_endpoints_send_mouse_report` ou só `zmk_endpoints_send_report`).
+
+Quer que eu faça essa busca no código oficial do ZMK agora e te traga a função exata que ele usa para mouse?
+
+
+
+eu encontrei estas suas linhas no app/include/zmk/endpoints.h:
+
+
+int zmk_endpoints_send_report(uint16_t usage_page);
+
+#if IS_ENABLED(CONFIG_ZMK_POINTING)
+int zmk_endpoints_send_mouse_report();
+#endif // IS_ENABLED(CONFIG_ZMK_POINTING)
+
+
+Perfeito! 🚀 Então já temos a resposta com base no que você achou dentro do `app/include/zmk/endpoints.h`.
+
+### O que isso significa:
+
+* `int zmk_endpoints_send_report(uint16_t usage_page);`
+  → É a função **genérica** que o ZMK usa para enviar relatórios HID, dependendo da *usage page* (ex.: teclado, consumer, etc.).
+
+* `int zmk_endpoints_send_mouse_report();`
+  → Essa é a função **específica para mouse**, mas só fica disponível se a flag de configuração `CONFIG_ZMK_POINTING` estiver ativada.
+
+### Como validar se ela existe no seu build
+
+1. **Ver no `build/zephyr/.config`** (depois de compilar):
+
+   ```bash
+   grep CONFIG_ZMK_POINTING build/zephyr/.config
+   ```
+
+   * Se aparecer como `CONFIG_ZMK_POINTING=y`, a função `zmk_endpoints_send_mouse_report()` vai estar compilada e disponível.
+   * Se estiver `# CONFIG_ZMK_POINTING is not set`, ela não está incluída no firmware.
+
+2. **Como o ZMK usa para eventos do mouse**
+   Quando você chama `zmk_endpoints_send_mouse_report()`, internamente ele empacota o `struct zmk_hid_mouse_report` (definido em `zmk/hid.h`) e envia esse HID report para os endpoints ativos (USB ou BLE).
+
+   Isso é equivalente a fazer:
+
+   ```c
+   zmk_endpoints_send_report(HID_USAGE_GD_MOUSE);
+   ```
+
+   Só que o wrapper `zmk_endpoints_send_mouse_report()` já cuida de usar a *usage page* correta.
+
+---
+
+👉 Ou seja:
+
+* Se você **tem `CONFIG_ZMK_POINTING=y`**, pode usar direto `zmk_endpoints_send_mouse_report()`.
+* Caso contrário, vai ter que usar a função genérica `zmk_endpoints_send_report(usage_page)` com a usage page do mouse.
+
+---
+
+Quer que eu te mostre **um exemplo mínimo em C** de como preencher o `zmk_hid_mouse_report` e chamar `zmk_endpoints_send_mouse_report()` para mover o cursor?
+
+
+# eu quero usar o mouse enviando comando via UART para o ZMK então como eu faço isso?
+
+
+Boa, entendi 👌
+Você quer mandar **comandos via UART para o firmware do ZMK**, e o central (no ZMK) deve interpretar isso e enviar **eventos de mouse** (movimento, clique etc.) via HID (USB ou BLE).
+
+O caminho fica assim:
+
+**UART → (seu código receiver no ZMK) → preencher struct `zmk_hid_mouse_report` → chamar `zmk_endpoints_send_mouse_report()` → PC/host recebe o movimento do mouse.**
+
+---
+
+### 1. Estrutura usada pelo ZMK
+
+No `app/include/zmk/hid.h` existe algo assim (pode variar um pouco dependendo da versão):
+
+```c
+struct zmk_hid_mouse_report {
+    int8_t x;      // deslocamento X
+    int8_t y;      // deslocamento Y
+    int8_t wheel;  // scroll vertical
+    int8_t pan;    // scroll horizontal
+    uint8_t buttons; // bitmap dos botões (bit0 = botão esquerdo, bit1 = direito, etc.)
+};
+```
+
+O ZMK mantém esse struct globalmente (ex.: `zmk_hid_mouse_report`).
+
+---
+
+### 2. Atualizando o report
+
+Você pode escrever uma função no seu código UART receiver (ex.: `uart_receiver_mouse.c`):
+
+```c
+#include <zephyr/kernel.h>
+#include <zephyr/logging/log.h>
+#include <zmk/endpoints.h>
+#include <zmk/hid.h>
+
+LOG_MODULE_REGISTER(uart_mouse_rx, LOG_LEVEL_INF);
+
+extern struct zmk_hid_mouse_report zmk_hid_mouse_report;
+
+static void process_uart_mouse_cmd(int8_t dx, int8_t dy, uint8_t buttons) {
+    zmk_hid_mouse_report.x = dx;
+    zmk_hid_mouse_report.y = dy;
+    zmk_hid_mouse_report.buttons = buttons;
+
+    int err = zmk_endpoints_send_mouse_report();
+    if (err) {
+        LOG_ERR("Falha ao enviar mouse report: %d", err);
+    }
+}
+```
+
+---
+
+### 3. Recebendo dados via UART
+
+Suponha que você envia via UART um pacote de **3 bytes**: `dx, dy, buttons`.
+Exemplo de receiver:
+
+```c
+#include <zephyr/device.h>
+#include <zephyr/drivers/uart.h>
+
+#define UART_DEVICE_NODE DT_NODELABEL(uart0)
+const struct device *uart_dev = DEVICE_DT_GET(UART_DEVICE_NODE);
+
+static uint8_t rx_buf[3];
+static size_t rx_pos = 0;
+
+static void uart_cb(const struct device *dev, void *user_data) {
+    while (uart_irq_update(dev) && uart_irq_is_pending(dev)) {
+        if (uart_irq_rx_ready(dev)) {
+            uint8_t c;
+            int recv_len = uart_fifo_read(dev, &c, 1);
+            if (recv_len) {
+                rx_buf[rx_pos++] = c;
+                if (rx_pos == 3) {
+                    int8_t dx = (int8_t)rx_buf[0];
+                    int8_t dy = (int8_t)rx_buf[1];
+                    uint8_t buttons = rx_buf[2];
+                    process_uart_mouse_cmd(dx, dy, buttons);
+                    rx_pos = 0; // reset buffer
+                }
+            }
+        }
+    }
+}
+```
+
+No `main` ou no `init` você inicializa a UART com callback:
+
+```c
+uart_irq_callback_set(uart_dev, uart_cb);
+uart_irq_rx_enable(uart_dev);
+```
+
+---
+
+### 4. Como enviar do lado do UART (exemplo)
+
+Se você tiver outro microcontrolador ou PC mandando comandos, basta mandar os **3 bytes**.
+Exemplo: mover 10 pra direita, 5 pra baixo, sem botão:
+
+```
+0x0A 0x05 0x00
+```
+
+Exemplo: clique com botão esquerdo sem mover:
+
+```
+0x00 0x00 0x01
+```
+
+---
+
+👉 Dessa forma, cada vez que chegar um pacote UART, o ZMK vai atualizar o `zmk_hid_mouse_report` e chamar `zmk_endpoints_send_mouse_report()`, que envia o movimento/clique para o host.
+
+---
+
+Quer que eu te faça uma versão **com scroll e clique direito** no protocolo UART (tipo 5 bytes: `dx, dy, wheel, pan, buttons`), igual ao HID completo?
+
+
+---
+
+# eu quero usar o mouse enviando comando via UART para o ZMK então eu precisaria ativar o zmk_endpoints_send_mouse_report?
+
+Exatamente 👍
+
+Se a sua ideia é:
+
+* ter um **periférico** mandando comandos via **UART** →
+* e no **central ZMK** transformar isso em **movimentos do mouse** (HID) →
+
+então sim, você **precisa ativar** o `CONFIG_ZMK_POINTING`,
+porque é ele que habilita a parte de **mouse HID reports** no ZMK.
+
+---
+
+### Como funciona no ZMK
+
+1. O `CONFIG_ZMK_POINTING=y` ativa:
+
+   * a estrutura `zmk_hid_mouse_report` em `zmk/hid.h`;
+   * a função `zmk_endpoints_send_mouse_report()`.
+
+2. No seu código UART receiver, você faria algo como:
+
+   ```c
+   #include <zmk/hid.h>
+   #include <zmk/endpoints.h>
+
+   static struct zmk_hid_mouse_report mouse_report = {0};
+
+   void move_mouse(int8_t dx, int8_t dy) {
+       mouse_report.x = dx;
+       mouse_report.y = dy;
+       zmk_endpoints_send_mouse_report();
+   }
+   ```
+
+   Esse `mouse_report` é enviado para o host como se fosse um mouse físico conectado.
+
+3. Ou seja:
+
+   * **sem `CONFIG_ZMK_POINTING`** → o firmware nem compila suporte de mouse;
+   * **com `CONFIG_ZMK_POINTING`** → você pode enviar relatórios de movimento e clique via HID.
+
+---
+
+### Checklist para você conseguir usar o mouse via UART
+
+* [ ] Ativar no `prj.conf` do seu central:
+
+  ```
+  CONFIG_ZMK_POINTING=y
+  ```
+* [ ] Criar no seu `uart_receiver.c` algo que leia os dados (`dx`, `dy`, botões, scroll).
+* [ ] Preencher `zmk_hid_mouse_report`.
+* [ ] Chamar `zmk_endpoints_send_mouse_report()` depois de atualizar o report.
+
+---
+
+👉 Quer que eu te monte um **exemplo completo de `uart_receiver.c`** que recebe `dx` e `dy` pela UART e move o mouse no host usando o ZMK?
+
+
+
+
+
+
+
+
+---
+
+# eu achei isso no zmk/app/include/zmk/hid.h: onde esta a função deles?
+
+
+#if IS_ENABLED(CONFIG_ZMK_POINTING)
+struct zmk_hid_mouse_report_body {
+    zmk_mouse_button_flags_t buttons;
+    int16_t d_x;
+    int16_t d_y;
+    int16_t d_scroll_y;
+    int16_t d_scroll_x;
+} __packed;
+
+struct zmk_hid_mouse_report {
+    uint8_t report_id;
+    struct zmk_hid_mouse_report_body body;
+} __packed;
+
+#if IS_ENABLED(CONFIG_ZMK_POINTING_SMOOTH_SCROLLING)
+
+struct zmk_hid_mouse_resolution_feature_report_body {
+    uint8_t wheel_res : 4;
+    uint8_t hwheel_res : 4;
+} __packed;
+
+struct zmk_hid_mouse_resolution_feature_report {
+    uint8_t report_id;
+    struct zmk_hid_mouse_resolution_feature_report_body body;
+} __packed;
+
+
+Boa! Você encontrou as **estruturas** dos relatórios de mouse (`zmk_hid_mouse_report`) dentro do `zmk/app/include/zmk/hid.h`.
+Essas structs definem **como o report HID do mouse é montado**, mas não mostram **onde ele é enviado**.
+
+No ZMK, a lógica é dividida assim:
+
+* `zmk/hid.h` → só define as estruturas de **relatórios HID** (teclado, mouse, consumer, etc.).
+* `zmk/endpoints.h` / `zmk/endpoints.c` → funções para enviar esses relatórios (ex: `zmk_endpoints_send_mouse_report()`).
+* `zmk/hid_mouse.c` (ou equivalente) → código que manipula o `zmk_hid_mouse_report` global e chama os endpoints.
+
+---
+
+### Onde está a função `zmk_endpoints_send_mouse_report`
+
+Ela está **declarada** em `zmk/app/include/zmk/endpoints.h` (como você já viu):
+
+```c
+#if IS_ENABLED(CONFIG_ZMK_POINTING)
+int zmk_endpoints_send_mouse_report();
+#endif
+```
+
+E a **implementação** fica em `zmk/app/src/endpoints.c`.
+Lá você vai achar algo como:
+
+```c
+#if IS_ENABLED(CONFIG_ZMK_POINTING)
+int zmk_endpoints_send_mouse_report() {
+    return zmk_endpoints_send_report(HID_USAGE_GD_MOUSE);
+}
+#endif
+```
+
+Ou seja, é apenas um **wrapper** que chama a função genérica `zmk_endpoints_send_report()`
+passando a *usage page* do mouse (`HID_USAGE_GD_MOUSE`).
+
+---
+
+### Como o ZMK mantém o report do mouse
+
+Existe uma instância global do relatório em `zmk/hid_mouse.c`:
+
+```c
+struct zmk_hid_mouse_report zmk_hid_mouse_report;
+```
+
+O fluxo é assim:
+
+1. Você altera os campos desse struct (`d_x`, `d_y`, `buttons`, etc.).
+2. Chama `zmk_endpoints_send_mouse_report();`.
+3. O ZMK empacota e envia o relatório para o host via USB/Bluetooth.
+
+---
+
+👉 Resumindo:
+
+* As **structs** que você achou são só a definição do formato HID.
+* A **função de envio real** (`zmk_endpoints_send_mouse_report`)
+está implementada em `app/src/endpoints.c`
+e usa `zmk_endpoints_send_report()` para mandar os dados do
+`zmk_hid_mouse_report` para o host.
+
+---
+
+Quer que eu te mostre **um exemplo prático** de como manipular o `zmk_hid_mouse_report` (mexendo em `d_x`, `d_y`) e depois chamar `zmk_endpoints_send_mouse_report()` para realmente mover o cursor?
+
+
+# esse é o código do zmk_endpoints_send_report() no endpoints.c, ele manda o zmk_hid_mouse_report? 
+
+int zmk_endpoints_send_report(uint16_t usage_page) {
+
+    LOG_DBG("usage page 0x%02X", usage_page);
+    switch (usage_page) {
+    case HID_USAGE_KEY:
+        return send_keyboard_report();
+
+    case HID_USAGE_CONSUMER:
+        return send_consumer_report();
+    }
+
+    LOG_ERR("Unsupported usage page %d", usage_page);
+    return -ENOTSUP;
+}
+
+
+
+Boa caçada 👀
+
+Pelo trecho que você achou, dá pra ver que **no estado atual** esse `zmk_endpoints_send_report()` **não está mandando relatórios de mouse** — só tem `KEY` (teclado) e `CONSUMER` (mídia).
+
+Ou seja:
+
+```c
+switch (usage_page) {
+    case HID_USAGE_KEY:       // teclado
+        return send_keyboard_report();
+
+    case HID_USAGE_CONSUMER:  // consumer (play, pause, volume, etc.)
+        return send_consumer_report();
+}
+```
+
+👉 Não tem `HID_USAGE_GD_MOUSE` aqui.
+Por isso, mesmo que exista o `zmk_endpoints_send_mouse_report()` declarado, se a sua versão do ZMK não implementou o **branch do mouse** nesse `switch`, ele vai cair no `LOG_ERR("Unsupported usage page")`.
+
+---
+
+### O que normalmente deveria existir
+
+Num suporte completo, você esperaria ver algo como:
+
+```c
+case HID_USAGE_GD_MOUSE:
+    return send_mouse_report();
+```
+
+com `send_mouse_report()` implementado em `hid_mouse.c`, mandando o `zmk_hid_mouse_report`.
+
+---
+
+### O que isso significa pra você
+
+* Se você quer usar **mouse via UART** no ZMK, precisa garantir que:
+
+  1. `CONFIG_ZMK_POINTING=y` está setado no `prj.conf`.
+  2. O código em `endpoints.c` tenha suporte ao `HID_USAGE_GD_MOUSE`.
+
+* Se a sua árvore do ZMK não tiver esse suporte, você vai ter que **adicionar** o case no `zmk_endpoints_send_report()` e criar (ou habilitar) a função `send_mouse_report()` que envia o `zmk_hid_mouse_report`.
+
+---
+
+👉 Me diz: você tá usando o **ZMK principal (oficial)** ou algum **fork**?
+Porque no **upstream oficial** já existe suporte experimental a pointing (mouse), mas em algumas versões antigas/forks esse case do mouse realmente não foi implementado.
+
+Quer que eu te mostre como ficaria a implementação de `send_mouse_report()` e a modificação do `endpoints.c` pra habilitar o envio do `zmk_hid_mouse_report`?
+
+
+
+eu encontrei isso sobre send_mouse_report no endpoints.c:
+
+#if IS_ENABLED(CONFIG_ZMK_POINTING)
+int zmk_endpoints_send_mouse_report() {
+    switch (current_instance.transport) {
+    case ZMK_TRANSPORT_USB: {
+#if IS_ENABLED(CONFIG_ZMK_USB)
+        int err = zmk_usb_hid_send_mouse_report();
+        if (err) {
+            LOG_ERR("FAILED TO SEND OVER USB: %d", err);
+        }
+        return err;
+#else
+        LOG_ERR("USB endpoint is not supported");
+        return -ENOTSUP;
+#endif /* IS_ENABLED(CONFIG_ZMK_USB) */
+    }
+
+    case ZMK_TRANSPORT_BLE: {
+#if IS_ENABLED(CONFIG_ZMK_BLE)
+        struct zmk_hid_mouse_report *mouse_report = zmk_hid_get_mouse_report();
+        int err = zmk_hog_send_mouse_report(&mouse_report->body);
+        if (err) {
+            LOG_ERR("FAILED TO SEND OVER HOG: %d", err);
+        }
+        return err;
+#else
+        LOG_ERR("BLE HOG endpoint is not supported");
+        return -ENOTSUP;
+#endif /* IS_ENABLED(CONFIG_ZMK_BLE) */
+    }
+    }
+
+    LOG_ERR("Unhandled endpoint transport %d", current_instance.transport);
+    return -ENOTSUP;
+}
+#endif // IS_ENABLED(CONFIG_ZMK_POINTING)
+
+isso me ajudaria a saber como montar uma função para usar o mouse via UART?
+
+
+
+🔥 Agora sim, você achou a **peça que faltava**: o `send_mouse_report()` real no `endpoints.c`.
+
+Esse trecho confirma que o ZMK já sabe mandar o **`zmk_hid_mouse_report`** tanto por **USB** (`zmk_usb_hid_send_mouse_report`) quanto por **BLE/HOGP** (`zmk_hog_send_mouse_report`).
+
+---
+
+### O que isso significa para o seu caso (UART → Mouse HID)
+
+* Você **não precisa reinventar** a parte de envio do HID: o `zmk_endpoints_send_mouse_report()` já cuida disso.
+* O que falta é só:
+
+  1. **receber os dados pela UART** (`dx`, `dy`, botões, scroll),
+  2. preencher a estrutura `zmk_hid_mouse_report`,
+  3. chamar `zmk_endpoints_send_mouse_report()`.
+
+---
+
+### Como montar sua função de integração (exemplo simplificado)
+
+```c
+#include <zephyr/kernel.h>
+#include <zephyr/logging/log.h>
+#include <zmk/hid.h>
+#include <zmk/endpoints.h>
+
+LOG_MODULE_REGISTER(uart_mouse, LOG_LEVEL_INF);
+
+void uart_move_mouse(int16_t dx, int16_t dy, int16_t scroll_y, int16_t scroll_x, zmk_mouse_button_flags_t buttons) {
+    struct zmk_hid_mouse_report *report = zmk_hid_get_mouse_report();
+
+    // Atualiza o report global
+    report->body.d_x = dx;
+    report->body.d_y = dy;
+    report->body.d_scroll_y = scroll_y;
+    report->body.d_scroll_x = scroll_x;
+    report->body.buttons = buttons;
+
+    // Envia para o host (USB/BLE)
+    int err = zmk_endpoints_send_mouse_report();
+    if (err) {
+        LOG_ERR("Falha ao enviar mouse report: %d", err);
+    } else {
+        LOG_DBG("Mouse report enviado: dx=%d dy=%d", dx, dy);
+    }
+}
+```
+
+---
+
+### Fluxo via UART
+
+* Seu **peripheral** manda um pacote pela UART (ex: `dx,dy,scroll,buttons`).
+* O **central (ZMK)** recebe esse pacote no `uart_receiver.c`.
+* No callback do UART, você chama a função `uart_move_mouse(...)` acima.
+* Isso atualiza o `zmk_hid_mouse_report` e o envia via USB ou BLE pro host.
+
+---
+
+👉 Ou seja: o `zmk_endpoints_send_mouse_report()` já resolve **como enviar**.
+Você só precisa cuidar de **como preencher os dados** recebidos via UART no `zmk_hid_mouse_report`.
+
+---
+
+Quer que eu monte um **exemplo completo de `uart_receiver_mouse.c`**, que escuta a UART, interpreta pacotes no formato `[dx,dy]` e move o mouse no host via ZMK?
+
+
+
+
+
+
+
+
+# eu precisaria passar todos os paramentro pro uart_move_mouse? eu gostaria por agora so enviar dx e dy
+
+
+Boa! 🙌 Não, você **não precisa passar todos os parâmetros** sempre.
+
+O `zmk_hid_mouse_report` tem os campos:
+
+```c
+struct zmk_hid_mouse_report_body {
+    zmk_mouse_button_flags_t buttons;
+    int16_t d_x;
+    int16_t d_y;
+    int16_t d_scroll_y;
+    int16_t d_scroll_x;
+};
+```
+
+Se você só quer mexer no **`dx`** e **`dy`**, pode deixar os outros (`buttons`, `d_scroll_y`, `d_scroll_x`) sempre em `0`.
+
+---
+
+### Versão simplificada só com `dx` e `dy`
+
+```c
+#include <zephyr/kernel.h>
+#include <zephyr/logging/log.h>
+#include <zmk/hid.h>
+#include <zmk/endpoints.h>
+
+LOG_MODULE_REGISTER(uart_mouse, LOG_LEVEL_INF);
+
+void uart_move_mouse(int16_t dx, int16_t dy) {
+    struct zmk_hid_mouse_report *report = zmk_hid_get_mouse_report();
+
+    // Atualiza apenas os deslocamentos
+    report->body.d_x = dx;
+    report->body.d_y = dy;
+
+    // Zera scroll e botões (por segurança)
+    report->body.d_scroll_y = 0;
+    report->body.d_scroll_x = 0;
+    report->body.buttons = 0;
+
+    // Envia para o host (USB ou BLE)
+    int err = zmk_endpoints_send_mouse_report();
+    if (err) {
+        LOG_ERR("Falha ao enviar movimento do mouse: %d", err);
+    } else {
+        LOG_DBG("Mouse move: dx=%d, dy=%d", dx, dy);
+    }
+}
+```
+
+---
+
+### Como usar
+
+* Do lado do **UART receiver**, você só precisa decodificar `dx` e `dy` do pacote recebido e chamar:
+
+```c
+uart_move_mouse(+10, 0);   // move 10px para a direita  
+uart_move_mouse(0, -5);    // move 5px para cima
+```
+
+---
+
+👉 Assim você já consegue testar movimentos básicos do mouse.
+Mais tarde, se quiser, dá para expandir a função e aceitar cliques ou scroll.
+
+---
+
+Quer que eu te mostre um exemplo de **`uart_receiver_mouse.c`** que lê da UART um pacote simples `[dx,dy]` em bytes e chama essa função?
+
+
+
+# me ajuda a corrigir o `uart_move_mouse.c` com:
+
+
+### Como montar sua função de integração (exemplo simplificado)
+
+```c
+#include <zephyr/kernel.h>
+#include <zephyr/logging/log.h>
+#include <zmk/hid.h>
+#include <zmk/endpoints.h>
+
+LOG_MODULE_REGISTER(uart_mouse, LOG_LEVEL_INF);
+
+void uart_move_mouse(int16_t dx, int16_t dy, int16_t scroll_y, int16_t scroll_x, zmk_mouse_button_flags_t buttons) {
+    struct zmk_hid_mouse_report *report = zmk_hid_get_mouse_report();
+
+    // Atualiza o report global
+    report->body.d_x = dx;
+    report->body.d_y = dy;
+    report->body.d_scroll_y = scroll_y;
+    report->body.d_scroll_x = scroll_x;
+    report->body.buttons = buttons;
+
+    // Envia para o host (USB/BLE)
+    int err = zmk_endpoints_send_mouse_report();
+    if (err) {
+        LOG_ERR("Falha ao enviar mouse report: %d", err);
+    } else {
+        LOG_DBG("Mouse report enviado: dx=%d dy=%d", dx, dy);
+    }
+}
+```
+
+atualmente meu código é assim:
+
+#include <zephyr/kernel.h>
+#include <zephyr/logging/log.h>
+#include <zmk/hid.h>
+#include <zmk/endpoints.h>
+#include <zmk/uart_move_mouse.h>
+
+// #error "!!!!VERIFICANDO SE ESTÁ SENDO COMPILADO!!!!"
+
+LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
+
+int uart_mouse_move(int8_t dx, int8_t dy, uint8_t buttons) {
+    struct zmk_hid_mouse_report_body report = {
+        .buttons = buttons,
+        .d_x = dx,
+        .d_y = dy
+    };
+
+    int ret = zmk_endpoints_send_mouse_report(&report);
+    LOG_DBG("UART mouse move dx=%d dy=%d buttons=0x%02X ret=%d",
+            dx, dy, buttons, ret);
+
+    return ret;
+}
+
+
+
+
+Boa, eu entendi o problema 👌
+
+O que está acontecendo é:
+
+* No **ZMK**, a função `zmk_endpoints_send_mouse_report()` **não recebe parâmetros** — ela pega os dados direto do `zmk_hid_get_mouse_report()`.
+* No seu código, você está tentando passar `&report` como argumento, mas essa função não aceita nada.
+
+---
+
+### Diferença
+
+No seu código:
+
+```c
+int ret = zmk_endpoints_send_mouse_report(&report);
+```
+
+Mas a assinatura correta (como você já achou no `endpoints.c`) é:
+
+```c
+int zmk_endpoints_send_mouse_report(void);
+```
+
+---
+
+### Como corrigir
+
+Você deve atualizar o **report global** (via `zmk_hid_get_mouse_report()`), em vez de criar um `struct zmk_hid_mouse_report_body` local.
+
+Aqui está a versão corrigida do seu `uart_move_mouse.c`:
+
+```c
+#include <zephyr/kernel.h>
+#include <zephyr/logging/log.h>
+#include <zmk/hid.h>
+#include <zmk/endpoints.h>
+#include <zmk/uart_move_mouse.h>
+
+LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
+
+int uart_move_mouse(int16_t dx, int16_t dy, int16_t scroll_y, int16_t scroll_x, zmk_mouse_button_flags_t buttons) {
+
+    // Pega o report global do ZMK
+    struct zmk_hid_mouse_report *report = zmk_hid_get_mouse_report();
+
+    // Atualiza apenas os campos necessários
+    report->body.d_x = dx;
+    report->body.d_y = dy;
+    report->body.buttons = buttons;
+    report->body.d_scroll_y = scroll_y;
+    report->body.d_scroll_x = scroll_x;
+
+    // Envia para o host (USB/BLE)
+    int ret = zmk_endpoints_send_mouse_report();
+    LOG_DBG("UART mouse move dx=%d dy=%d buttons=0x%02X ret=%d", dx, dy, buttons, ret);
+
+    return ret;
+}
+```
+
+---
+
+### O que mudou
+
+1. Em vez de criar um `struct zmk_hid_mouse_report_body report = {...}`, você usa o **report global**:
+
+   ```c
+   struct zmk_hid_mouse_report *report = zmk_hid_get_mouse_report();
+   ```
+
+2. `zmk_endpoints_send_mouse_report()` é chamado **sem argumentos**.
+
+---
+
+👉 Com isso, o seu `uart_mouse_move()` vai realmente atualizar o relatório HID do mouse do ZMK e enviá-lo corretamente via USB ou BLE.
+
+Quer que eu te ajude a montar também o `uart_receiver.c` que lê os bytes da UART e chama essa função?
+
+
+
+# agora que o uart_move_mouse recebe esses parâmetros:
+# int uart_move_mouse(int16_t dx, int16_t dy, int16_t scroll_y, int16_t scroll_x, zmk_mouse_button_flags_t buttons)
+# eu quero:
+1. recever os bytes da uart com esses parametros a mais
+2. chamar o uart_receiver_left como com os parametros corretos
+
+aqui meu uart_receiver_left.c:
+
+/* uart_receiver_left.c - versão corrigida */
+#include <zephyr/kernel.h>
+#include <zephyr/device.h>
+#include <zephyr/drivers/uart.h>
+#include <zephyr/init.h>
+#include <zephyr/logging/log.h>
+#include <zmk/uart_switch_left.h>
+#include <zmk/uart_move_mouse.h>
+
+LOG_MODULE_REGISTER(uart_receiver_left, LOG_LEVEL_INF);
+
+/* UART device (ajuste se o nodelabel for diferente) */
+static const struct device *uart_left = DEVICE_DT_GET(DT_NODELABEL(uart0));
+
+/* Tipos (mesmo que no right) */
+#define EVT_KEYBOARD 0x01
+#define EVT_MOUSE    0x02
+
+/* Pacote esperado: [0xAA][event_type][row][col][pressed][checksum] => 6 bytes */
+static uint8_t uart_left_buf[7];
+static int uart_left_buf_pos = 0;
+static int uart_left_expected_len = 0;
+
+/* Estrutura de evento (igual ao right, mas suporta mouse também) */
+struct uart_left_event_t {
+    uint8_t event_type;
+    union {
+        struct {
+            uint8_t row;
+            uint8_t col;
+            uint8_t pressed;
+        } key;
+        struct {
+            int8_t dx;
+            int8_t dy;
+            uint8_t buttons;
+        } mouse;
+    };
+};
+
+#define UART_LEFT_EVENT_QUEUE_SIZE 32
+K_MSGQ_DEFINE(uart_left_event_msgq, sizeof(struct uart_left_event_t), UART_LEFT_EVENT_QUEUE_SIZE, 4);
+
+/* Thread */
+K_THREAD_STACK_DEFINE(uart_left_stack, 1024);
+static struct k_thread uart_left_thread_data;
+
+/* Processa eventos vindos da fila */
+void uart_left_event_thread(void *a, void *b, void *c)
+{
+    struct uart_left_event_t event;
+
+    while (1) {
+        k_msgq_get(&uart_left_event_msgq, &event, K_FOREVER);
+
+        switch (event.event_type) {
+        case EVT_KEYBOARD:
+            uart_switch_simulate_left(
+                event.key.row,
+                event.key.col,
+                event.key.pressed ? true : false
+            );
+            break;
+
+        case EVT_MOUSE:
+            uart_mouse_move(event.mouse.dx, event.mouse.dy, event.mouse.buttons);
+            break;
+
+        default:
+            LOG_WRN("evento desconhecido: %02x", event.event_type);
+            break;
+        }
+    }
+}
+
+/* Callback UART - monta pacotes */
+static void uart_left_cb(const struct device *dev, void *user_data)
+{
+    uint8_t c;
+
+    ARG_UNUSED(user_data);
+
+    while (uart_fifo_read(dev, &c, 1) > 0) {
+        if (uart_left_buf_pos == 0 && c != 0xAA) {
+            continue; /* espera byte inicial */
+        }
+
+        if (uart_left_buf_pos < (int)sizeof(uart_left_buf)) {
+            uart_left_buf[uart_left_buf_pos++] = c;
+        } else {
+            /* proteção: overflow */
+            LOG_ERR("buffer overflow detectado, resetando");
+            uart_left_buf_pos = 0;
+            uart_left_expected_len = 0;
+            continue;
+        }
+
+        /* Assim que lê o tipo de evento, define o tamanho esperado */
+        if (uart_left_buf_pos == 2) {
+            if (uart_left_buf[1] == EVT_KEYBOARD) {
+                uart_left_expected_len = 6; /* [AA][type][row][col][pressed][checksum] */
+            } else if (uart_left_buf[1] == EVT_MOUSE) {
+                uart_left_expected_len = 6; /* [AA][type][dx][dy][buttons][checksum] */
+            } else {
+                /* tipo inválido */
+                LOG_WRN("tipo inválido recebido: 0x%02x", uart_left_buf[1]);
+                uart_left_buf_pos = 0;
+                uart_left_expected_len = 0;
+                continue;
+            }
+        }
+
+        /* Se pacote completo chegou */
+        if (uart_left_expected_len > 0 && uart_left_buf_pos == uart_left_expected_len) {
+            uint8_t checksum = 0;
+            for (int i = 1; i < uart_left_expected_len - 1; i++) {
+                checksum ^= uart_left_buf[i];
+            }
+
+            if (checksum != uart_left_buf[uart_left_expected_len - 1]) {
+                LOG_WRN("checksum inválido: esperado 0x%02x recebido 0x%02x",
+                        checksum, uart_left_buf[uart_left_expected_len - 1]);
+                uart_left_buf_pos = 0;
+                uart_left_expected_len = 0;
+                continue; /* pacote inválido */
+            }
+
+            struct uart_left_event_t event = { .event_type = uart_left_buf[1] };
+
+            if (event.event_type == EVT_KEYBOARD) {
+                event.key.row = uart_left_buf[2];
+                event.key.col = uart_left_buf[3];
+                event.key.pressed = uart_left_buf[4];
+            } else if (event.event_type == EVT_MOUSE) {
+                event.mouse.dx = (int8_t)uart_left_buf[2];
+                event.mouse.dy = (int8_t)uart_left_buf[3];
+                event.mouse.buttons = uart_left_buf[4];
+            }
+
+            int ret = k_msgq_put(&uart_left_event_msgq, &event, K_NO_WAIT);
+            if (ret != 0) {
+                LOG_ERR("fila cheia, evento descartado");
+            }
+
+            uart_left_buf_pos = 0;
+            uart_left_expected_len = 0;
+        }
+    }
+}
+
+void uart_left_receiver_init(void)
+{
+    if (!device_is_ready(uart_left)) {
+        LOG_ERR("UART device not ready");
+        return;
+    }
+
+    uart_irq_callback_user_data_set(uart_left, uart_left_cb, NULL);
+    uart_irq_rx_enable(uart_left);
+
+    k_thread_create(&uart_left_thread_data, uart_left_stack,
+                    K_THREAD_STACK_SIZEOF(uart_left_stack),
+                    uart_left_event_thread, NULL, NULL, NULL,
+                    7, 0, K_NO_WAIT);
+
+    LOG_INF("uart_receiver_left init done");
+}
+
+static int uart_left_receiver_sys_init(void)
+{
+    uart_left_receiver_init();
+    return 0;
+}
+
+/* inicialização no boot (evitar colisão de nomes) */
+SYS_INIT(uart_left_receiver_sys_init, APPLICATION, CONFIG_APPLICATION_INIT_PRIORITY);
+
+
+Perfeito! Pelo que você descreveu, você quer **expandir o pacote UART** para receber **`dx, dy, scroll_y, scroll_x, buttons`** e depois chamar `uart_move_mouse()` com esses parâmetros.
+
+Vou te mostrar como ajustar **duas partes principais**:
+
+1. **Atualizar a estrutura e o pacote UART**
+2. **Chamar `uart_move_mouse()` com os parâmetros corretos**
+
+---
+
+### 1️⃣ Atualizando a estrutura do evento
+
+No topo do seu `uart_receiver_left.c`, troque a parte do mouse para suportar todos os campos:
+
+```c
+struct uart_left_event_t {
+    uint8_t event_type;
+    union {
+        struct {
+            uint8_t row;
+            uint8_t col;
+            uint8_t pressed;
+        } key;
+        struct {
+            int16_t dx;
+            int16_t dy;
+            int16_t scroll_y;
+            int16_t scroll_x;
+            zmk_mouse_button_flags_t buttons;
+        } mouse;
+    };
+};
+```
+
+> Note: `int16_t` para `dx/dy/scroll` e `zmk_mouse_button_flags_t` para `buttons`.
+
+---
+
+### 2️⃣ Ajustando o pacote esperado na UART
+
+Se você quer enviar:
+
+```
+[0xAA][type][dxH][dxL][dyH][dyL][scrollYH][scrollYL][scrollXH][scrollXL][buttons][checksum]
+```
+
+Isso dá **12 bytes** por pacote (2 bytes por int16_t + 1 byte buttons + header + checksum).
+
+Atualize:
+
+```c
+if (uart_left_buf_pos == 2) {
+    if (uart_left_buf[1] == EVT_KEYBOARD) {
+        uart_left_expected_len = 6; // como antes
+    } else if (uart_left_buf[1] == EVT_MOUSE) {
+        uart_left_expected_len = 12; // novo tamanho do pacote
+    } else {
+        ...
+    }
+}
+```
+
+---
+
+### 3️⃣ Decodificando os bytes na callback
+
+```c
+if (event.event_type == EVT_MOUSE) {
+    // converter pares de bytes para int16_t
+    event.mouse.dx       = (int16_t)((uart_left_buf[2] << 8) | uart_left_buf[3]);
+    event.mouse.dy       = (int16_t)((uart_left_buf[4] << 8) | uart_left_buf[5]);
+    event.mouse.scroll_y = (int16_t)((uart_left_buf[6] << 8) | uart_left_buf[7]);
+    event.mouse.scroll_x = (int16_t)((uart_left_buf[8] << 8) | uart_left_buf[9]);
+    event.mouse.buttons  = uart_left_buf[10]; // 1 byte
+}
+```
+
+---
+
+### 4️⃣ Chamando a função correta no thread
+
+Na função `uart_left_event_thread()`:
+
+```c
+case EVT_MOUSE:
+    uart_move_mouse(
+        event.mouse.dx,
+        event.mouse.dy,
+        event.mouse.scroll_y,
+        event.mouse.scroll_x,
+        event.mouse.buttons
+    );
+    break;
+```
+
+---
+
+✅ Com isso você terá:
+
+* Pacote UART completo para `dx/dy/scroll/buttons`.
+* Callback que converte bytes para int16_t corretamente.
+* Chamada de `uart_move_mouse()` com todos os parâmetros.
+
+---
+
+Se você quiser, eu posso **reescrever todo o `uart_receiver_left.c` já com essas mudanças**, pronto para compilar e receber pacotes de mouse de 12 bytes.
+
+Quer que eu faça isso?
+
+
+Perfeito! 👍 Aqui está uma versão **completa e reescrita do `uart_receiver_left.c`**, pronta para receber pacotes de mouse com `dx, dy, scroll_y, scroll_x, buttons` e pacotes de teclado, chamando `uart_move_mouse()` corretamente.
+
+```c
+/* uart_receiver_left.c - versão atualizada para mouse completo */
+#include <zephyr/kernel.h>
+#include <zephyr/device.h>
+#include <zephyr/drivers/uart.h>
+#include <zephyr/init.h>
+#include <zephyr/logging/log.h>
+#include <zmk/uart_switch_left.h>
+#include <zmk/uart_move_mouse.h>
+
+LOG_MODULE_REGISTER(uart_receiver_left, LOG_LEVEL_INF);
+
+/* UART device (ajuste se o nodelabel for diferente) */
+static const struct device *uart_left = DEVICE_DT_GET(DT_NODELABEL(uart0));
+
+/* Tipos de evento */
+#define EVT_KEYBOARD 0x01
+#define EVT_MOUSE    0x02
+
+/* Buffer UART */
+static uint8_t uart_left_buf[16]; // maior para mouse completo
+static int uart_left_buf_pos = 0;
+static int uart_left_expected_len = 0;
+
+/* Estrutura de evento */
+struct uart_left_event_t {
+    uint8_t event_type;
+    union {
+        struct {
+            uint8_t row;
+            uint8_t col;
+            uint8_t pressed;
+        } key;
+        struct {
+            int16_t dx;
+            int16_t dy;
+            int16_t scroll_y;
+            int16_t scroll_x;
+            zmk_mouse_button_flags_t buttons;
+        } mouse;
+    };
+};
+
+/* Fila de eventos */
+#define UART_LEFT_EVENT_QUEUE_SIZE 32
+K_MSGQ_DEFINE(uart_left_event_msgq, sizeof(struct uart_left_event_t), UART_LEFT_EVENT_QUEUE_SIZE, 4);
+
+/* Thread stack */
+K_THREAD_STACK_DEFINE(uart_left_stack, 1024);
+static struct k_thread uart_left_thread_data;
+
+/* Thread de processamento de eventos */
+void uart_left_event_thread(void *a, void *b, void *c)
+{
+    struct uart_left_event_t event;
+
+    while (1) {
+        k_msgq_get(&uart_left_event_msgq, &event, K_FOREVER);
+
+        switch (event.event_type) {
+        case EVT_KEYBOARD:
+            uart_switch_simulate_left(
+                event.key.row,
+                event.key.col,
+                event.key.pressed ? true : false
+            );
+            break;
+
+        case EVT_MOUSE:
+            uart_move_mouse(
+                event.mouse.dx,
+                event.mouse.dy,
+                event.mouse.scroll_y,
+                event.mouse.scroll_x,
+                event.mouse.buttons
+            );
+            break;
+
+        default:
+            LOG_WRN("Evento desconhecido: %02x", event.event_type);
+            break;
+        }
+    }
+}
+
+/* Callback UART - monta pacotes */
+static void uart_left_cb(const struct device *dev, void *user_data)
+{
+    uint8_t c;
+    ARG_UNUSED(user_data);
+
+    while (uart_fifo_read(dev, &c, 1) > 0) {
+        if (uart_left_buf_pos == 0 && c != 0xAA) {
+            continue; // espera byte inicial
+        }
+
+        if (uart_left_buf_pos < (int)sizeof(uart_left_buf)) {
+            uart_left_buf[uart_left_buf_pos++] = c;
+        } else {
+            LOG_ERR("Buffer overflow detectado, resetando");
+            uart_left_buf_pos = 0;
+            uart_left_expected_len = 0;
+            continue;
+        }
+
+        /* Define tamanho esperado */
+        if (uart_left_buf_pos == 2) {
+            if (uart_left_buf[1] == EVT_KEYBOARD) {
+                uart_left_expected_len = 6; // [AA][type][row][col][pressed][checksum]
+            } else if (uart_left_buf[1] == EVT_MOUSE) {
+                uart_left_expected_len = 12; // [AA][type][dxH][dxL][dyH][dyL][scrollYH][scrollYL][scrollXH][scrollXL][buttons][checksum]
+            } else {
+                LOG_WRN("Tipo inválido recebido: 0x%02x", uart_left_buf[1]);
+                uart_left_buf_pos = 0;
+                uart_left_expected_len = 0;
+                continue;
+            }
+        }
+
+        /* Pacote completo */
+        if (uart_left_expected_len > 0 && uart_left_buf_pos == uart_left_expected_len) {
+            /* Valida checksum */
+            uint8_t checksum = 0;
+            for (int i = 1; i < uart_left_expected_len - 1; i++) {
+                checksum ^= uart_left_buf[i];
+            }
+
+            if (checksum != uart_left_buf[uart_left_expected_len - 1]) {
+                LOG_WRN("Checksum inválido: esperado 0x%02x recebido 0x%02x",
+                        checksum, uart_left_buf[uart_left_expected_len - 1]);
+                uart_left_buf_pos = 0;
+                uart_left_expected_len = 0;
+                continue;
+            }
+
+            /* Cria evento */
+            struct uart_left_event_t event = { .event_type = uart_left_buf[1] };
+
+            if (event.event_type == EVT_KEYBOARD) {
+                event.key.row = uart_left_buf[2];
+                event.key.col = uart_left_buf[3];
+                event.key.pressed = uart_left_buf[4];
+            } else if (event.event_type == EVT_MOUSE) {
+                event.mouse.dx       = (int16_t)((uart_left_buf[2] << 8) | uart_left_buf[3]);
+                event.mouse.dy       = (int16_t)((uart_left_buf[4] << 8) | uart_left_buf[5]);
+                event.mouse.scroll_y = (int16_t)((uart_left_buf[6] << 8) | uart_left_buf[7]);
+                event.mouse.scroll_x = (int16_t)((uart_left_buf[8] << 8) | uart_left_buf[9]);
+                event.mouse.buttons  = uart_left_buf[10];
+            }
+
+            int ret = k_msgq_put(&uart_left_event_msgq, &event, K_NO_WAIT);
+            if (ret != 0) {
+                LOG_ERR("Fila cheia, evento descartado");
+            }
+
+            uart_left_buf_pos = 0;
+            uart_left_expected_len = 0;
+        }
+    }
+}
+
+/* Inicializa receptor UART */
+void uart_left_receiver_init(void)
+{
+    if (!device_is_ready(uart_left)) {
+        LOG_ERR("UART device not ready");
+        return;
+    }
+
+    uart_irq_callback_user_data_set(uart_left, uart_left_cb, NULL);
+    uart_irq_rx_enable(uart_left);
+
+    k_thread_create(&uart_left_thread_data, uart_left_stack,
+                    K_THREAD_STACK_SIZEOF(uart_left_stack),
+                    uart_left_event_thread, NULL, NULL, NULL,
+                    7, 0, K_NO_WAIT);
+
+    LOG_INF("uart_receiver_left init done");
+}
+
+static int uart_left_receiver_sys_init(void)
+{
+    uart_left_receiver_init();
+    return 0;
+}
+
+/* Inicialização no boot */
+SYS_INIT(uart_left_receiver_sys_init, APPLICATION, CONFIG_APPLICATION_INIT_PRIORITY);
+```
+
+---
+
+✅ **O que mudou:**
+
+1. Estrutura `uart_left_event_t.mouse` agora suporta `dx/dy/scroll_x/scroll_y/buttons`.
+2. Pacote UART esperado ampliado para **12 bytes**.
+3. Conversão de bytes para `int16_t` usando `<<8 |` para cada campo de 2 bytes.
+4. Thread chama `uart_move_mouse()` com todos os parâmetros corretos.
+5. Mantida compatibilidade com eventos de teclado.
+
+---
+
+Se quiser, posso te fazer **um esquema visual de como enviar o pacote UART do periférico**, mostrando a ordem dos bytes para `dx, dy, scroll_x, scroll_y, buttons` e checksum.
+
+Quer que eu faça isso?
+
+
+Perfeito! Vamos organizar o **pacote UART completo para o mouse** com todos os parâmetros e checksum.
+
+---
+
+### Estrutura do pacote (12 bytes)
+
+| Byte | Conteúdo           | Observações                               |
+| ---- | ------------------ | ----------------------------------------- |
+| 0    | 0xAA               | Byte inicial (header)                     |
+| 1    | EVT_MOUSE (0x02)   | Tipo de evento                            |
+| 2    | dx high byte       | dx é int16_t → divide em dois bytes       |
+| 3    | dx low byte        |                                           |
+| 4    | dy high byte       | dy é int16_t → divide em dois bytes       |
+| 5    | dy low byte        |                                           |
+| 6    | scroll_y high byte | scroll_y é int16_t → divide em dois bytes |
+| 7    | scroll_y low byte  |                                           |
+| 8    | scroll_x high byte | scroll_x é int16_t → divide em dois bytes |
+| 9    | scroll_x low byte  |                                           |
+| 10   | buttons            | zmk_mouse_button_flags_t (1 byte)         |
+| 11   | checksum           | XOR de todos os bytes de 1 até 10         |
+
+---
+
+### Exemplo de construção do pacote em C (lado periférico)
+
+```c
+uint8_t pkt[12];
+int16_t dx = 50;
+int16_t dy = -20;
+int16_t scroll_y = 0;
+int16_t scroll_x = 0;
+uint8_t buttons = 0x01; // botão esquerdo pressionado
+
+pkt[0] = 0xAA;
+pkt[1] = 0x02; // EVT_MOUSE
+
+pkt[2] = (dx >> 8) & 0xFF;  // dx high
+pkt[3] = dx & 0xFF;         // dx low
+pkt[4] = (dy >> 8) & 0xFF;  // dy high
+pkt[5] = dy & 0xFF;         // dy low
+pkt[6] = (scroll_y >> 8) & 0xFF;
+pkt[7] = scroll_y & 0xFF;
+pkt[8] = (scroll_x >> 8) & 0xFF;
+pkt[9] = scroll_x & 0xFF;
+pkt[10] = buttons;
+
+// calcula checksum (XOR bytes 1..10)
+uint8_t cs = 0;
+for (int i = 1; i <= 10; i++) cs ^= pkt[i];
+pkt[11] = cs;
+
+// envia bytes pela UART
+uart_send(pkt, 12); // função de envio da sua plataforma
+```
+
+---
+
+### Observações importantes
+
+1. **Byte inicial 0xAA**: sincroniza a UART, o receptor espera por ele.
+2. **dx/dy/scroll**: sempre `int16_t`, divididos em **high byte** e **low byte**.
+3. **buttons**: apenas 1 byte, pode combinar flags de botões (ex: esquerda=0x01, direita=0x02, etc).
+4. **checksum**: XOR de todos os bytes do índice 1 até o 10, garante integridade do pacote.
+
+---
+
+💡 Com esse esquema, seu `uart_receiver_left.c` vai interpretar corretamente os 12 bytes, converter para int16_t e chamar `uart_move_mouse(dx, dy, scroll_y, scroll_x, buttons)`.
+
+---
+
+Se quiser, posso fazer **um diagrama visual mostrando cada byte do pacote** para facilitar a implementação no periférico.
+Quer que eu faça?
+
+
+me ajuda a reescrever todo o `uart_receiver_right.c` com as mudanças do `uart_receiver_left.c`:
+
+assim esta atualmente:
+
+
+/* uart_receiver_right.c - versão corrigida */
+#include <zephyr/kernel.h>
+#include <zephyr/device.h>
+#include <zephyr/drivers/uart.h>
+#include <zephyr/init.h>
+#include <zmk/uart_switch_right.h>
+#include <zephyr/logging/log.h>
+
+LOG_MODULE_REGISTER(uart_receiver_right, LOG_LEVEL_INF);
+
+/* UART device (ajuste se o nodelabel for diferente) */
+static const struct device *uart_right = DEVICE_DT_GET(DT_NODELABEL(uart0));
+
+/* Tipos (mesmo que no left) */
+#define EVT_KEYBOARD 0x01
+#define EVT_MOUSE    0x02
+
+/* Pacote esperado: [0xAA][event_type][row][col][pressed][checksum] => 6 bytes */
+static uint8_t buf_right[7];
+static int buf_pos_right = 0;
+static int expected_len_right = 0;
+
+/* Estrutura de evento (parecida com left, mas apenas teclado aqui) */
+struct uart_event_right_t {
+    uint8_t event_type;
+    union {
+        struct {
+            uint8_t row;
+            uint8_t col;
+            uint8_t pressed;
+        } key;
+        struct {
+            int8_t dx;
+            int8_t dy;
+            uint8_t buttons;
+        } mouse;
+    };
+};
+
+#define UART_EVENT_QUEUE_SIZE_RIGHT 32
+K_MSGQ_DEFINE(uart_event_msgq_right, sizeof(struct uart_event_right_t), UART_EVENT_QUEUE_SIZE_RIGHT, 4);
+
+/* Thread */
+K_THREAD_STACK_DEFINE(uart_stack_right, 1024);
+static struct k_thread uart_thread_data_right;
+
+/* Processa eventos vindos da fila */
+void uart_event_thread_right(void *a, void *b, void *c)
+{
+    struct uart_event_right_t event;
+
+    while (1) {
+        k_msgq_get(&uart_event_msgq_right, &event, K_FOREVER);
+
+        switch (event.event_type) {
+        case EVT_KEYBOARD:
+            uart_switch_simulate_right(
+                event.key.row,
+                event.key.col,
+                event.key.pressed ? true : false
+            );
+            break;
+
+        case EVT_MOUSE:
+            /* se precisar suportar mouse também, habilitar chamada apropriada */
+            break;
+
+        default:
+            LOG_WRN("evento desconhecido: %02x", event.event_type);
+            break;
+        }
+    }
+}
+
+/* Callback UART - monta pacotes */
+static void uart_cb_right(const struct device *dev, void *user_data)
+{
+    uint8_t c;
+
+    ARG_UNUSED(user_data);
+
+    while (uart_fifo_read(dev, &c, 1) > 0) {
+        if (buf_pos_right == 0 && c != 0xAA) {
+            continue; /* espera byte inicial */
+        }
+
+        if (buf_pos_right < (int)sizeof(buf_right)) {
+            buf_right[buf_pos_right++] = c;
+        } else {
+            /* proteção: se por algum motivo overflow, reset */
+            LOG_ERR("buffer overflow detectado, resetando");
+            buf_pos_right = 0;
+            expected_len_right = 0;
+            continue;
+        }
+
+        /* Assim que lê o tipo de evento, define o tamanho esperado */
+        if (buf_pos_right == 2) {
+            if (buf_right[1] == EVT_KEYBOARD) {
+                expected_len_right = 6; /* [AA][type][row][col][pressed][checksum] */
+            } else if (buf_right[1] == EVT_MOUSE) {
+                expected_len_right = 6; /* se usar mouse com 3 bytes de payload */
+            } else {
+                /* tipo inválido */
+                LOG_WRN("tipo inválido recebido: 0x%02x", buf_right[1]);
+                buf_pos_right = 0;
+                expected_len_right = 0;
+                continue;
+            }
+        }
+
+        /* Se pacote completo chegou */
+        if (expected_len_right > 0 && buf_pos_right == expected_len_right) {
+            uint8_t checksum = 0;
+            /* XOR dos bytes de índice 1 até expected_len-2 (inclui pressed) */
+            for (int i = 1; i < expected_len_right - 1; i++) {
+                checksum ^= buf_right[i];
+            }
+
+            if (checksum != buf_right[expected_len_right - 1]) {
+                LOG_WRN("checksum inválido: esperado 0x%02x recebido 0x%02x",
+                        checksum, buf_right[expected_len_right - 1]);
+                buf_pos_right = 0;
+                expected_len_right = 0;
+                continue; /* pacote inválido */
+            }
+
+            struct uart_event_right_t event = { .event_type = buf_right[1] };
+
+            if (event.event_type == EVT_KEYBOARD) {
+                event.key.row = buf_right[2];
+                event.key.col = buf_right[3];
+                event.key.pressed = buf_right[4];
+            } else if (event.event_type == EVT_MOUSE) {
+                event.mouse.dx = (int8_t)buf_right[2];
+                event.mouse.dy = (int8_t)buf_right[3];
+                event.mouse.buttons = buf_right[4];
+            }
+
+            int ret = k_msgq_put(&uart_event_msgq_right, &event, K_NO_WAIT);
+            if (ret != 0) {
+                LOG_ERR("fila cheia, evento descartado");
+            }
+
+            buf_pos_right = 0;
+            expected_len_right = 0;
+        }
+    }
+}
+
+void uart_receiver_right_init(void)
+{
+    if (!device_is_ready(uart_right)) {
+        LOG_ERR("UART device not ready");
+        return;
+    }
+
+    uart_irq_callback_user_data_set(uart_right, uart_cb_right, NULL);
+    uart_irq_rx_enable(uart_right);
+
+    k_thread_create(&uart_thread_data_right, uart_stack_right,
+                    K_THREAD_STACK_SIZEOF(uart_stack_right),
+                    uart_event_thread_right, NULL, NULL, NULL,
+                    7, 0, K_NO_WAIT);
+
+    LOG_INF("uart_receiver_right init done");
+}
+
+static int uart_receiver_right_sys_init(void)
+{
+    uart_receiver_right_init();
+    return 0;
+}
+
+/* inicialização no boot (evitar colisão de nomes) */
+SYS_INIT(uart_receiver_right_sys_init, APPLICATION, CONFIG_APPLICATION_INIT_PRIORITY);
+
+
+
+Perfeito! Podemos reescrever o `uart_receiver_right.c` **espelhando as mudanças que fizemos no `uart_receiver_left.c`**, ou seja: suporte completo para mouse com `dx, dy, scroll_y, scroll_x, buttons` e pacotes de teclado.
+
+Aqui está a versão reescrita completa:
+
+```c
+/* uart_receiver_right.c - versão atualizada para mouse completo */
+#include <zephyr/kernel.h>
+#include <zephyr/device.h>
+#include <zephyr/drivers/uart.h>
+#include <zephyr/init.h>
+#include <zephyr/logging/log.h>
+#include <zmk/uart_switch_right.h>
+#include <zmk/uart_move_mouse.h>
+
+LOG_MODULE_REGISTER(uart_receiver_right, LOG_LEVEL_INF);
+
+/* UART device (ajuste se o nodelabel for diferente) */
+static const struct device *uart_right = DEVICE_DT_GET(DT_NODELABEL(uart0));
+
+/* Tipos de evento */
+#define EVT_KEYBOARD 0x01
+#define EVT_MOUSE    0x02
+
+/* Buffer UART */
+static uint8_t buf_right[16]; // maior para mouse completo
+static int buf_pos_right = 0;
+static int expected_len_right = 0;
+
+/* Estrutura de evento */
+struct uart_event_right_t {
+    uint8_t event_type;
+    union {
+        struct {
+            uint8_t row;
+            uint8_t col;
+            uint8_t pressed;
+        } key;
+        struct {
+            int16_t dx;
+            int16_t dy;
+            int16_t scroll_y;
+            int16_t scroll_x;
+            zmk_mouse_button_flags_t buttons;
+        } mouse;
+    };
+};
+
+/* Fila de eventos */
+#define UART_EVENT_QUEUE_SIZE_RIGHT 32
+K_MSGQ_DEFINE(uart_event_msgq_right, sizeof(struct uart_event_right_t), UART_EVENT_QUEUE_SIZE_RIGHT, 4);
+
+/* Thread stack */
+K_THREAD_STACK_DEFINE(uart_stack_right, 1024);
+static struct k_thread uart_thread_data_right;
+
+/* Thread de processamento de eventos */
+void uart_event_thread_right(void *a, void *b, void *c)
+{
+    struct uart_event_right_t event;
+
+    while (1) {
+        k_msgq_get(&uart_event_msgq_right, &event, K_FOREVER);
+
+        switch (event.event_type) {
+        case EVT_KEYBOARD:
+            uart_switch_simulate_right(
+                event.key.row,
+                event.key.col,
+                event.key.pressed ? true : false
+            );
+            break;
+
+        case EVT_MOUSE:
+            uart_move_mouse(
+                event.mouse.dx,
+                event.mouse.dy,
+                event.mouse.scroll_y,
+                event.mouse.scroll_x,
+                event.mouse.buttons
+            );
+            break;
+
+        default:
+            LOG_WRN("Evento desconhecido: %02x", event.event_type);
+            break;
+        }
+    }
+}
+
+/* Callback UART - monta pacotes */
+static void uart_cb_right(const struct device *dev, void *user_data)
+{
+    uint8_t c;
+    ARG_UNUSED(user_data);
+
+    while (uart_fifo_read(dev, &c, 1) > 0) {
+        if (buf_pos_right == 0 && c != 0xAA) {
+            continue; // espera byte inicial
+        }
+
+        if (buf_pos_right < (int)sizeof(buf_right)) {
+            buf_right[buf_pos_right++] = c;
+        } else {
+            LOG_ERR("Buffer overflow detectado, resetando");
+            buf_pos_right = 0;
+            expected_len_right = 0;
+            continue;
+        }
+
+        /* Define tamanho esperado */
+        if (buf_pos_right == 2) {
+            if (buf_right[1] == EVT_KEYBOARD) {
+                expected_len_right = 6; // [AA][type][row][col][pressed][checksum]
+            } else if (buf_right[1] == EVT_MOUSE) {
+                expected_len_right = 12; // [AA][type][dxH][dxL][dyH][dyL][scrollYH][scrollYL][scrollXH][scrollXL][buttons][checksum]
+            } else {
+                LOG_WRN("Tipo inválido recebido: 0x%02x", buf_right[1]);
+                buf_pos_right = 0;
+                expected_len_right = 0;
+                continue;
+            }
+        }
+
+        /* Pacote completo */
+        if (expected_len_right > 0 && buf_pos_right == expected_len_right) {
+            uint8_t checksum = 0;
+            for (int i = 1; i < expected_len_right - 1; i++) {
+                checksum ^= buf_right[i];
+            }
+
+            if (checksum != buf_right[expected_len_right - 1]) {
+                LOG_WRN("Checksum inválido: esperado 0x%02x recebido 0x%02x",
+                        checksum, buf_right[expected_len_right - 1]);
+                buf_pos_right = 0;
+                expected_len_right = 0;
+                continue;
+            }
+
+            struct uart_event_right_t event = { .event_type = buf_right[1] };
+
+            if (event.event_type == EVT_KEYBOARD) {
+                event.key.row = buf_right[2];
+                event.key.col = buf_right[3];
+                event.key.pressed = buf_right[4];
+            } else if (event.event_type == EVT_MOUSE) {
+                event.mouse.dx       = (int16_t)((buf_right[2] << 8) | buf_right[3]);
+                event.mouse.dy       = (int16_t)((buf_right[4] << 8) | buf_right[5]);
+                event.mouse.scroll_y = (int16_t)((buf_right[6] << 8) | buf_right[7]);
+                event.mouse.scroll_x = (int16_t)((buf_right[8] << 8) | buf_right[9]);
+                event.mouse.buttons  = buf_right[10];
+            }
+
+            int ret = k_msgq_put(&uart_event_msgq_right, &event, K_NO_WAIT);
+            if (ret != 0) {
+                LOG_ERR("Fila cheia, evento descartado");
+            }
+
+            buf_pos_right = 0;
+            expected_len_right = 0;
+        }
+    }
+}
+
+/* Inicializa receptor UART */
+void uart_receiver_right_init(void)
+{
+    if (!device_is_ready(uart_right)) {
+        LOG_ERR("UART device not ready");
+        return;
+    }
+
+    uart_irq_callback_user_data_set(uart_right, uart_cb_right, NULL);
+    uart_irq_rx_enable(uart_right);
+
+    k_thread_create(&uart_thread_data_right, uart_stack_right,
+                    K_THREAD_STACK_SIZEOF(uart_stack_right),
+                    uart_event_thread_right, NULL, NULL, NULL,
+                    7, 0, K_NO_WAIT);
+
+    LOG_INF("uart_receiver_right init done");
+}
+
+static int uart_receiver_right_sys_init(void)
+{
+    uart_receiver_right_init();
+    return 0;
+}
+
+/* Inicialização no boot */
+SYS_INIT(uart_receiver_right_sys_init, APPLICATION, CONFIG_APPLICATION_INIT_PRIORITY);
+```
+
+---
+
+✅ **O que mudou em relação à versão antiga**:
+
+1. Suporte completo para mouse (`dx, dy, scroll_y, scroll_x, buttons`) igual ao `uart_receiver_left.c`.
+2. Pacote UART esperado ampliado para **12 bytes**.
+3. Conversão de bytes para `int16_t` usando `(high << 8 | low)`.
+4. Thread chama `uart_move_mouse()` com todos os parâmetros corretos.
+5. Mantida compatibilidade com eventos de teclado.
+
+---
+
+Se quiser, agora posso fazer **um diagrama visual mostrando todos os 12 bytes do pacote UART do mouse**, que serve para referência ao enviar do periférico. Quer que eu faça isso?
+
+
+
+estou com esse erro ao compilar:
+
+➜  zmk git:(main) ✗ west build -p always -s app -b nice_nano_v2 -- -DSHIELD=corne_right -DZMK_CONFIG=/ho
+me/segodimo/zmkpromicro/config
+-- west build: making build dir /home/segodimo/zmk/build pristine
+-- west build: generating a build system
+Loading Zephyr default modules (Zephyr base).
+-- Application: /home/segodimo/zmk/app
+-- CMake version: 4.0.1
+-- Found Python3: /usr/bin/python (found suitable version "3.13.2", minimum required is "3.8") found com
+ponents: Interpreter
+-- Cache files will be written to: /home/segodimo/.cache/zephyr
+-- Zephyr version: 3.5.0 (/home/segodimo/zmk/zephyr)
+-- Found west (found suitable version "1.4.0", minimum required is "0.14.0")
+-- Adding /home/segodimo/zmk/app/boards/shields/corne
+-- ZMK Config directory: /home/segodimo/zmkpromicro/config
+-- ZMK Config devicetree overlay: /home/segodimo/zmkpromicro/config/corne_right.overlay
+-- ZMK Config Kconfig: /home/segodimo/zmkpromicro/config/corne_right.conf
+-- Using keymap file: /home/segodimo/zmkpromicro/config/corne.keymap
+-- Using keymap file: /home/segodimo/zmkpromicro/config/corne.keymap
+-- Board: nice_nano_v2
+-- Shield(s): corne_right
+-- Found host-tools: zephyr 0.16.4 (/home/segodimo/zephyr-sdk-0.16.4)
+-- Found toolchain: zephyr 0.16.4 (/home/segodimo/zephyr-sdk-0.16.4)
+-- Found Dtc: /home/segodimo/zephyr-sdk-0.16.4/sysroots/x86_64-pokysdk-linux/usr/bin/dtc (found suitable
+ version "1.6.0", minimum required is "1.4.6")
+-- Found BOARD.dts: /home/segodimo/zmk/app/boards/arm/nice_nano/nice_nano_v2.dts
+-- Found devicetree overlay: /home/segodimo/zmkpromicro/config/corne_right.overlay
+-- Found devicetree overlay: /home/segodimo/zmk/app/boards/shields/corne/corne_right.overlay
+-- Found devicetree overlay: /home/segodimo/zmk/app/boards/shields/corne/boards/nice_nano_v2.overlay
+-- Found devicetree overlay: /home/segodimo/zmkpromicro/config/corne.keymap
+'label' is marked as deprecated in 'properties:' in /home/segodimo/zmk/app/dts/bindings/behaviors/zmk,be
+havior-tap-dance.yaml for node /behaviors/parenthesis.
+'label' is marked as deprecated in 'properties:' in /home/segodimo/zmk/app/dts/bindings/behaviors/zmk,be
+havior-tap-dance.yaml for node /behaviors/bracket.
+'label' is marked as deprecated in 'properties:' in /home/segodimo/zmk/app/dts/bindings/behaviors/zmk,be
+havior-tap-dance.yaml for node /behaviors/brace.
+'label' is marked as deprecated in 'properties:' in /home/segodimo/zmk/app/dts/bindings/zmk,keymap.yaml 
+for node /keymap/rec_layer.
+-- Generated zephyr.dts: /home/segodimo/zmk/build/zephyr/zephyr.dts
+-- Generated devicetree_generated.h: /home/segodimo/zmk/build/zephyr/include/generated/devicetree_genera
+ted.h
+-- Including generated dts.cmake file: /home/segodimo/zmk/build/zephyr/dts.cmake
+
+warning: ZMK_SPLIT_BLE_CENTRAL_PERIPHERALS (defined at
+/home/segodimo/zmk/app/src/split/bluetooth/Kconfig:30,
+/home/segodimo/zmk/app/src/split/bluetooth/Kconfig.defaults:13) was assigned the value '1' but got
+the value ''. Check these unsatisfied dependencies: ((ZMK_SPLIT_ROLE_CENTRAL && ZMK_SPLIT &&
+ZMK_SPLIT_BLE) || (ZMK_SPLIT_ROLE_CENTRAL && ZMK_SPLIT_BLE && ZMK_BLE)) (=n). See
+http://docs.zephyrproject.org/latest/kconfig.html#CONFIG_ZMK_SPLIT_BLE_CENTRAL_PERIPHERALS and/or
+look up ZMK_SPLIT_BLE_CENTRAL_PERIPHERALS in the menuconfig/guiconfig interface. The Application
+Development Primer, Setting Configuration Values, and Kconfig - Tips and Best Practices sections of
+the manual might be helpful too.
+
+
+warning: UART_CONSOLE (defined at drivers/console/Kconfig:43) was assigned the value 'y' but got the
+value 'n'. Check these unsatisfied dependencies: CONSOLE (=n). See
+http://docs.zephyrproject.org/latest/kconfig.html#CONFIG_UART_CONSOLE and/or look up UART_CONSOLE in
+the menuconfig/guiconfig interface. The Application Development Primer, Setting Configuration
+Values, and Kconfig - Tips and Best Practices sections of the manual might be helpful too.
+
+
+warning: USB_CDC_ACM (defined at subsys/usb/device/class/Kconfig.cdc:6) was assigned the value 'y'
+but got the value 'n'. Check these unsatisfied dependencies: DT_HAS_ZEPHYR_CDC_ACM_UART_ENABLED
+(=n). See http://docs.zephyrproject.org/latest/kconfig.html#CONFIG_USB_CDC_ACM and/or look up
+USB_CDC_ACM in the menuconfig/guiconfig interface. The Application Development Primer, Setting
+Configuration Values, and Kconfig - Tips and Best Practices sections of the manual might be helpful
+too.
+
+
+warning: Deprecated symbol NRF_STORE_REBOOT_TYPE_GPREGRET is enabled.
+
+Parsing /home/segodimo/zmk/app/Kconfig
+Loaded configuration '/home/segodimo/zmk/app/boards/arm/nice_nano/nice_nano_v2_defconfig'
+Merged configuration '/home/segodimo/zmk/app/prj.conf'
+Merged configuration '/home/segodimo/zmkpromicro/config/corne_right.conf'
+Merged configuration '/home/segodimo/zmk/app/boards/shields/corne/corne_right.conf'
+Configuration saved to '/home/segodimo/zmk/build/zephyr/.config'
+Kconfig header saved to '/home/segodimo/zmk/build/zephyr/include/generated/autoconf.h'
+-- Found GnuLd: /home/segodimo/zephyr-sdk-0.16.4/arm-zephyr-eabi/bin/../lib/gcc/arm-zephyr-eabi/12.2.0/.
+./../../../arm-zephyr-eabi/bin/ld.bfd (found version "2.38")
+-- The C compiler identification is GNU 12.2.0
+-- The CXX compiler identification is GNU 12.2.0
+-- The ASM compiler identification is GNU
+-- Found assembler: /home/segodimo/zephyr-sdk-0.16.4/arm-zephyr-eabi/bin/arm-zephyr-eabi-gcc
+-- Configuring done (2.4s)
+-- Generating done (0.1s)
+-- Build files have been written to: /home/segodimo/zmk/build
+-- west build: building application
+[1/297] Preparing syscall dependency handling
+
+[3/297] Generating include/generated/version.h
+-- Zephyr version: 3.5.0 (/home/segodimo/zmk/zephyr), build: 628a0d85e369
+[292/297] Linking C executable zephyr/zephyr_pre0.elf
+FAILED: zephyr/zephyr_pre0.elf zephyr/zephyr_pre0.map /home/segodimo/zmk/build/zephyr/zephyr_pre0.map 
+: && /home/segodimo/zephyr-sdk-0.16.4/arm-zephyr-eabi/bin/arm-zephyr-eabi-gcc  -gdwarf-4 zephyr/CMakeFil
+es/zephyr_pre0.dir/misc/empty_file.c.obj -o zephyr/zephyr_pre0.elf  zephyr/CMakeFiles/offsets.dir/./arch
+/arm/core/offsets/offsets.c.obj  -fuse-ld=bfd  -T  zephyr/linker_zephyr_pre0.cmd  -Wl,-Map=/home/segodim
+o/zmk/build/zephyr/zephyr_pre0.map  -Wl,--whole-archive  app/libapp.a  zephyr/libzephyr.a  zephyr/arch/c
+ommon/libarch__common.a  zephyr/arch/arch/arm/core/libarch__arm__core.a  zephyr/arch/arch/arm/core/corte
+x_m/libarch__arm__core__cortex_m.a  zephyr/arch/arch/arm/core/mpu/libarch__arm__core__mpu.a  zephyr/lib/
+libc/picolibc/liblib__libc__picolibc.a  zephyr/lib/libc/common/liblib__libc__common.a  zephyr/soc/soc/ar
+m/common/cortex_m/libsoc__arm__common__cortex_m.a  zephyr/soc/soc/arm/nordic_nrf/nrf52/libsoc__arm__nord
+ic_nrf__nrf52.a  zephyr/subsys/random/libsubsys__random.a  zephyr/subsys/bluetooth/common/libsubsys__blu
+etooth__common.a  zephyr/subsys/bluetooth/host/libsubsys__bluetooth__host.a  zephyr/subsys/bluetooth/cry
+pto/libsubsys__bluetooth__crypto.a  zephyr/subsys/bluetooth/controller/libsubsys__bluetooth__controller.
+a  zephyr/subsys/input/libsubsys__input.a  zephyr/subsys/net/libsubsys__net.a  zephyr/drivers/usb/device
+/libdrivers__usb__device.a  zephyr/drivers/adc/libdrivers__adc.a  zephyr/drivers/clock_control/libdriver
+s__clock_control.a  zephyr/drivers/entropy/libdrivers__entropy.a  zephyr/drivers/flash/libdrivers__flash
+.a  zephyr/drivers/gpio/libdrivers__gpio.a  zephyr/drivers/hwinfo/libdrivers__hwinfo.a  zephyr/drivers/k
+scan/libdrivers__kscan.a  zephyr/drivers/pinctrl/libdrivers__pinctrl.a  zephyr/drivers/sensor/nrf5/libdr
+ivers__sensor__nrf5.a  zephyr/drivers/serial/libdrivers__serial.a  zephyr/drivers/timer/libdrivers__time
+r.a  modules/hal_nordic/nrfx/libmodules__hal_nordic__nrfx.a  modules/module/drivers/sensor/battery/lib..
+__app__module__drivers__sensor__battery.a  modules/module/lib/zmk_debounce/lib..__app__module__lib__zmk_
+debounce.a  -Wl,--no-whole-archive  zephyr/kernel/libkernel.a  -L"/home/segodimo/zephyr-sdk-0.16.4/arm-z
+ephyr-eabi/bin/../lib/gcc/arm-zephyr-eabi/12.2.0/thumb/v7e-m+fp/hard"  -L/home/segodimo/zmk/build/zephyr
+  -lgcc  zephyr/arch/common/libisr_tables.a  -mcpu=cortex-m4  -mthumb  -mabi=aapcs  -mfpu=fpv4-sp-d16  -
+mfloat-abi=hard  -mfp16-format=ieee  -Wl,--gc-sections  -Wl,--build-id=none  -Wl,--sort-common=descendin
+g  -Wl,--sort-section=alignment  -Wl,-u,_OffsetAbsSyms  -Wl,-u,_ConfigAbsSyms  -nostdlib  -static  -Wl,-
+X  -Wl,-N  -Wl,--orphan-handling=warn  -Wl,-no-pie  -DPICOLIBC_INTEGER_PRINTF_SCANF  --specs=picolibc.sp
+ecs  -lc  -lgcc && cd /home/segodimo/zmk/build/zephyr && /sbin/cmake -E true
+/home/segodimo/zephyr-sdk-0.16.4/arm-zephyr-eabi/bin/../lib/gcc/arm-zephyr-eabi/12.2.0/../../../../arm-z
+ephyr-eabi/bin/ld.bfd: app/libapp.a(uart_move_mouse.c.obj): in function `uart_move_mouse':
+/home/segodimo/zmkpromicro/config/src/uart_move_mouse.c:12: undefined reference to `zmk_hid_get_mouse_re
+port'
+/home/segodimo/zephyr-sdk-0.16.4/arm-zephyr-eabi/bin/../lib/gcc/arm-zephyr-eabi/12.2.0/../../../../arm-z
+ephyr-eabi/bin/ld.bfd: /home/segodimo/zmkpromicro/config/src/uart_move_mouse.c:22: undefined reference t
+o `zmk_endpoints_send_mouse_report'
+collect2: error: ld returned 1 exit status
+ninja: build stopped: subcommand failed.
+FATAL ERROR: command exited with status 1: /sbin/cmake --build /home/segodimo/zmk/build
+
+
+
+
+aqui meu codigo uart_move_mouse.c:
+
+
+#include <zephyr/kernel.h>
+#include <zephyr/logging/log.h>
+#include <zmk/hid.h>
+#include <zmk/endpoints.h>
+#include <zmk/uart_move_mouse.h>
+
+LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
+
+int uart_move_mouse(int16_t dx, int16_t dy, int16_t scroll_y, int16_t scroll_x, zmk_mouse_button_flags_t buttons) {
+
+    // Pega o report global do ZMK
+    struct zmk_hid_mouse_report *report = zmk_hid_get_mouse_report();
+
+    // Atualiza o report global
+    report->body.d_x = dx;
+    report->body.d_y = dy;
+    report->body.buttons = buttons;
+    report->body.d_scroll_y = scroll_y;
+    report->body.d_scroll_x = scroll_x;
+
+    // Envia para o host (USB/BLE)
+    int ret = zmk_endpoints_send_mouse_report();
+    LOG_DBG("UART mouse move dx=%d dy=%d buttons=0x%02X ret=%d", dx, dy, buttons, ret);
+
+    return ret;
+}
+
+
+zmk_endpoints_send_mouse_report
+
+
+
+
+Perfeito, agora entendi exatamente o problema: o seu **lado direito (peripheral) não está compilando porque os símbolos Kconfig que você está tentando ativar nem existem ou não são visíveis para o build**. Isso não é um erro do seu código, é do **Kconfig do ZMK**.
+
+No ZMK 3.x (e você está usando 3.5.0), **o lado peripheral nunca compila funções de mouse por padrão**, porque o mouse só é habilitado no **central/host**. Ou seja:
+
+* `zmk_hid_get_mouse_report()` e `zmk_endpoints_send_mouse_report()` **só existem se o módulo HID de mouse estiver incluído na build**.
+* No lado peripheral (`ZMK_SPLIT_ROLE_PERIPHERAL=y`), o Kconfig **não permite incluir o módulo HID de mouse**, por isso todas as tentativas de `CONFIG_ZMK_HID_MOUSE=y` falham: o Kconfig nem define esse símbolo.
+
+---
+
+### 🔹 O que significa na prática
+
+1. **Peripheral não pode enviar mouse via HID nativo**. Ele só envia **keypresses via split** para o central.
+2. Qualquer função que tente chamar `zmk_endpoints_send_mouse_report()` do lado peripheral vai dar **undefined reference**, porque ela não está compilada para esse papel.
+3. Por isso, **não adianta habilitar `CONFIG_ZMK_HID_MOUSE` ou `CONFIG_ZMK_USB_HID` no peripheral**, eles são ignorados.
+
+---
+
+### 🔹 Como resolver
+
+Você tem algumas opções:
+
+1. **Enviar comandos de mouse via split**
+
+   * No peripheral, você envia **uma mensagem custom via UART ou BLE** para o central,
+   que então **executa o movimento de mouse**.
+   * Esse é o padrão do ZMK para mouse em splits.
+
+2. **Código condicional**
+
+   * No seu `uart_move_mouse.c`, coloque:
+
+```c
+#if IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
+    // chama zmk_hid_get_mouse_report() e zmk_endpoints_send_mouse_report()
+#endif
+```
+
+Isso evita `undefined reference` no lado peripheral.
+
+3. **Não tente compilar HID mouse no peripheral**
+
+   * Remova qualquer `CONFIG_ZMK_HID_MOUSE` do `corne_right.conf`.
+   * Deixe apenas:
+
+```conf
+CONFIG_ZMK_SPLIT_ROLE_PERIPHERAL=y
+```
+
+* Todo envio de mouse deve passar pelo central.
+
+---
+
+Se você quiser, eu posso te escrever **um exemplo completo de como enviar movimento de mouse do lado direito (peripheral) via UART para o central**, que é a forma correta de fazer no ZMK 3.x.
+
+Quer que eu faça isso?
+
+
+
+
+como criar um uart_move_mouse_right.c para poder enviar comandos de mouse via split?
+
+   * No peripheral, você envia **uma mensagem custom via UART ou BLE** para o central,
+   que então **executa o movimento de mouse**.
+   * Esse é o padrão do ZMK para mouse em splits.
+
+
+
+Perfeito! Então você quer que o **lado direito (peripheral)** não mova o mouse diretamente, mas envie **uma mensagem para o lado esquerdo (central)**, que fará o movimento. Isso segue exatamente o padrão do ZMK para splits.
+
+Vou te mostrar como organizar isso.
+
+---
+
+### 1️⃣ Criar `uart_move_mouse_right.c` (Peripheral)
+
+```c
+#include <zephyr/kernel.h>
+#include <zephyr/logging/log.h>
+#include <zephyr/drivers/uart.h>
+#include "uart_move_mouse_right.h"
+
+LOG_MODULE_REGISTER(uart_move_mouse_right, LOG_LEVEL_INF);
+
+/**
+ * Envia comando de mouse para o central via UART.
+ * dx, dy = movimento; buttons = estado dos botões do mouse
+ */
+void uart_move_mouse_right(int dx, int dy, uint8_t buttons) {
+    uint8_t buf[4];
+
+    // Exemplo de protocolo simples: [dx, dy, buttons, checksum]
+    buf[0] = (uint8_t)dx;
+    buf[1] = (uint8_t)dy;
+    buf[2] = buttons;
+    buf[3] = buf[0] + buf[1] + buf[2]; // checksum simples
+
+    // Envia pelo UART configurado no peripheral
+    for (int i = 0; i < 4; i++) {
+        uart_poll_out(uart0, buf[i]);
+    }
+
+    LOG_INF("Mouse command sent: dx=%d dy=%d buttons=%d", dx, dy, buttons);
+}
+```
+
+---
+
+### 2️⃣ Criar o header `uart_move_mouse_right.h`
+
+```c
+#pragma once
+#include <stdint.h>
+
+void uart_move_mouse_right(int dx, int dy, uint8_t buttons);
+```
+
+---
+
+### 3️⃣ Ajustar `uart_receiver_left.c` (Central)
+
+No central, você precisa **receber a mensagem via UART** e chamar a função real de mouse:
+
+```c
+#include "uart_move_mouse.h"
+
+// Dentro do thread/handler do UART:
+uint8_t buf[4];
+// buf preenchido com a leitura do UART do peripheral
+int dx = (int8_t)buf[0];
+int dy = (int8_t)buf[1];
+uint8_t buttons = buf[2];
+
+// Chama a função que realmente move o mouse
+uart_move_mouse(dx, dy, buttons);
+```
+
+---
+
+### 4️⃣ Ajustar o `CMakeLists.txt`
+
+```cmake
+if(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
+  target_sources(app PRIVATE
+    ${CMAKE_CURRENT_LIST_DIR}/uart_receiver_left.c
+    ${CMAKE_CURRENT_LIST_DIR}/uart_switch_left.c
+    ${CMAKE_CURRENT_LIST_DIR}/uart_move_mouse.c  # real
+  )
+else()
+  target_sources(app PRIVATE
+    ${CMAKE_CURRENT_LIST_DIR}/uart_receiver_right.c
+    ${CMAKE_CURRENT_LIST_DIR}/uart_switch_right.c
+    ${CMAKE_CURRENT_LIST_DIR}/uart_move_mouse_right.c  # envia mensagem
+  )
+endif()
+```
+
+---
+
+### ✅ Padrão ZMK para mouse split
+
+1. **Peripheral** → nunca move o mouse diretamente, só envia comandos.
+2. **Central** → recebe a mensagem e executa o movimento real.
+3. **API unificada** → ambos os lados chamam `uart_move_mouse(dx, dy, buttons)`, mas cada lado faz algo diferente internamente.
+
+---
+
+Se você quiser, posso te escrever **uma versão pronta de `uart_move_mouse_right.c` e `uart_receiver_left.c`** já com **thread de UART e parsing do pacote de mouse**, pronta para compilar no ZMK.
+
+Quer que eu faça isso?
+
+
+
+
+
+
+
+
+
+---
+
+
+# como criar um uart_move_mouse_right.c para poder enviar comandos de mouse via split? eu estou enviando o teclado via bluetooth, e não por cabo * No peripheral, você envia **uma mensagem custom via UART ou BLE** para o central, que então **executa o movimento de mouse**. * Esse é o padrão do ZMK para mouse em splits. adicione os parametros scroll_y e scroll_x
+
+
+Perfeito! No padrão ZMK, **o lado direito (peripheral)** nunca envia diretamente eventos de mouse USB/HID, porque ele não tem “poder” de enviar HID para o host — ele só envia mensagens via **UART ou BLE** para o lado esquerdo (central), que aí sim envia os eventos HID.
+
+Então você precisa de:
+
+1. Um **header comum** `uart_move_mouse.h` com a assinatura da função que o peripheral vai chamar.
+2. Um **arquivo `uart_move_mouse_right.c`** que envia via UART uma struct ou pacote contendo `dx`, `dy`, `buttons`, `scroll_x` e `scroll_y`.
+3. O **central** lê esses pacotes e chama `uart_move_mouse()` real (USB/HID).
+
+Vou te dar um exemplo organizado:
+
+---
+
+### **uart_move_mouse.h**
+
+```c
+#pragma once
+#include <stdint.h>
+
+void uart_move_mouse(int8_t dx, int8_t dy, uint8_t buttons, int8_t scroll_x, int8_t scroll_y);
+```
+
+---
+
+### **uart_move_mouse_right.c (peripheral / lado direito)**
+
+```c
+#include "uart_move_mouse.h"
+#include <zephyr/kernel.h>
+#include <zephyr/drivers/uart.h>
+#include <zmk/uart_switch_right.h>  // se você tiver funções helper do UART
+
+extern const struct device *uart_dev; // inicializado em uart_receiver_right.c
+
+struct mouse_report_t {
+    int8_t dx;
+    int8_t dy;
+    int8_t scroll_x;
+    int8_t scroll_y;
+    uint8_t buttons;
+};
+
+void uart_move_mouse(int8_t dx, int8_t dy, uint8_t buttons, int8_t scroll_x, int8_t scroll_y) {
+    struct mouse_report_t report = {
+        .dx = dx,
+        .dy = dy,
+        .scroll_x = scroll_x,
+        .scroll_y = scroll_y,
+        .buttons = buttons
+    };
+
+    // envia via UART para o central
+    if (uart_dev) {
+        uart_tx(uart_dev, (uint8_t *)&report, sizeof(report), SYS_FOREVER_MS);
+    }
+}
+```
+
+---
+
+### **uart_move_mouse_left.c (central / lado esquerdo)**
+
+```c
+#include "uart_move_mouse.h"
+#include <zmk/hid.h>
+#include <zmk/endpoints.h>
+#include <zephyr/kernel.h>
+
+struct mouse_report_t {
+    int8_t dx;
+    int8_t dy;
+    int8_t scroll_x;
+    int8_t scroll_y;
+    uint8_t buttons;
+};
+
+void uart_move_mouse(int8_t dx, int8_t dy, uint8_t buttons, int8_t scroll_x, int8_t scroll_y) {
+    struct mouse_report_t report = {
+        .dx = dx,
+        .dy = dy,
+        .scroll_x = scroll_x,
+        .scroll_y = scroll_y,
+        .buttons = buttons
+    };
+
+    // envia para o host via USB/BLE HID
+    zmk_endpoints_send_mouse_report(report.dx, report.dy, report.buttons, report.scroll_x, report.scroll_y);
+}
+```
+
+---
+
+### **CMakeLists.txt**
+
+```cmake
+zephyr_include_directories(${ZMK_CONFIG}/include)
+zephyr_include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../include)
+
+if(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
+  # Central (lado esquerdo)
+  target_sources(app PRIVATE
+    ${CMAKE_CURRENT_LIST_DIR}/uart_receiver_left.c
+    ${CMAKE_CURRENT_LIST_DIR}/uart_switch_left.c
+    ${CMAKE_CURRENT_LIST_DIR}/uart_move_mouse_left.c
+  )
+else()
+  # Peripheral (lado direito)
+  target_sources(app PRIVATE
+    ${CMAKE_CURRENT_LIST_DIR}/uart_receiver_right.c
+    ${CMAKE_CURRENT_LIST_DIR}/uart_switch_right.c
+    ${CMAKE_CURRENT_LIST_DIR}/uart_move_mouse_right.c
+  )
+endif()
+```
+
+---
+
+✅ **Resumo do fluxo:**
+
+1. **Peripheral:** chama `uart_move_mouse(dx, dy, buttons, scroll_x, scroll_y)` → envia pacote via UART.
+2. **Central:** recebe pacote via UART → chama `uart_move_mouse(dx, dy, buttons, scroll_x, scroll_y)` real → envia HID para o host.
+3. **Assim você mantém o padrão ZMK**, separado entre **peripheral** e **central**, com suporte a scroll.
+
+---
+
+Se você quiser, posso fazer **uma versão pronta de `uart_receiver_left.c` e `uart_receiver_right.c`** já configurada para receber/enviar pacotes de mouse com `dx, dy, buttons, scroll_x, scroll_y`. Isso te deixa o split **100% funcional**.
+
+Quer que eu faça isso?
+
+---
+
+me ajuda a ver se uart_receiver_left.c e uart_receiver_right.c fazem sentido,
+me ajuda a fazer como deve ficar os uart_move_mouse_left.h uart_move_mouse_rigth.h
+
+aqui minhas verções atuais:
+
+
+uart_move_mouse_left.c (central / lado esquerdo):
+
+#include <zephyr/kernel.h>
+#include <zephyr/logging/log.h>
+#include <zmk/hid.h>
+#include <zmk/endpoints.h>
+#include <zmk/uart_move_mouse.h>
+
+LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
+
+int uart_move_mouse(int16_t dx, int16_t dy, int16_t scroll_y, int16_t scroll_x, zmk_mouse_button_flags_t buttons) {
+
+    // Pega o report global do ZMK
+    struct zmk_hid_mouse_report *report = zmk_hid_get_mouse_report();
+
+    // Atualiza o report global
+    report->body.d_x = dx;
+    report->body.d_y = dy;
+    report->body.buttons = buttons;
+    report->body.d_scroll_y = scroll_y;
+    report->body.d_scroll_x = scroll_x;
+
+    // Envia para o host (USB/BLE)
+    int ret = zmk_endpoints_send_mouse_report();
+    LOG_DBG("UART mouse move dx=%d dy=%d buttons=0x%02X ret=%d", dx, dy, buttons, ret);
+
+    return ret;
+}
+
+
+
+uart_move_mouse_right.h (peripheral / lado direito):
+
+
+#include "uart_move_mouse.h"
+#include <zephyr/kernel.h>
+#include <zephyr/drivers/uart.h>
+#include <zmk/uart_switch_right.h>  // se você tiver funções helper do UART
+
+extern const struct device *uart_dev; // inicializado em uart_receiver_right.c
+
+struct mouse_report_t {
+    int8_t dx;
+    int8_t dy;
+    int8_t scroll_x;
+    int8_t scroll_y;
+    uint8_t buttons;
+};
+
+void uart_move_mouse(int8_t dx, int8_t dy, uint8_t buttons, int8_t scroll_x, int8_t scroll_y) {
+    struct mouse_report_t report = {
+        .dx = dx,
+        .dy = dy,
+        .scroll_x = scroll_x,
+        .scroll_y = scroll_y,
+        .buttons = buttons
+    };
+
+    // envia via UART para o central
+    if (uart_dev) {
+        uart_tx(uart_dev, (uint8_t *)&report, sizeof(report), SYS_FOREVER_MS);
+    }
+}
+
+
+---
+
+
+
+de acordo com o anterior dito, como deveria ficar minha função para enviar os dados pro central se meus arquivos estão assim?
+
+
+config/src/uart_move_mouse_right.c
+
+#include <zmk/uart_move_mouse_right.h>
+#include <zephyr/kernel.h>
+#include <zephyr/drivers/uart.h>
+#include <zmk/uart_switch_right.h>  // se você tiver funções helper do UART
+
+extern const struct device *uart_dev; // inicializado em uart_receiver_right.c
+
+struct mouse_report_t {
+    int8_t dx;
+    int8_t dy;
+    int8_t scroll_x;
+    int8_t scroll_y;
+    uint8_t buttons;
+};
+
+void uart_move_mouse(int16_t dx, int16_t dy, uint8_t buttons, int16_t scroll_x, int16_t scroll_y) {
+    struct mouse_report_t report = {
+        .dx = dx,
+        .dy = dy,
+        .scroll_x = scroll_x,
+        .scroll_y = scroll_y,
+        .buttons = buttons
+    };
+
+    // envia via UART para o central
+    if (uart_dev) {
+        uart_tx(uart_dev, (uint8_t *)&report, sizeof(report), SYS_FOREVER_MS);
+    }
+}
+
+
+
+config/include/zmk/uart_move_mouse_right.h
+
+#pragma once
+#include <stdint.h>
+#include <zephyr/drivers/uart.h>
+
+extern const struct device *uart_dev; // definido em uart_receiver_right.c
+
+// Função que envia pacotes para o central
+void uart_move_mouse(int16_t dx, int16_t dy, uint8_t buttons, int16_t scroll_x, int16_t scroll_y);
+
+
+
+---
+
+💡 Perfeito, isso que você disse está certíssimo: no **split sem fio do ZMK**, o transporte **não é UART** → ele usa o **canal BLE do split**.
+
+Quando usamos `uart_tx()` você está basicamente implementando o protocolo de split por conta própria, só que o ZMK já resolve isso internamente via **split transport layer** (que abstrai se o link é BLE, UART, SPI etc.).
+
+Então a arquitetura correta é:
+
+* **Peripheral (lado direito)**
+  Cria um **evento custom** (`mouse_move_event`) e o dispara quando precisa mandar movimento de mouse. Esse evento será interceptado pelo sistema de split.
+* **ZMK Split Transport**
+  Repassa automaticamente o evento para o **central**, usando BLE (no seu caso).
+* **Central (lado esquerdo)**
+  Recebe o evento split, traduz e envia para o host via `zmk_endpoints_send_mouse_report()`.
+
+---
+
+### 1. Criar evento custom (exemplo)
+
+`include/zmk/events/mouse_move.h`
+
+```c
+#pragma once
+
+#include <zephyr/kernel.h>
+#include <zmk/event_manager.h>
+#include <zmk/event_manager/event.h>
+
+struct mouse_move_event {
+    int8_t dx;
+    int8_t dy;
+    int8_t scroll_x;
+    int8_t scroll_y;
+    uint8_t buttons;
+};
+
+ZMK_EVENT_DECLARE(mouse_move_event);
+```
+
+---
+
+### 2. Definir o evento
+
+`src/mouse_move_event.c`
+
+```c
+#include <zmk/events/mouse_move.h>
+
+ZMK_EVENT_IMPL(mouse_move_event);
+```
+
+---
+
+### 3. No *peripheral*
+
+Quando quiser mandar movimento de mouse:
+
+```c
+#include <zmk/events/mouse_move.h>
+#include <zmk/event_manager.h>
+
+void send_mouse_move(int8_t dx, int8_t dy, int8_t scroll_x, int8_t scroll_y, uint8_t buttons) {
+    struct mouse_move_event *ev = new_mouse_move_event();
+    ev->dx = dx;
+    ev->dy = dy;
+    ev->scroll_x = scroll_x;
+    ev->scroll_y = scroll_y;
+    ev->buttons = buttons;
+
+    ZMK_EVENT_RAISE(ev);
+}
+```
+
+Esse `ZMK_EVENT_RAISE(ev);` é o que dispara o evento e o manda pelo canal BLE split (igual já acontece com `keycode_state_changed`).
+
+---
+
+### 4. No *central* (handler)
+
+Agora você cria um listener para interceptar o evento **quando ele chegar via split**:
+
+```c
+#include <zmk/endpoints.h>
+#include <zmk/hid.h>
+#include <zmk/events/mouse_move.h>
+#include <zephyr/logging/log.h>
+
+LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
+
+static int mouse_move_listener(const struct zmk_event_header *eh) {
+    if (is_mouse_move_event(eh)) {
+        const struct mouse_move_event *ev = cast_mouse_move_event(eh);
+
+        struct zmk_hid_mouse_report report = {
+            .x = ev->dx,
+            .y = ev->dy,
+            .scroll_x = ev->scroll_x,
+            .scroll_y = ev->scroll_y,
+            .buttons = ev->buttons
+        };
+
+        zmk_endpoints_send_mouse_report(&report);
+        return 0;
+    }
+    return -ENOTSUP;
+}
+
+ZMK_LISTENER(mouse_move_listener, mouse_move_listener);
+ZMK_SUBSCRIPTION(mouse_move_listener, mouse_move_event);
+```
+
+---
+
+✅ Dessa forma:
+
+* No *peripheral*, você apenas chama `send_mouse_move(...)`.
+* O split BLE repassa pro *central*.
+* O *central* envia o `hid_report` pro host via `zmk_endpoints_send_mouse_report()`.
+
+---
+
+Quer que eu te mostre como adaptar esse fluxo direto no seu `uart_move_mouse_right.c` → transformando ele num evento `mouse_move_event` em vez de `uart_tx()`?
+
+
+
+Boa 👌 então vamos adaptar o seu `uart_move_mouse_right.c` para **não usar `uart_tx()`** e sim disparar um **evento custom** (`mouse_move_event`) que será transmitido pelo **canal BLE split**.
+
+---
+
+### 1. Arquivo do evento
+
+Crie `include/zmk/events/mouse_move.h`:
+
+```c
+#pragma once
+
+#include <zephyr/kernel.h>
+#include <zmk/event_manager.h>
+#include <zmk/event_manager/event.h>
+
+struct mouse_move_event {
+    int16_t dx;
+    int16_t dy;
+    int16_t scroll_x;
+    int16_t scroll_y;
+    uint8_t buttons;
+};
+
+ZMK_EVENT_DECLARE(mouse_move_event);
+```
+
+E `src/mouse_move_event.c`:
+
+```c
+#include <zmk/events/mouse_move.h>
+
+ZMK_EVENT_IMPL(mouse_move_event);
+```
+
+---
+
+### 2. Adaptar `uart_move_mouse_right.c` (peripheral)
+
+Antes você tinha algo assim:
+
+```c
+#include <zmk/uart_move_mouse_right.h>
+#include <zephyr/kernel.h>
+#include <zephyr/drivers/uart.h>
+#include <zmk/uart_switch_right.h>
+
+extern const struct device *uart_dev;
+
+struct mouse_report_t {
+    int8_t dx;
+    int8_t dy;
+    int8_t scroll_x;
+    int8_t scroll_y;
+    uint8_t buttons;
+};
+
+void uart_move_mouse(int16_t dx, int16_t dy, uint8_t buttons, int16_t scroll_x, int16_t scroll_y) {
+    struct mouse_report_t report = {
+        .dx = dx,
+        .dy = dy,
+        .scroll_x = scroll_x,
+        .scroll_y = scroll_y,
+        .buttons = buttons
+    };
+
+    if (uart_dev) {
+        uart_tx(uart_dev, (uint8_t *)&report, sizeof(report), SYS_FOREVER_MS);
+    }
+}
+```
+
+---
+
+Agora vamos mudar para **levantar evento**:
+
+`src/uart_move_mouse_right.c`
+
+```c
+#include <zmk/events/mouse_move.h>
+#include <zmk/event_manager.h>
+#include <zephyr/logging/log.h>
+
+LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
+
+// No peripheral, apenas cria e dispara o evento
+void uart_move_mouse(int16_t dx, int16_t dy, uint8_t buttons, int16_t scroll_x, int16_t scroll_y) {
+    struct mouse_move_event *ev = new_mouse_move_event();
+    ev->dx = dx;
+    ev->dy = dy;
+    ev->scroll_x = scroll_x;
+    ev->scroll_y = scroll_y;
+    ev->buttons = buttons;
+
+    ZMK_EVENT_RAISE(ev);
+
+    LOG_DBG("Raised mouse move event: dx=%d dy=%d scroll_x=%d scroll_y=%d buttons=0x%02X",
+            dx, dy, scroll_x, scroll_y, buttons);
+}
+```
+
+⚠️ repara:
+
+* Agora **não usa `uart_dev` nem `uart_tx()`**.
+* Apenas gera um evento e dispara → o split BLE se encarrega de enviar.
+
+---
+
+### 3. No *central* (listener)
+
+Crie `src/mouse_move_listener.c`:
+
+```c
+#include <zmk/endpoints.h>
+#include <zmk/hid.h>
+#include <zmk/events/mouse_move.h>
+#include <zephyr/logging/log.h>
+
+LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
+
+static int mouse_move_listener(const struct zmk_event_header *eh) {
+    if (is_mouse_move_event(eh)) {
+        const struct mouse_move_event *ev = cast_mouse_move_event(eh);
+
+        struct zmk_hid_mouse_report *report = zmk_hid_get_mouse_report();
+
+        report->body.d_x = ev->dx;
+        report->body.d_y = ev->dy;
+        report->body.d_scroll_x = ev->scroll_x;
+        report->body.d_scroll_y = ev->scroll_y;
+        report->body.buttons = ev->buttons;
+
+        int ret = zmk_endpoints_send_mouse_report();
+        LOG_DBG("Mouse report sent: dx=%d dy=%d scroll_x=%d scroll_y=%d buttons=0x%02X ret=%d",
+                ev->dx, ev->dy, ev->scroll_x, ev->scroll_y, ev->buttons, ret);
+
+        return 0;
+    }
+    return -ENOTSUP;
+}
+
+ZMK_LISTENER(mouse_move_listener, mouse_move_listener);
+ZMK_SUBSCRIPTION(mouse_move_listener, mouse_move_event);
+```
+
+---
+
+✅ Assim:
+
+* **Peripheral** chama `uart_move_mouse()` → dispara `mouse_move_event`.
+* **Split BLE** leva o evento até o **central**.
+* **Central** recebe no listener, monta o HID report e envia pro host via USB/BLE.
+
+---
+
+Quer que eu já refaça também o seu `uart_move_mouse_right.h` e `uart_move_mouse_left.c` para combinar com esse novo fluxo?
+
+
+Perfeito 👌 então vamos deixar tudo consistente com o padrão **ZMK events + split BLE**.
+Vou te reestruturar os três pontos principais:
+
+---
+
+## 1. `uart_move_mouse_right.h` (peripheral)
+
+```c
+#pragma once
+#include <stdint.h>
+
+// Função para disparar movimento de mouse a partir do peripheral
+void uart_move_mouse(int16_t dx, int16_t dy, uint8_t buttons, int16_t scroll_x, int16_t scroll_y);
+```
+
+👉 Repara que agora não tem mais `uart_dev`, porque não usamos UART físico.
+
+---
+
+## 2. `uart_move_mouse_right.c` (peripheral)
+
+```c
+#include <zmk/events/mouse_move.h>
+#include <zmk/event_manager.h>
+#include <zephyr/logging/log.h>
+
+LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
+
+// Peripheral: apenas levanta o evento, que será enviado via split BLE
+void uart_move_mouse(int16_t dx, int16_t dy, uint8_t buttons, int16_t scroll_x, int16_t scroll_y) {
+    struct mouse_move_event *ev = new_mouse_move_event();
+    ev->dx = dx;
+    ev->dy = dy;
+    ev->scroll_x = scroll_x;
+    ev->scroll_y = scroll_y;
+    ev->buttons = buttons;
+
+    ZMK_EVENT_RAISE(ev);
+
+    LOG_DBG("Raised mouse move event: dx=%d dy=%d scroll_x=%d scroll_y=%d buttons=0x%02X",
+            dx, dy, scroll_x, scroll_y, buttons);
+}
+```
+
+---
+
+## 3. `uart_move_mouse_left.c` (central)
+
+```c
+#include <zmk/endpoints.h>
+#include <zmk/hid.h>
+#include <zmk/events/mouse_move.h>
+#include <zephyr/logging/log.h>
+
+LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
+
+// Central: escuta evento vindo do peripheral e envia HID report pro host
+static int mouse_move_listener(const struct zmk_event_header *eh) {
+    if (is_mouse_move_event(eh)) {
+        const struct mouse_move_event *ev = cast_mouse_move_event(eh);
+
+        struct zmk_hid_mouse_report *report = zmk_hid_get_mouse_report();
+
+        report->body.d_x = ev->dx;
+        report->body.d_y = ev->dy;
+        report->body.d_scroll_x = ev->scroll_x;
+        report->body.d_scroll_y = ev->scroll_y;
+        report->body.buttons = ev->buttons;
+
+        int ret = zmk_endpoints_send_mouse_report();
+        LOG_DBG("Mouse report sent: dx=%d dy=%d scroll_x=%d scroll_y=%d buttons=0x%02X ret=%d",
+                ev->dx, ev->dy, ev->scroll_x, ev->scroll_y, ev->buttons, ret);
+
+        return 0;
+    }
+    return -ENOTSUP;
+}
+
+ZMK_LISTENER(mouse_move_listener, mouse_move_listener);
+ZMK_SUBSCRIPTION(mouse_move_listener, mouse_move_event);
+```
+
+---
+
+## 4. Evento custom (compartilhado entre os dois lados)
+
+`include/zmk/events/mouse_move.h`:
+
+```c
+#pragma once
+
+#include <zephyr/kernel.h>
+#include <zmk/event_manager.h>
+#include <zmk/event_manager/event.h>
+
+struct mouse_move_event {
+    int16_t dx;
+    int16_t dy;
+    int16_t scroll_x;
+    int16_t scroll_y;
+    uint8_t buttons;
+};
+
+ZMK_EVENT_DECLARE(mouse_move_event);
+```
+
+`src/mouse_move_event.c`:
+
+```c
+#include <zmk/events/mouse_move.h>
+
+ZMK_EVENT_IMPL(mouse_move_event);
+```
+
+---
+
+✅ Com isso:
+
+* O **peripheral** chama `uart_move_mouse()` → levanta `mouse_move_event`.
+* O **ZMK split BLE** cuida de transportar o evento.
+* O **central** recebe no `mouse_move_listener` e envia o HID report pro host (USB/BLE).
+
+---
+
+Quer que eu também te mostre como organizar esses arquivos nas pastas (`include/zmk/events`, `src/`, `config/src/`) para seguir exatamente o estilo oficial do ZMK?
+
+
+Show 😃 então vamos deixar a estrutura igual ao **padrão do ZMK** (onde cada coisa tem seu lugar).
+
+Assim você evita confusão e garante que o **CMakeLists.txt** ache os arquivos certinho.
+
+---
+
+## 📂 Estrutura de pastas organizada
+
+```
+config/
+├── include/
+│   └── zmk/
+│       ├── uart_move_mouse_right.h      # header público do peripheral
+│       └── events/
+│           └── mouse_move.h             # definição do evento
+└── src/
+    ├── uart_move_mouse_right.c          # peripheral levanta evento
+    ├── uart_move_mouse_left.c           # central escuta evento
+    └── mouse_move_event.c               # implementação do evento
+```
+
+---
+
+## 🔧 Conteúdo dos arquivos
+
+### `include/zmk/uart_move_mouse_right.h`
+
+```c
+#pragma once
+#include <stdint.h>
+
+// Peripheral: dispara movimento de mouse como evento
+void uart_move_mouse(int16_t dx, int16_t dy, uint8_t buttons, int16_t scroll_x, int16_t scroll_y);
+```
+
+---
+
+### `include/zmk/events/mouse_move.h`
+
+```c
+#pragma once
+
+#include <zephyr/kernel.h>
+#include <zmk/event_manager.h>
+#include <zmk/event_manager/event.h>
+
+struct mouse_move_event {
+    int16_t dx;
+    int16_t dy;
+    int16_t scroll_x;
+    int16_t scroll_y;
+    uint8_t buttons;
+};
+
+ZMK_EVENT_DECLARE(mouse_move_event);
+```
+
+---
+
+### `src/mouse_move_event.c`
+
+```c
+#include <zmk/events/mouse_move.h>
+
+ZMK_EVENT_IMPL(mouse_move_event);
+```
+
+---
+
+### `src/uart_move_mouse_right.c` (peripheral)
+
+```c
+#include <zmk/events/mouse_move.h>
+#include <zmk/event_manager.h>
+#include <zephyr/logging/log.h>
+
+LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
+
+// Peripheral: só levanta evento, split BLE envia para o central
+void uart_move_mouse(int16_t dx, int16_t dy, uint8_t buttons, int16_t scroll_x, int16_t scroll_y) {
+    struct mouse_move_event *ev = new_mouse_move_event();
+    ev->dx = dx;
+    ev->dy = dy;
+    ev->scroll_x = scroll_x;
+    ev->scroll_y = scroll_y;
+    ev->buttons = buttons;
+
+    ZMK_EVENT_RAISE(ev);
+
+    LOG_DBG("Raised mouse move event: dx=%d dy=%d scroll_x=%d scroll_y=%d buttons=0x%02X",
+            dx, dy, scroll_x, scroll_y, buttons);
+}
+```
+
+---
+
+### `src/uart_move_mouse_left.c` (central)
+
+```c
+#include <zmk/endpoints.h>
+#include <zmk/hid.h>
+#include <zmk/events/mouse_move.h>
+#include <zephyr/logging/log.h>
+
+LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
+
+// Central: escuta evento vindo do peripheral e envia HID report pro host
+static int mouse_move_listener(const struct zmk_event_header *eh) {
+    if (is_mouse_move_event(eh)) {
+        const struct mouse_move_event *ev = cast_mouse_move_event(eh);
+
+        struct zmk_hid_mouse_report *report = zmk_hid_get_mouse_report();
+
+        report->body.d_x = ev->dx;
+        report->body.d_y = ev->dy;
+        report->body.d_scroll_x = ev->scroll_x;
+        report->body.d_scroll_y = ev->scroll_y;
+        report->body.buttons = ev->buttons;
+
+        int ret = zmk_endpoints_send_mouse_report();
+        LOG_DBG("Mouse report sent: dx=%d dy=%d scroll_x=%d scroll_y=%d buttons=0x%02X ret=%d",
+                ev->dx, ev->dy, ev->scroll_x, ev->scroll_y, ev->buttons, ret);
+
+        return 0;
+    }
+    return -ENOTSUP;
+}
+
+ZMK_LISTENER(mouse_move_listener, mouse_move_listener);
+ZMK_SUBSCRIPTION(mouse_move_listener, mouse_move_event);
+```
+
+---
+
+✅ Dessa forma:
+
+* Arquivos de **eventos** ficam em `include/zmk/events/` e `src/`.
+* O **peripheral** tem apenas a função `uart_move_mouse()` que dispara o evento.
+* O **central** tem o listener que escuta e envia pro host.
+* Tudo segue a organização oficial do ZMK.
+
+---
+
+Quer que eu já te monte também o trecho de `CMakeLists.txt` necessário para compilar esses novos arquivos (`mouse_move_event.c`, `uart_move_mouse_right.c`, `uart_move_mouse_left.c`)?
+
+
+
+
+
+
+
+Boa 👍 — se você for seguir a estrutura que montamos (eventos separados em `include/zmk/events/` e `src/mouse_move_event.c`), o `CMakeLists.txt` precisa **sempre** compilar o arquivo do evento (`mouse_move_event.c`), e condicionalmente os arquivos do **lado central** ou **lado peripheral**.
+
+Ficaria assim:
+
+```cmake
+# Inclui diretórios de headers
+zephyr_include_directories(${ZMK_CONFIG}/include)
+zephyr_include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../include)
+
+# Eventos (compilados para os dois lados)
+target_sources(app PRIVATE
+  ${CMAKE_CURRENT_LIST_DIR}/mouse_move_event.c
+)
+
+if(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
+  # Central (lado esquerdo)
+  target_sources(app PRIVATE
+    ${CMAKE_CURRENT_LIST_DIR}/uart_receiver_left.c
+    ${CMAKE_CURRENT_LIST_DIR}/uart_switch_left.c
+    ${CMAKE_CURRENT_LIST_DIR}/uart_move_mouse_left.c
+  )
+else()
+  # Peripheral (lado direito)
+  target_sources(app PRIVATE
+    ${CMAKE_CURRENT_LIST_DIR}/uart_receiver_right.c
+    ${CMAKE_CURRENT_LIST_DIR}/uart_switch_right.c
+    ${CMAKE_CURRENT_LIST_DIR}/uart_move_mouse_right.c
+  )
+endif()
+```
+
+### 🔑 Diferença principal
+
+* `mouse_move_event.c` precisa estar fora do `if`, porque **evento é usado por ambos os lados** (o peripheral dispara e o central consome).
+* `uart_move_mouse_right.c` e `uart_move_mouse_left.c` continuam no `if`, porque cada lado só precisa compilar o seu.
+
+---
+
+Quer que eu te mostre também como ficaria o `Kconfig` para garantir que esse código novo só compila quando o split está ativo (`CONFIG_ZMK_SPLIT`)?
+
+
+
+
+
+
+---
+
+esses eventos são enviados pelo peripheral e o central trata
+
+como eventos de mouse pelo canal BLE split
+Isso significa criar um custom event que o peripheral dispara e o central trata
+igual já é feito com keycodes
+Ou seja: no peripheral, você não deveria estar chamando uart_tx(),
+e sim disparando algo tipo zmk_split_bt_send(...) ou definindo um split transport message.
+
+---
+
+o lado central é o left e o peripheral é o right
+eu ja consigo receber os eventos do mouse via UART no arquivo uart_move_mouse_left.c do lado peripheral
+eu quero que ZMK consiga executar esses eventos de mouse do lado central enviados pelo peripheral usando o uart_move_mouse_right.c
+igual como já é feito com keycodes enviados do peripheral para o central usado no uart_switch_right.c
+O que falta é criar o equivalente para o mouse no lado peripheral no uart_move_mouse_right.c ele enviaria os dados pro zmk 
+
+minha estrutura está assim:
+
+➜  zmkpromicro git:(master) ✗ tree
+.
+├── boards
+│   └── shields
+├── build.yaml
+├── config
+│   ├── corne.keymap
+│   ├── corne_left.conf
+│   ├── corne_left.overlay
+│   ├── corne_right.conf
+│   ├── corne_right.overlay
+│   ├── include
+│   │   └── zmk
+│   │       ├── uart_move_mouse_left.h
+│   │       ├── uart_move_mouse_right.h
+│   │       ├── uart_switch_left.h
+│   │       └── uart_switch_right.h
+│   ├── src
+│   │   ├── CMakeLists.txt
+│   │   ├── uart_move_mouse_left.c
+│   │   ├── uart_move_mouse_right.c
+│   │   ├── uart_receiver_left.c
+│   │   ├── uart_receiver_right.c
+│   │   ├── uart_switch_left.c
+│   │   └── uart_switch_right.c
+│   └── west.yml
+├── README.md
+└── zephyr
+    └── module.yml
+
+aqui meu código do uart_move_mouse_left.c:
+
+
+/* uart_receiver_left.c - versão atualizada para mouse completo */
+#include <zephyr/kernel.h>
+#include <zephyr/device.h>
+#include <zephyr/drivers/uart.h>
+#include <zephyr/init.h>
+#include <zephyr/logging/log.h>
+#include <zmk/uart_switch_left.h>
+#include <zmk/uart_move_mouse_left.h>
+
+LOG_MODULE_REGISTER(uart_receiver_left, LOG_LEVEL_INF);
+
+/* UART device (ajuste se o nodelabel for diferente) */
+static const struct device *uart_left = DEVICE_DT_GET(DT_NODELABEL(uart0));
+
+/* Tipos de evento */
+#define EVT_KEYBOARD 0x01
+#define EVT_MOUSE    0x02
+
+/* Buffer UART */
+static uint8_t uart_left_buf[16]; // maior para mouse completo
+static int uart_left_buf_pos = 0;
+static int uart_left_expected_len = 0;
+
+/* Estrutura de evento */
+struct uart_left_event_t {
+    uint8_t event_type;
+    union {
+        struct {
+            uint8_t row;
+            uint8_t col;
+            uint8_t pressed;
+        } key;
+        struct {
+            int16_t dx;
+            int16_t dy;
+            int16_t scroll_y;
+            int16_t scroll_x;
+            zmk_mouse_button_flags_t buttons;
+        } mouse;
+    };
+};
+
+/* Fila de eventos */
+#define UART_LEFT_EVENT_QUEUE_SIZE 32
+K_MSGQ_DEFINE(uart_left_event_msgq, sizeof(struct uart_left_event_t), UART_LEFT_EVENT_QUEUE_SIZE, 4);
+
+/* Thread stack */
+K_THREAD_STACK_DEFINE(uart_left_stack, 1024);
+static struct k_thread uart_left_thread_data;
+
+/* Thread de processamento de eventos */
+void uart_left_event_thread(void *a, void *b, void *c)
+{
+    struct uart_left_event_t event;
+
+    while (1) {
+        k_msgq_get(&uart_left_event_msgq, &event, K_FOREVER);
+
+        switch (event.event_type) {
+        case EVT_KEYBOARD:
+            uart_switch_simulate_left(
+                event.key.row,
+                event.key.col,
+                event.key.pressed ? true : false
+            );
+            break;
+
+        case EVT_MOUSE:
+            uart_move_mouse(
+                event.mouse.dx,
+                event.mouse.dy,
+                event.mouse.scroll_y,
+                event.mouse.scroll_x,
+                event.mouse.buttons
+            );
+            break;
+
+        default:
+            LOG_WRN("Evento desconhecido: %02x", event.event_type);
+            break;
+        }
+    }
+}
+
+/* Callback UART - monta pacotes */
+static void uart_left_cb(const struct device *dev, void *user_data)
+{
+    uint8_t c;
+    ARG_UNUSED(user_data);
+
+    while (uart_fifo_read(dev, &c, 1) > 0) {
+        if (uart_left_buf_pos == 0 && c != 0xAA) {
+            continue; // espera byte inicial
+        }
+
+        if (uart_left_buf_pos < (int)sizeof(uart_left_buf)) {
+            uart_left_buf[uart_left_buf_pos++] = c;
+        } else {
+            LOG_ERR("Buffer overflow detectado, resetando");
+            uart_left_buf_pos = 0;
+            uart_left_expected_len = 0;
+            continue;
+        }
+
+        /* Define tamanho esperado */
+        if (uart_left_buf_pos == 2) {
+            if (uart_left_buf[1] == EVT_KEYBOARD) {
+                uart_left_expected_len = 6; // [AA][type][row][col][pressed][checksum]
+            } else if (uart_left_buf[1] == EVT_MOUSE) {
+                uart_left_expected_len = 12; // [AA][type][dxH][dxL][dyH][dyL][scrollYH][scrollYL][scrollXH][scrollXL][buttons][checksum]
+            } else {
+                LOG_WRN("Tipo inválido recebido: 0x%02x", uart_left_buf[1]);
+                uart_left_buf_pos = 0;
+                uart_left_expected_len = 0;
+                continue;
+            }
+        }
+
+        /* Pacote completo */
+        if (uart_left_expected_len > 0 && uart_left_buf_pos == uart_left_expected_len) {
+            /* Valida checksum */
+            uint8_t checksum = 0;
+            for (int i = 1; i < uart_left_expected_len - 1; i++) {
+                checksum ^= uart_left_buf[i];
+            }
+
+            if (checksum != uart_left_buf[uart_left_expected_len - 1]) {
+                LOG_WRN("Checksum inválido: esperado 0x%02x recebido 0x%02x",
+                        checksum, uart_left_buf[uart_left_expected_len - 1]);
+                uart_left_buf_pos = 0;
+                uart_left_expected_len = 0;
+                continue;
+            }
+
+            /* Cria evento */
+            struct uart_left_event_t event = { .event_type = uart_left_buf[1] };
+
+            if (event.event_type == EVT_KEYBOARD) {
+                event.key.row = uart_left_buf[2];
+                event.key.col = uart_left_buf[3];
+                event.key.pressed = uart_left_buf[4];
+            } else if (event.event_type == EVT_MOUSE) {
+                event.mouse.dx       = (int16_t)((uart_left_buf[2] << 8) | uart_left_buf[3]);
+                event.mouse.dy       = (int16_t)((uart_left_buf[4] << 8) | uart_left_buf[5]);
+                event.mouse.scroll_y = (int16_t)((uart_left_buf[6] << 8) | uart_left_buf[7]);
+                event.mouse.scroll_x = (int16_t)((uart_left_buf[8] << 8) | uart_left_buf[9]);
+                event.mouse.buttons  = uart_left_buf[10];
+            }
+
+            int ret = k_msgq_put(&uart_left_event_msgq, &event, K_NO_WAIT);
+            if (ret != 0) {
+                LOG_ERR("Fila cheia, evento descartado");
+            }
+
+            uart_left_buf_pos = 0;
+            uart_left_expected_len = 0;
+        }
+    }
+}
+
+/* Inicializa receptor UART */
+void uart_left_receiver_init(void)
+{
+    if (!device_is_ready(uart_left)) {
+        LOG_ERR("UART device not ready");
+        return;
+    }
+
+    uart_irq_callback_user_data_set(uart_left, uart_left_cb, NULL);
+    uart_irq_rx_enable(uart_left);
+
+    k_thread_create(&uart_left_thread_data, uart_left_stack,
+                    K_THREAD_STACK_SIZEOF(uart_left_stack),
+                    uart_left_event_thread, NULL, NULL, NULL,
+                    7, 0, K_NO_WAIT);
+
+    LOG_INF("uart_receiver_left init done");
+}
+
+static int uart_left_receiver_sys_init(void)
+{
+    uart_left_receiver_init();
+    return 0;
+}
+
+/* Inicialização no boot */
+SYS_INIT(uart_left_receiver_sys_init, APPLICATION, CONFIG_APPLICATION_INIT_PRIORITY);
+
+
+
+
+aqui meu código do uart_switch_right.c:
+
+
+#include <zephyr/kernel.h>
+#include <zephyr/logging/log.h>
+#include <zmk/keymap.h>
+#include <zmk/behavior.h>
+#include <zmk/uart_switch_right.h>
+#include <zmk/events/position_state_changed.h>  // Inclua o header do evento
+
+// #error "!!!!VERIFICANDO SE ESTÁ SENDO COMPILADO!!!!"
+LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
+
+#define MATRIX_COLS 12
+#define ZMK_KEYMAP_POSITION(row, col) ((row) * MATRIX_COLS + (col))
+
+// Função que envia evento position_state_changed via split BLE
+int uart_switch_simulate_right(uint8_t row, uint8_t col, bool pressed) {
+    uint32_t position = ZMK_KEYMAP_POSITION(row, col);
+
+    struct zmk_position_state_changed event = {
+        .source = ZMK_POSITION_STATE_CHANGE_SOURCE_LOCAL,
+        .state = pressed,
+        .position = position,
+        .timestamp = k_uptime_get(),
+    };
+
+    int ret = raise_zmk_position_state_changed(event);
+    LOG_DBG("uart_switch %s at (%d, %d) => position %d, result: %d",
+            pressed ? "press" : "release", row, col, position, ret);
+    return ret;
+}
+
+
+
+Ahhh, saquei 🚀.
+O que você está descrevendo é:
+
+* **No lado peripheral/right**, você não quer apenas empacotar no UART e repassar para o central.
+* Você quer que o próprio ZMK (no peripheral) consiga **levantar um evento de mouse**, igual já existe para teclado (`zmk_position_state_changed`).
+
+Ou seja: “como faço para o peripheral/right mandar movimento de mouse **direto para o stack ZMK**, sem depender de UART?”
+
+---
+
+### Como o ZMK trata mouse
+
+O caminho oficial no ZMK é via **eventos internos** → que acabam no `zmk_endpoints_send_mouse_report()`.
+
+Hoje já existem esses dois blocos importantes:
+
+* `zmk/events/mouse_button_state_changed.h`
+* `zmk/events/mouse_movement_state_changed.h`
+
+Ou seja, o fluxo é parecido com o teclado: você **cria e dispara eventos** e o ZMK cuida de enviar para o host.
+
+---
+
+### Exemplo prático: gerar movimento do mouse no peripheral
+
+```c
+#include <zephyr/kernel.h>
+#include <zephyr/logging/log.h>
+#include <zmk/endpoints.h>
+#include <zmk/hid.h>
+#include <zmk/events/mouse_movement_state_changed.h>
+#include <zmk/events/mouse_button_state_changed.h>
+
+LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
+
+int uart_move_mouse(int16_t dx, int16_t dy, uint8_t buttons, int16_t scroll_x, int16_t scroll_y) {
+    /* Movimento */
+    if (dx != 0 || dy != 0 || scroll_x != 0 || scroll_y != 0) {
+        struct mouse_movement_state_changed mm_evt = {
+            .dx = dx,
+            .dy = dy,
+            .scroll_x = scroll_x,
+            .scroll_y = scroll_y,
+            .timestamp = k_uptime_get(),
+        };
+        ZMK_EVENT_RAISE(new_mouse_movement_state_changed(&mm_evt));
+    }
+
+    /* Botões */
+    if (buttons) {
+        struct mouse_button_state_changed mb_evt = {
+            .buttons = buttons,
+            .state = true, // pressed (você pode mandar false quando soltar)
+            .timestamp = k_uptime_get(),
+        };
+        ZMK_EVENT_RAISE(new_mouse_button_state_changed(&mb_evt));
+    }
+
+    return 0;
+}
+```
+
+---
+
+### O que esse código faz?
+
+* Cria eventos do tipo `mouse_movement_state_changed` e `mouse_button_state_changed`.
+* O **event manager do ZMK** propaga esses eventos até o `zmk_endpoints`, que gera os relatórios HID.
+* Assim, o peripheral/right passa a ser capaz de **enviar movimento e clique de mouse diretamente para o host BLE**, sem passar pelo central.
+
+---
+
+### Resumindo
+
+* **Se você quer o mesmo modelo do teclado** (onde o peripheral gera eventos e o central envia para o host): precisa do UART, igual já faz com keycodes.
+* **Se você quer que o peripheral também seja capaz de falar HID direto para o host**: então no peripheral você usa os eventos internos (`mouse_movement_state_changed`, `mouse_button_state_changed`) e o ZMK vai mandar direto.
+
+---
+
+👉 Pergunto: você quer que o **host veja só o lado central (left)** como dispositivo HID (modelo clássico do ZMK split), ou você quer que o **peripheral também possa mandar HID direto** (como se cada metade fosse independente)?
+
+
+
+
+
+---
+# eu gostaria que quer que o host veja só o lado central (left) como dispositivo HID (modelo clássico do ZMK split)
+
+
+
+Show 👌 — então nesse caso você **precisa continuar no modelo UART → central → host**,
+igual o que o `uart_switch_right.c` faz com teclado.
+
+👉 Por quê?
+Porque no **ZMK split clássico**, **só o central** tem os endpoints HID (via BLE/USB).
+O peripheral nunca fala direto com o host — ele só empacota os eventos
+(keycodes, mouse, sensor etc.) e manda via **transport (UART, BLE split, SPI …)**.
+
+---
+
+### Então o que você precisa no `uart_move_mouse_right.c`
+
+Ele não deve chamar `zmk_endpoints_send_mouse_report()` direto.
+Ele deve **fazer exatamente o papel que o `uart_switch_right.c` faz para teclas**:
+
+* Monta o pacote de evento de mouse.
+* Envia via UART para o central.
+* O central decodifica (`uart_move_mouse_left.c`)
+e aí sim chama `uart_move_mouse(...)` → `zmk_endpoints_send_mouse_report()`.
+
+---
+
+### Exemplo minimalista (lado **peripheral/right**)
+
+```c
+#include <zephyr/kernel.h>
+#include <zephyr/device.h>
+#include <zephyr/drivers/uart.h>
+#include <zephyr/logging/log.h>
+#include <zmk/uart_move_mouse_right.h>
+
+LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
+
+#define EVT_MOUSE 0x02
+static const struct device *uart_right = DEVICE_DT_GET(DT_NODELABEL(uart0));
+
+/* Envia movimento de mouse do peripheral para o central */
+int uart_move_mouse_right(int16_t dx, int16_t dy, int16_t scroll_x, int16_t scroll_y, uint8_t buttons) {
+    if (!device_is_ready(uart_right)) {
+        LOG_ERR("UART device not ready");
+        return -ENODEV;
+    }
+
+    uint8_t buf[12];
+    buf[0]  = 0xAA;
+    buf[1]  = EVT_MOUSE;
+    buf[2]  = (dx >> 8) & 0xFF;
+    buf[3]  = dx & 0xFF;
+    buf[4]  = (dy >> 8) & 0xFF;
+    buf[5]  = dy & 0xFF;
+    buf[6]  = (scroll_x >> 8) & 0xFF;
+    buf[7]  = scroll_x & 0xFF;
+    buf[8]  = (scroll_y >> 8) & 0xFF;
+    buf[9]  = scroll_y & 0xFF;
+    buf[10] = buttons;
+
+    /* checksum simples (XOR dos bytes 1..10) */
+    uint8_t checksum = 0;
+    for (int i = 1; i <= 10; i++) {
+        checksum ^= buf[i];
+    }
+    buf[11] = checksum;
+
+    for (int i = 0; i < sizeof(buf); i++) {
+        uart_poll_out(uart_right, buf[i]);
+    }
+
+    LOG_DBG("Mouse RIGHT → LEFT enviado: dx=%d dy=%d scrollX=%d scrollY=%d btn=%02x",
+            dx, dy, scroll_x, scroll_y, buttons);
+
+    return 0;
+}
+```
+
+E no header `uart_move_mouse_right.h`:
+
+```c
+#pragma once
+
+#include <zephyr/kernel.h>
+
+int uart_move_mouse_right(int16_t dx, int16_t dy, int16_t scroll_x, int16_t scroll_y, uint8_t buttons);
+```
+
+---
+
+### Fluxo final no modelo split clássico
+
+* Peripheral/right chama `uart_move_mouse_right(dx, dy, …)`.
+* Pacote vai via **UART → central/left**.
+* Central/left (`uart_move_mouse_left.c`) recebe, decodifica, e chama `zmk_endpoints_send_mouse_report()` (ou sua wrapper `uart_move_mouse(...)`).
+* O **host só vê o central** como dispositivo HID. ✅
+
+---
+
+Quer que eu já modifique o seu `uart_move_mouse_left.c` para encaixar bonitinho esse formato de pacote (12 bytes com checksum), igual fiz no `uart_move_mouse_right.c`?
+
+
+
+como ficaria o ajuste se meu arquivo uart_move_mouse_left.c está como este:
+
+
+#include <zephyr/kernel.h>
+#include <zephyr/logging/log.h>
+#include <zmk/hid.h>
+#include <zmk/endpoints.h>
+#include <zmk/uart_move_mouse_left.h>
+
+LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
+
+int uart_move_mouse(int16_t dx, int16_t dy, int16_t scroll_y, int16_t scroll_x, zmk_mouse_button_flags_t buttons) {
+
+    // Pega o report global do ZMK
+    struct zmk_hid_mouse_report *report = zmk_hid_get_mouse_report();
+
+    // Atualiza o report global
+    report->body.d_x = dx;
+    report->body.d_y = dy;
+    report->body.buttons = buttons;
+    report->body.d_scroll_y = scroll_y;
+    report->body.d_scroll_x = scroll_x;
+
+    // Envia para o host (USB/BLE)
+    int ret = zmk_endpoints_send_mouse_report();
+    LOG_DBG("UART mouse move dx=%d dy=%d buttons=0x%02X ret=%d", dx, dy, buttons, ret);
+
+    return ret;
+}
+
+---
+
+porfavor transforme meu código para receber parâmetros de com valores de int8_t os invés de int16_t:
+
+---
+
+aqui esta a função que recebe os parâmetro para mover o mouse,
+como seria minha função em micropython para mover o mouse?
+
+Perfeito! Para refletir **exatamente o seu `uart_receiver_left.c`**, precisamos incluir **scroll_x e scroll_y** no pacote e ajustar o checksum para incluir todos os bytes do mouse. Em MicroPython, a função ficaria assim:
+
+```python
+from machine import UART
+
+# Inicializa UART (ajuste para sua placa)
+uart = UART(0, baudrate=115200)  # tx/rx configurados automaticamente na placa
+
+EVT_MOUSE = 0x02
+START_BYTE = 0xAA
+
+def log(msg, val=None, level=0):
+    if val is not None:
+        print(f"[{level}] {msg}: {val}")
+    else:
+        print(f"[{level}] {msg}")
+
+def send_mouse(dx: int, dy: int, scroll_y: int, scroll_x: int, buttons: int):
+    # Limita dx/dy/scroll a int8 (-128 a 127)
+    for name, val in (("dx", dx), ("dy", dy), ("scroll_y", scroll_y), ("scroll_x", scroll_x)):
+        if not (-128 <= val <= 127):
+            log(f"[WARNING] {name} fora do range", val)
+            return
+
+    # Limita buttons a 0..255
+    if not (0 <= buttons <= 255):
+        log(f"[WARNING] buttons fora do range", buttons)
+        return
+
+    # Converte valores para bytes int8
+    dx_byte       = dx & 0xFF
+    dy_byte       = dy & 0xFF
+    scroll_y_byte = scroll_y & 0xFF
+    scroll_x_byte = scroll_x & 0xFF
+    buttons_byte  = buttons & 0xFF
+
+    # Calcula checksum (XOR de type, dx, dy, scrollY, scrollX, buttons)
+    checksum = EVT_MOUSE ^ dx_byte ^ dy_byte ^ scroll_y_byte ^ scroll_x_byte ^ buttons_byte
+
+    # Monta pacote conforme uart_receiver_left.c
+    packet = bytes([
+        START_BYTE,
+        EVT_MOUSE,
+        dx_byte,
+        dy_byte,
+        scroll_y_byte,
+        scroll_x_byte,
+        buttons_byte,
+        checksum
+    ])
+
+    # Debug
+    log("send_mouse", (dx, dy, scroll_y, scroll_x, buttons))
+    print("packet:", packet)
+
+    # Envia via UART
+    uart.write(packet)
+
+# Exemplo de uso
+send_mouse(10, -5, 0, 0, 0x01)  # move 10x, -5y, sem scroll, botão esquerdo pressionado
+```
+
+✅ **O que mudou em relação à sua função inicial:**
+
+1. Incluí **scroll_y** e **scroll_x**, pois seu C espera 8 bytes para mouse.
+2. Checksum agora considera todos os bytes do evento mouse.
+3. Conversão de todos os parâmetros para **int8** (`& 0xFF`).
+4. Logs detalhados e alerta caso algum valor esteja fora do intervalo.
+
+Se você quiser, posso fazer uma **versão “genérica”** que aceita **eventos de teclado e mouse**, igual ao seu `uart_left_event_thread`, pronta para enviar qualquer evento via MicroPython.
+
+Quer que eu faça?
+
+o que esta faltando para que o mouse_ready funcione como toggle?
+
+
+import time
+import config
+from hw import init_i2c, init_mpu, init_mpr121, init_vibrator, init_led
+from actions import vibrar, send_charPs, send_mouse, testmouse, tsttap, piscaled
+from printlogs import log
+from dicctozmk import potsgyrotozmk
+from calibration import calc_pots_hysteresis, calc_accl_hysteresis
+from pots import check_pots, tap_pots, tap_pots_test, check_timeout, PotsState
+from gyro import initial_buffer, average_and_slide, gyro_principal, accl_principal, GyroState, AcclState
+
+
+def post_data(url, data):
+    import urequests
+    try:
+        r = urequests.post(url, json=data)  # envia como JSON
+        print("Status:", r.status_code)
+        print("Resposta:", r.text)
+        r.close()
+    except Exception as e:
+        print("Erro no POST:", e)
+
+def restart(vib, segundos=3):
+    vibrar(vib, 1, 2, ready=True)
+
+    import machine
+    machine.reset()
+
+def liberar_repl(vib, led, segundos=3):
+    vibrar(vib, 1, 2, ready=True)
+
+    import webrepl
+    import network
+
+    print("\nBoot...")
+    station = network.WLAN(network.STA_IF)
+    station.active(True)
+
+    red = config.REDES
+    indexid = 0
+    for i in red:
+        print(f'Connecting to WiFi {i[0]}...')
+
+        try:
+            station.disconnect()
+            time.sleep_ms(200)
+        except:
+            pass
+
+        station.connect(i[0], i[1])
+
+        # time.sleep_ms(10000)
+
+        # espera no máximo 5 segundos
+        for _ in range(50):
+            if station.isconnected():
+                break
+            time.sleep_ms(100)  # 0.1s
+            piscaled(led, 50, 1)
+
+        if station.isconnected():
+            print(f'\nConnected to {i[0]} with success.')
+            indexid = i
+            print(f'Config: {station.ifconfig()}')
+            time.sleep_ms(1000)
+            piscaled(led, 100, 6)
+            break
+
+        else:
+            print(f'Falha ao conectar em {i[0]}')
+        
+    if not station.isconnected():
+        print('xxxxxx Error WiFi Connected xxxxxx')
+        station.active(False)
+
+    try:
+        if webrepl.is_running():
+            print("WebREPL já ativo")
+            vibrar(vib, 1, 2, ready=True)
+        else:
+            webrepl.start()
+
+    except AttributeError:
+        # fallback se a função não existir
+        if getattr(webrepl, "_webrepl", None):
+            print("WebREPL já rodando")
+        else:
+            webrepl.start()
+
+    if station.isconnected():
+        # url = "http://192.168.31.127:5050"
+        # url = "http://192.168.31.13:5050"
+        print("indexid:", indexid)
+        url = indexid[2]
+        # post_data(url,f'config: {station.ifconfig()}')
+        piscaled(led, 100, 6)
+
+    print("\n*****************************")
+
+    # print(f"Liberando REPL por {segundos}s...")
+    # inicio = time.time()
+    # while time.time() - inicio < segundos:
+    #     vibrar(vib, 1, 1, ready=True)
+    #     time.sleep(1)
+    # print("Loop retomado.")
+
+def toggle_ready(ready, vib):
+    ready = not ready
+    vibrar(vib, 3, 0, ready=True)
+    return ready
+
+def toggle_mouse(mouse_ready, vib):
+    mouse_ready = not mouse_ready
+    vibrar(vib, 3, 0, ready=True)
+    return mouse_ready
+
+# --- define triggers fora do start ---
+def process_triggers(ativos, gyro_state, triggers, ready, vib):
+    for trig in triggers:
+        current_state = all(b in ativos for b in trig["buttons"]) and trig["condition"](gyro_state)
+        if current_state and not trig["last_state"]:
+            # executa a ação, atualizando ready se necessário
+            if trig.get("returns_ready", False):
+                ready = trig["action"](ready, vib)
+            else:
+                trig["action"]()
+        trig["last_state"] = current_state
+    return ready
+
+
+def start(i2c=None, mpu=None, mpr=None, pots=None, vib=None, led=None, force_calib=False):
+    # Inicializa hardware se não passado
+    if i2c is None: i2c = init_i2c()
+    if mpu is None: mpu = init_mpu(i2c)
+    if vib is None: vib = init_vibrator()
+    if mpr is None: mpr = init_mpr121(i2c)
+    if led is None: led = init_led(2)
+
+    vibrar(vib, 3, 0, ready=True)
+    piscaled(led, 100, 2)
+
+    remap_list = config.INDEX_MAP_POTS 
+    remap = {i: remap_list[i] for i in range(len(remap_list))}
+
+    # Estado dos potenciômetros
+    pots_state = PotsState()
+
+    # Estado do giroscópio
+    gyro_state = GyroState()
+    accl_state = AcclState()
+
+    # # Se quiser calibrar o acelerômetro:
+    # acclthresholds = calc_accl_hysteresis(mpu, vib, ready, force_calib)
+    # print("\nThresholds Acelerometro", acclthresholds)
+
+    # print("------------------------------------")
+    # raise KeyboardInterrupt("Parando programa!")
+
+    # Prepara buffer do gyro
+    buffer = [[] for _ in range(6)]
+    buffer = initial_buffer(buffer, mpu)
+    gyro, accl = average_and_slide(buffer, mpu)
+
+    gy1, gy2 = config.GY1, config.GY2
+
+    # tap_hold = True
+    tap_hold = False
+
+    accl_states = [0, 0, 0] # 0 = neutro, 1 = positivo, -1 = negativo
+    stable_count = [0, 0, 0]
+
+    last_ativos = set()  # mantém o estado anterior
+    last_abclevel = [0, 0]  # mantém o último abclevel
+    force_release = False
+
+    # Loop principal
+    ready = False
+    mouse_ready = False 
+    num = 0
+
+    # --- triggers ---
+    triggers = [
+        {
+            "buttons": {4, 8},
+            "condition": lambda gs: gs.stepY == 0,
+            "action": toggle_ready,
+            "last_state": False,
+            "returns_ready": True  # indica que a função retorna ready
+        },
+        {
+            "buttons": {7, 8},
+            "condition": lambda gs: gs.stepY == 0,
+            "action": toggle_mouse,
+            "last_state": False,
+            "returns_ready": True  # retorna mouse_ready
+        },
+        {
+            "buttons": {4, 6, 8},
+            "condition": lambda gs: True,
+            # "condition": lambda gs: gs.stepY == 3,
+            # "action": lambda: liberar_repl(vib, led, segundos=20),
+            "action": lambda: testmouse(),
+            "last_state": False,
+            "returns_ready": False
+        },
+        {
+            "buttons": {4, 5, 8},
+            "condition": lambda gs: True,
+            # "condition": lambda gs: gs.stepY == 3,
+            "action": lambda: restart(vib, segundos=20),
+            "last_state": False,
+            "returns_ready": False
+        }
+    ]
+
+    while True:
+        gyro, accl = average_and_slide(buffer, mpu)
+        # x[P] Y[L] Z[V]
+        # print(f'x{accl[0]},y{accl[1]},z{accl[2]}')
+
+        if mouse_ready:
+            print(gyro[0], gyro[1])
+            # gyromouse(gyro[0], gyro[1])
+
+        # Atualiza acelerômetro
+        # accl_state = accl_principal(accl, acclthresholds, accl_state)
+
+        # Atualiza giroscópio
+        gyro_state = gyro_principal(gyro, gy1, gy2, vib, ready, gyro_state)
+
+        # Atualiza potenciômetros
+        abclevel = [gyro_state.stepX, gyro_state.stepY]
+
+
+        mask = mpr.get_touched_mask()
+        num_electrodes = mpr.electrodes
+        # conjunto dos ativos
+        # ativos = {i for i in range(num_electrodes) if mask & (1 << i)} 
+        ativos = {remap[i] for i in range(num_electrodes) if mask & (1 << i) and i in remap}
+        # print(f'ativos: {ativos}')
+
+        # --- processa triggers ---
+        ready = process_triggers(ativos, gyro_state, triggers, ready, vib)
+
+        eventos = []  # lista de eventos a enviar
+
+        # --- detecta mudança de abclevel ---
+        if abclevel != last_abclevel:
+            force_release = True
+
+        # --- se flag ativada, solta tudo ---
+        if force_release:
+            for i in last_ativos:
+                eventos.append([abclevel, i, 0, config.THIS_IS])
+            gyro_state.wait2Zero = True
+            last_ativos = set()
+            force_release = False
+
+        # --- detectar press ---
+        novos = ativos - last_ativos
+        for i in novos:
+            eventos.append([abclevel, i, 1, config.THIS_IS])
+            gyro_state.wait2Zero = False
+            gyro_state.cycle = 0
+
+        # --- detectar release ---
+        liberados = last_ativos - ativos
+        for i in liberados:
+            eventos.append([abclevel, i, 0, config.THIS_IS])
+            gyro_state.wait2Zero = True
+
+        # --- envia todos os eventos ---
+        for ev in eventos:
+            # ev [[M, Y], pot, status, R/L]
+            print(f'evento {ev}, ready={ready}, ready_mouse={mouse_ready}')
+
+            if ready:
+                tozmk = potsgyrotozmk(*ev)
+                log(f'tozmk {tozmk}', 0)
+                send_charPs(tozmk)
+
+        # atualiza estado
+        last_ativos = ativos
+        last_abclevel = abclevel[:]
+
+        """FIM E LIMPEZA"""
+        # Reset se parado
+        if gyro_state.wait2Zero and gyro_state.cycle < config.CYCLE_RESET_LIMIT:
+            gyro_state.cycle += 1
+            if gyro_state.cycle == config.CYCLE_RESET_LIMIT:
+                gyro_state.stepX = gyro_state.stepY = 0
+                vibrar(vib, 2, ready=ready)
+                gyro_state.wait2Zero = False
+                gyro_state.cycle = 0
+        
+        # Controle de limpeza de log
+        if num % config.TCLEAR == 0:
+            num = 0
+        num += 1
+
+        time.sleep_ms(config.TSLEEP)
+
+
+if __name__ == "__main__":
+    vibrar(init_vibrator(), 4, ready=True)
+    liberar_repl(init_vibrator(), init_led(2), 3)  # <-- webrepl ativado
+    start(force_calib=False)
+
+
+
+
+
+
+---
+
+quero ajustar os valores de um giroscópio para mover um mouse
+os valores máximo e minimo que eu posso enviar são entre  -128 <= val <= 127
+
+
+
+
+4868.2 -5137.0
+3306.6 -3654.8
+1353.8 -2082.0
+249.6 -1493.2
+1461.8 -1168.8
+1319.2 306.8
+364.4 -217.8
+123.0 1351.8
+-1941.6 2490.8
+-4370.2 2965.6
+-6166.6 2942.6
+-6366.8 3593.2
+-6279.2 3046.8
+-4356.4 2038.8
+-3124.0 1868.4
+-1512.4 953.4
+-660.0 645.0
+-518.6 150.8
+-1121.0 -148.8
+-1825.2 -625.4
+-2868.2 -1112.8
+-2693.6 -1554.8
+-1990.0 -2020.8
+-309.6 -2657.4
+3023.0 -2028.0
+5444.2 -2597.8
+9106.8 -3396.2
+12165.0 -4478.4
+12194.6 -4817.4
+9772.2 -5210.0
+6832.8 -3144.4
+2206.0 -970.6
+-2871.0 956.4
+-5078.0 3771.4
+-6062.0 4551.4
+-6398.6 5209.8
+-6167.0 5585.6
+-4738.0 5642.0
+-4842.4 5242.8
+-5525.4 4796.6
+-6232.0 4032.6
+-7004.8 3711.8
+-8211.0 3610.4
+-8087.4 2993.8
+-7397.2 3295.4
+-5551.2 2972.6
+-3783.2 2230.0
+-1994.4 1677.2
+-954.0 1122.2
+235.2 683.8
+685.2 465.4
+1988.8 620.8
+2962.8 418.0
+4138.8 497.4
+4842.0 87.6
+5371.2 -141.6
+4999.4 -739.2
+4467.0 -703.8
+3667.2 -1025.6
+3180.4 -945.6
+3041.2 -1275.8
+3146.8 -1448.4
+3282.6 -1741.4
+3807.0 -2989.4
+4276.0 -6162.6
+4547.8 -8841.8
+4772.4 -11623.8
+4296.6 -12378.8
+3587.6 -8997.8
+2012.4 -2880.0
+31.0 3664.0
+-2024.2 9795.8
+-3536.2 13460.6
+-4515.0 14515.8
+-4493.8 14212.8
+-3852.4 13447.0
+-3599.4 11699.2
+-2660.6 9812.2
+-2078.8 5623.8
+-941.8 1186.2
+436.2 -3762.8
+1808.6 -7083.8
+3640.2 -8258.4
+4493.0 -7273.8
+4036.6 -4972.4
+2968.2 -2565.6
+2342.2 -286.4
+744.4 222.8
+91.0 337.6
+13.4 -426.0
+248.0 -1146.2
+569.2 -1957.6
+768.6 -2543.6
+1054.4 -2309.6
+1050.4 -1822.0
+720.8 -1095.0
+288.8 -434.0
+144.2 210.8
+-11.2 305.4
+26.6 353.6
+240.0 349.4
+308.8 338.4
+305.2 191.6
+260.8 -342.6
+660.0 -880.4
+1173.8 -1409.0
+1615.6 -1576.2
+1615.8 -1464.8
+1598.6 -1123.6
+1404.0 -762.2
+1173.4 -503.2
+1030.8 -467.2
+1240.2 -484.2
+1373.8 -441.2
+1167.2 -329.8
+859.0 -201.4
+602.0 -129.8
+368.8 -29.6
+172.6 139.0
+-79.2 267.2
+-1186.4 610.8
+-2769.4 1245.8
+-3778.6 2096.6
+-3895.2 2897.4
+-3832.2 3380.0
+-3495.2 3101.2
+-2126.4 2995.4
+-2098.6 2225.2
+-2559.4 1434.6
+-2733.4 447.4
+-2031.0 394.4
+-1664.4 -122.2
+-155.0 -573.0
+1020.6 -1047.6
+2242.4 -742.4

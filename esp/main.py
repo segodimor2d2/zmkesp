@@ -222,10 +222,7 @@ def start(i2c=None, mpu=None, mpr=None, pots=None, vib=None, led=None, force_cal
         # x[P] Y[L] Z[V]
         # print(f'x{accl[0]},y{accl[1]},z{accl[2]}')
 
-        if mouse_ready:
-            dx, dy = gyromouse(gyro[0], gyro[1])
-            if dx != 0 or dy != 0:
-                send_mouse(dx, dy, 0, 0, 0)
+
 
         # Atualiza acelerômetro
         # accl_state = accl_principal(accl, acclthresholds, accl_state)
@@ -246,7 +243,6 @@ def start(i2c=None, mpu=None, mpr=None, pots=None, vib=None, led=None, force_cal
 
         # --- processa triggers ---
         ready, mouse_ready = process_triggers(ativos, gyro_state, triggers, ready, mouse_ready, vib)
-
 
         eventos = []  # lista de eventos a enviar
 
@@ -274,6 +270,15 @@ def start(i2c=None, mpu=None, mpr=None, pots=None, vib=None, led=None, force_cal
         for i in liberados:
             eventos.append([abclevel, i, 0, config.THIS_IS])
             gyro_state.wait2Zero = True
+
+        if mouse_ready and 4 not in ativos:  # só envia se botão 4 não está pressionado
+            dx, dy = gyromouse(gyro[0], gyro[1])
+            if dx != 0 or dy != 0:
+                # print(f'mouse: dx={dx}, dy={dy}')
+                send_mouse(dx, dy, 0, 0, 0)
+
+        # if 4 in liberados and mouse_ready:
+        #     reset_mouse_center(gyro[0], gyro[1])
 
         # --- envia todos os eventos ---
         for ev in eventos:

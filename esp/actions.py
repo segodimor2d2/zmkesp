@@ -13,12 +13,12 @@ def send_mouse(dx: int, dy: int, scroll_y: int, scroll_x: int, buttons: int):
     # Limita dx/dy/scroll a int8 (-128 a 127)
     for name, val in (("dx", dx), ("dy", dy), ("scroll_y", scroll_y), ("scroll_x", scroll_x)):
         if not (-128 <= val <= 127):
-            log(f"[WARNING] {name} fora do range", val)
+            # log(f"[WARNING] {name} fora do range", val)
             return
 
     # Limita buttons a 0..255
     if not (0 <= buttons <= 255):
-        log(f"[WARNING] buttons fora do range", buttons)
+        # log(f"[WARNING] buttons fora do range", buttons)
         return
 
     dx_byte       = dx & 0xFF
@@ -40,16 +40,16 @@ def send_mouse(dx: int, dy: int, scroll_y: int, scroll_x: int, buttons: int):
         checksum
     ])
 
-    print("packet:", packet)
+    # print("packet:", packet)
     uart.write(packet)
 
 def reset_mouse_center(gx, gy):
     """Define o novo ponto (0,0) relativo do mouse com base no giroscópio atual."""
     global _mouse_offset
     _mouse_offset = [gx, gy]
-    print(f"[INFO] Mouse center resetado para gx={gx}, gy={gy}")
+    # print(f"[INFO] Mouse center resetado para gx={gx}, gy={gy}")
 
-def gyromouse(gx, gy, scale=500.0, deadzone=200.0):
+def gyromouse(gx, gy, scale=360.0, deadzone=200.0):
     """
     scale    : fator de normalização (maior = menos sensível)
     deadzone : zona morta para ignorar pequenas variações (ruído)
@@ -69,7 +69,9 @@ def gyromouse(gx, gy, scale=500.0, deadzone=200.0):
     dx = int(max(-128, min(127, gx / scale)))
     dy = int(max(-128, min(127, gy / scale)))
 
-    print(f'dx={dx}, dy={dy}')
+    # Inverte os sentidos
+    dx = -dx
+    dy = -dy
     return dx, dy
 
 
@@ -108,16 +110,15 @@ def send_charPs(zmkcodes):
             checksum ^= b
 
         packet = bytes([0xAA, 0x01, row, col, pressed, checksum])
-        print('packet', packet)
+        # print('packet', packet)
         uart.write(packet)
+
 
 
 def tsttap(row, col, delay=0.1):
     send_charPs([row, col, True])
     time.sleep(delay)
     send_charPs([row, col, False])
-
-
 
 
 def vibrar(pino_vibracao, n_pulsos, step=None, ready=False):

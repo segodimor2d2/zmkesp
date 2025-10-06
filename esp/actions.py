@@ -40,7 +40,7 @@ def send_mouse(dx: int, dy: int, scroll_y: int, scroll_x: int, buttons: int):
         checksum
     ])
 
-    # print("packet:", packet)
+    print("packet:", packet)
     uart.write(packet)
 
 def reset_mouse_center(gx, gy):

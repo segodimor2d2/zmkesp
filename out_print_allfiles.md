@@ -1,642 +1,797 @@
-=== CONSOLIDAÇÃO DE CÓDIGOS DA PASTA: ../zmkpromicro ===
+# Projeto da pasta: /home/segodimo/zmkxrepos/cirque-input-module/
+
+## arquivo: /home/segodimo/zmkxrepos/cirque-input-module/CMakeLists.txt
+
+```text
+
+add_subdirectory(drivers)
+
+```
 
 
+## arquivo: /home/segodimo/zmkxrepos/cirque-input-module/drivers/CMakeLists.txt
 
-=== ARQUIVO: ../zmkpromicro/README.md ===
+```text
 
-# Recomendação realista
-- Se você precisa de código .c adicional como uart_receiver.c, siga esta estrutura:
-- Tenha um fork do repositório ZMK
-- No seu fork do ZMK, edite CMakeLists.txt para incluir:
-- add_subdirectory(${ZMK_CONFIG}/src)
-- Mantenha tudo seu (configs e código) no zmk-config/, e só altere o CMakeLists.txt do ZMK uma vez.
+add_subdirectory_ifdef(CONFIG_INPUT input)
 
-## Vá até o final do arquivo zmk/app/CMakeLists.txt e adicione isso 
-### Incluir código do zmk-config/src de fora do repositório
-add_subdirectory(${ZMK_CONFIG}/src ${CMAKE_CURRENT_BINARY_DIR}/zmk_config_src)
+```
 
 
-## compilation test
-// #error "!!!!VERIFICANDO SE ESTÁ SENDO COMPILADO!!!!"
+## arquivo: /home/segodimo/zmkxrepos/cirque-input-module/drivers/input/CMakeLists.txt
+
+```text
+# Copyright (c) 2024 The ZMK Contributors
+# SPDX-License-Identifier: MIT
+
+zephyr_library_amend()
+
+zephyr_library_sources_ifdef(CONFIG_INPUT_PINNACLE input_pinnacle.c)
+
+target_sources_ifdef(CONFIG_ZMK_INPUT_PINNACLE_IDLE_SLEEPER app PRIVATE zmk_pinnacle_idle_sleeper.c)
+
+```
 
 
-=== ARQUIVO: ../zmkpromicro/config/include/zmk/uart_move_mouse_right.h ===
+## arquivo: /home/segodimo/zmkxrepos/cirque-input-module/drivers/input/zmk_pinnacle_idle_sleeper.c
 
-#pragma once
-
-#include <zephyr/kernel.h>
-
-int uart_move_mouse_right(int8_t dx, int8_t dy, int8_t scroll_x, int8_t scroll_y, uint32_t buttons);
+```c
 
 
-=== ARQUIVO: ../zmkpromicro/config/include/zmk/zmk_mouse_state_changed.h ===
-
-#pragma once
-
-#include <zephyr/kernel.h>
+#include <zephyr/device.h>
+#include <zephyr/devicetree.h>
 #include <zmk/event_manager.h>
+#include <zmk/events/activity_state_changed.h>
+#include "input_pinnacle.h"
 
-struct zmk_mouse_state_changed {
-    int8_t dx;
-    int8_t dy;
-    int8_t scroll_y;
-    int8_t scroll_x;
-    uint8_t buttons;
+#include <zephyr/logging/log.h>
+
+LOG_MODULE_REGISTER(pinnacle_sleeper, CONFIG_INPUT_LOG_LEVEL);
+
+#define GET_PINNACLE(node_id) DEVICE_DT_GET(node_id),
+
+static const struct device *pinnacle_devs[] = {
+    DT_FOREACH_STATUS_OKAY(cirque_pinnacle, GET_PINNACLE)
 };
 
-// Macro para registrar o evento no ZMK
-ZMK_EVENT_DECLARE(zmk_mouse_state_changed);
+static int on_activity_state(const zmk_event_t *eh) {
+    struct zmk_activity_state_changed *state_ev = as_zmk_activity_state_changed(eh);
 
-
-=== ARQUIVO: ../zmkpromicro/config/include/zmk/uart_switch_left.h ===
-
-#ifndef ZMK_UART_SWITCH_H
-#define ZMK_UART_SWITCH_H
-
-#include <stdint.h>
-#include <stdbool.h>
-
-int uart_switch_simulate_left(uint8_t row, uint8_t col, bool pressed);
-
-#endif
-
-
-=== ARQUIVO: ../zmkpromicro/config/include/zmk/uart_move_mouse_left.h ===
-
-#pragma once
-#include <zephyr/kernel.h>
-#include <zmk/hid.h>
-
-// Agora todos os deslocamentos são int8_t
-int uart_move_mouse(int8_t dx, int8_t dy,
-                    int8_t scroll_y, int8_t scroll_x,
-                    zmk_mouse_button_flags_t buttons);
-
-
-=== ARQUIVO: ../zmkpromicro/config/include/zmk/uart_switch_right.h ===
-
-#ifndef ZMK_UART_SWITCH_H
-#define ZMK_UART_SWITCH_H
-
-#include <stdint.h>
-#include <stdbool.h>
-
-int uart_switch_simulate_right(uint8_t row, uint8_t col, bool pressed);
-
-#endif
-
-
-=== ARQUIVO: ../zmkpromicro/config/src/mouse_state_listener.c ===
-
-#include <zephyr/kernel.h>
-#include <zephyr/logging/log.h>
-#include <zmk/event_manager.h>
-#include <zmk/zmk_mouse_state_changed.h>
-#include <zmk/endpoints.h>
-#include <zmk/hid.h>
-#include <zmk/uart_move_mouse_left.h> // ou uart_move_mouse_right.h conforme o lado
-
-LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
-
-// Callback para tratar eventos de mouse
-static int mouse_state_listener_cb(const zmk_event_t *eh) {
-    const struct zmk_mouse_state_changed *ev = as_zmk_mouse_state_changed(eh);
-
-    if (!ev) {
-        return 0; // evento não era do tipo esperado
+    if (!state_ev) {
+        LOG_WRN("NO EVENT, leaving early");
+        return 0;
     }
 
-    LOG_INF("Mouse event: dx=%d, dy=%d, scroll_y=%d, scroll_x=%d, buttons=0x%02X",
-            ev->dx, ev->dy, ev->scroll_y, ev->scroll_x, ev->buttons);
+    bool sleep = state_ev->state == ZMK_ACTIVITY_ACTIVE ? 0 : 1;
+    for (size_t i = 0; i < ARRAY_SIZE(pinnacle_devs); i++) {
+        pinnacle_set_sleep(pinnacle_devs[i], sleep);
+    }
 
-    // Chama a função que atualiza o HID report e envia para o host
-    int ret = uart_move_mouse(
-        ev->dx,
-        ev->dy,
-        ev->scroll_y,
-        ev->scroll_x,
-        ev->buttons
-    );
+    return 0;
+}
+
+ZMK_LISTENER(zmk_pinnacle_idle_sleeper, on_activity_state);
+ZMK_SUBSCRIPTION(zmk_pinnacle_idle_sleeper, zmk_activity_state_changed);
+```
+
+
+## arquivo: /home/segodimo/zmkxrepos/cirque-input-module/drivers/input/input_pinnacle.h
+
+```c
+#pragma once
+
+#include <zephyr/device.h>
+#include <zephyr/drivers/i2c.h>
+#include <zephyr/drivers/spi.h>
+
+#define PINNACLE_READ 0xA0
+#define PINNACLE_WRITE 0x80
+
+#define PINNACLE_AUTOINC 0xFC
+#define PINNACLE_FILLER 0xFB
+
+// Registers
+#define PINNACLE_FW_ID 0x00   // ASIC ID.
+#define PINNACLE_FW_VER 0x01  // Firmware Version Firmware revision number.
+#define PINNACLE_STATUS1 0x02 // Contains status flags about the state of Pinnacle.
+#define PINNACLE_STATUS1_SW_DR BIT(2)
+#define PINNACLE_STATUS1_SW_CC BIT(3)
+#define PINNACLE_SYS_CFG 0x03 // Contains system operation and configuration bits.
+#define PINNACLE_SYS_CFG_EN_SLEEP_BIT 2
+#define PINNACLE_SYS_CFG_EN_SLEEP BIT(2)
+#define PINNACLE_SYS_CFG_SHUTDOWN BIT(1)
+#define PINNACLE_SYS_CFG_RESET BIT(0)
+
+#define PINNACLE_FEED_CFG1 0x04 // Contains feed operation and configuration bits.
+#define PINNACLE_FEED_CFG1_EN_FEED BIT(0)
+#define PINNACLE_FEED_CFG1_ABS_MODE BIT(1)
+#define PINNACLE_FEED_CFG1_DIS_FILT BIT(2)
+#define PINNACLE_FEED_CFG1_DIS_X BIT(3)
+#define PINNACLE_FEED_CFG1_DIS_Y BIT(4)
+#define PINNACLE_FEED_CFG1_INV_X BIT(6)
+#define PINNACLE_FEED_CFG1_INV_Y BIT(7)
+#define PINNACLE_FEED_CFG2 0x05               // Contains feed operation and configuration bits.
+#define PINNACLE_FEED_CFG2_EN_IM BIT(0)       // Intellimouse
+#define PINNACLE_FEED_CFG2_DIS_TAP BIT(1)     // Disable all taps
+#define PINNACLE_FEED_CFG2_DIS_SEC BIT(2)     // Disable secondary tap
+#define PINNACLE_FEED_CFG2_DIS_SCRL BIT(3)    // Disable scroll
+#define PINNACLE_FEED_CFG2_DIS_GE BIT(4)      // Disable GlideExtend
+#define PINNACLE_FEED_CFG2_EN_BTN_SCRL BIT(6) // Enable Button Scroll
+#define PINNACLE_FEED_CFG2_ROTATE_90 BIT(7)   // Swap X & Y
+#define PINNACLE_CAL_CFG 0x07                 // Contains calibration configuration bits.
+#define PINNACLE_PS2_AUX 0x08                 // Contains Data register for PS/2 Aux Control.
+#define PINNACLE_SAMPLE 0x09                  // Sample Rate Number of samples generated per second.
+#define PINNACLE_Z_IDLE 0x0A         // Number of Z=0 packets sent when Z goes from >0 to 0.
+#define PINNACLE_Z_SCALER 0x0B       // Contains the pen Z_On threshold.
+#define PINNACLE_SLEEP_INTERVAL 0x0C // Sleep Interval
+#define PINNACLE_SLEEP_TIMER 0x0D    // Sleep Timer
+#define PINNACLE_AG_PACKET0 0x10     // trackpad Data (Pinnacle AG)
+#define PINNACLE_2_2_PACKET0 0x12    // trackpad Data
+#define PINNACLE_REG_COUNT 0x18
+
+#define PINNACLE_REG_ERA_VALUE 0x1B
+#define PINNACLE_REG_ERA_HIGH_BYTE 0x1C
+#define PINNACLE_REG_ERA_LOW_BYTE 0x1D
+#define PINNACLE_REG_ERA_CONTROL 0x1E
+
+#define PINNACLE_ERA_CONTROL_READ 0x01
+#define PINNACLE_ERA_CONTROL_WRITE 0x02
+
+#define PINNACLE_ERA_REG_X_AXIS_WIDE_Z_MIN 0x0149
+#define PINNACLE_ERA_REG_Y_AXIS_WIDE_Z_MIN 0x0168
+#define PINNACLE_ERA_REG_TRACKING_ADC_CONFIG 0x0187
+
+#define PINNACLE_TRACKING_ADC_CONFIG_1X 0x00
+#define PINNACLE_TRACKING_ADC_CONFIG_2X 0x40
+#define PINNACLE_TRACKING_ADC_CONFIG_3X 0x80
+#define PINNACLE_TRACKING_ADC_CONFIG_4X 0xC0
+
+#define PINNACLE_PACKET0_BTN_PRIM BIT(0) // Primary button
+#define PINNACLE_PACKET0_BTN_SEC BIT(1)  // Secondary button
+#define PINNACLE_PACKET0_BTN_AUX BIT(2)  // Auxiliary (middle?) button
+#define PINNACLE_PACKET0_X_SIGN BIT(4)   // X delta sign
+#define PINNACLE_PACKET0_Y_SIGN BIT(5)   // Y delta sign
+
+struct pinnacle_data {
+    uint8_t btn_cache;
+    bool in_int;
+    const struct device *dev;
+    struct gpio_callback gpio_cb;
+    struct k_work work;
+};
+
+enum pinnacle_sensitivity {
+    PINNACLE_SENSITIVITY_1X,
+    PINNACLE_SENSITIVITY_2X,
+    PINNACLE_SENSITIVITY_3X,
+    PINNACLE_SENSITIVITY_4X,
+};
+
+typedef int (*pinnacle_seq_read_t)(const struct device *dev, const uint8_t addr, uint8_t *buf,
+                                   const uint8_t len);
+typedef int (*pinnacle_write_t)(const struct device *dev, const uint8_t addr, const uint8_t val);
+
+struct pinnacle_config {
+    union {
+        struct i2c_dt_spec i2c;
+        struct spi_dt_spec spi;
+    } bus;
+
+    pinnacle_seq_read_t seq_read;
+    pinnacle_write_t write;
+
+    bool rotate_90, sleep_en, no_taps, no_secondary_tap, x_invert, y_invert;
+    enum pinnacle_sensitivity sensitivity;
+    uint8_t x_axis_z_min, y_axis_z_min;
+    const struct gpio_dt_spec dr;
+};
+
+int pinnacle_set_sleep(const struct device *dev, bool enabled);
+
+```
+
+
+## arquivo: /home/segodimo/zmkxrepos/cirque-input-module/drivers/input/input_pinnacle.c
+
+```c
+#define DT_DRV_COMPAT cirque_pinnacle
+
+#include <zephyr/dt-bindings/input/input-event-codes.h>
+#include <zephyr/init.h>
+#include <zephyr/input/input.h>
+#include <zephyr/pm/device.h>
+
+#include <zephyr/logging/log.h>
+
+#include "input_pinnacle.h"
+
+LOG_MODULE_REGISTER(pinnacle, CONFIG_INPUT_LOG_LEVEL);
+
+static int pinnacle_seq_read(const struct device *dev, const uint8_t addr, uint8_t *buf,
+                             const uint8_t len) {
+    const struct pinnacle_config *config = dev->config;
+    return config->seq_read(dev, addr, buf, len);
+}
+static int pinnacle_write(const struct device *dev, const uint8_t addr, const uint8_t val) {
+    const struct pinnacle_config *config = dev->config;
+    return config->write(dev, addr, val);
+}
+
+#if DT_ANY_INST_ON_BUS_STATUS_OKAY(i2c)
+
+static int pinnacle_i2c_seq_read(const struct device *dev, const uint8_t addr, uint8_t *buf,
+                                 const uint8_t len) {
+    const struct pinnacle_config *config = dev->config;
+    return i2c_burst_read_dt(&config->bus.i2c, PINNACLE_READ | addr, buf, len);
+}
+
+static int pinnacle_i2c_write(const struct device *dev, const uint8_t addr, const uint8_t val) {
+    const struct pinnacle_config *config = dev->config;
+    return i2c_reg_write_byte_dt(&config->bus.i2c, PINNACLE_WRITE | addr, val);
+}
+
+#endif // DT_ANY_INST_ON_BUS_STATUS_OKAY(i2c)
+
+#if DT_ANY_INST_ON_BUS_STATUS_OKAY(spi)
+
+static int pinnacle_spi_seq_read(const struct device *dev, const uint8_t addr, uint8_t *buf,
+                                 const uint8_t len) {
+    const struct pinnacle_config *config = dev->config;
+    uint8_t tx_buffer[len + 3], rx_dummy[3];
+    tx_buffer[0] = PINNACLE_READ | addr;
+    memset(&tx_buffer[1], PINNACLE_AUTOINC, len + 2);
+
+    const struct spi_buf tx_buf[2] = {
+        {
+            .buf = tx_buffer,
+            .len = len + 3,
+        },
+    };
+    const struct spi_buf_set tx = {
+        .buffers = tx_buf,
+        .count = 1,
+    };
+    struct spi_buf rx_buf[2] = {
+        {
+            .buf = rx_dummy,
+            .len = 3,
+        },
+        {
+            .buf = buf,
+            .len = len,
+        },
+    };
+    const struct spi_buf_set rx = {
+        .buffers = rx_buf,
+        .count = 2,
+    };
+    int ret = spi_transceive_dt(&config->bus.spi, &tx, &rx);
+
+    return ret;
+}
+
+static int pinnacle_spi_write(const struct device *dev, const uint8_t addr, const uint8_t val) {
+    const struct pinnacle_config *config = dev->config;
+    uint8_t tx_buffer[2] = {PINNACLE_WRITE | addr, val};
+    uint8_t rx_buffer[2];
+
+    const struct spi_buf tx_buf = {
+        .buf = tx_buffer,
+        .len = 2,
+    };
+    const struct spi_buf_set tx = {
+        .buffers = &tx_buf,
+        .count = 1,
+    };
+
+    const struct spi_buf rx_buf = {
+        .buf = rx_buffer,
+        .len = 2,
+    };
+    const struct spi_buf_set rx = {
+        .buffers = &rx_buf,
+        .count = 1,
+    };
+
+    const int ret = spi_transceive_dt(&config->bus.spi, &tx, &rx);
 
     if (ret < 0) {
-        LOG_ERR("Falha ao enviar mouse report, ret=%d", ret);
+        LOG_ERR("spi ret: %d", ret);
     }
 
-    return 0;
+    if (rx_buffer[1] != PINNACLE_FILLER) {
+        LOG_ERR("bad ret val %d - %d", rx_buffer[0], rx_buffer[1]);
+        return -EIO;
+    }
+
+    k_usleep(50);
+
+    return ret;
 }
+#endif // DT_ANY_INST_ON_BUS_STATUS_OKAY(spi)
 
-ZMK_LISTENER(mouse_state_listener, mouse_state_listener_cb);
-ZMK_SUBSCRIPTION(mouse_state_listener, zmk_mouse_state_changed);
-
-
-=== ARQUIVO: ../zmkpromicro/config/src/CMakeLists.txt ===
-
-# Inclui diretórios de headers
-zephyr_include_directories(${ZMK_CONFIG}/include)
-zephyr_include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../include)
-
-# Fonte comum (sempre incluída)
-target_sources(app PRIVATE
-  ${CMAKE_CURRENT_LIST_DIR}/zmk_mouse_state_changed.c
-)
-
-if(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
-  # Central (lado esquerdo)
-  target_sources(app PRIVATE
-    ${CMAKE_CURRENT_LIST_DIR}/uart_move_mouse_left.c
-    ${CMAKE_CURRENT_LIST_DIR}/uart_receiver_left.c
-    ${CMAKE_CURRENT_LIST_DIR}/uart_switch_left.c
-    ${CMAKE_CURRENT_LIST_DIR}/mouse_state_listener.c
-  )
-else()
-  # Peripheral (lado direito)
-  target_sources(app PRIVATE
-    ${CMAKE_CURRENT_LIST_DIR}/uart_receiver_right.c
-    ${CMAKE_CURRENT_LIST_DIR}/uart_switch_right.c
-  )
-endif()
-
-
-=== ARQUIVO: ../zmkpromicro/config/src/zmk_mouse_state_changed.c ===
-
-#include <zephyr/kernel.h>
-#include <zmk/event_manager.h>
-#include <zmk/zmk_mouse_state_changed.h>
-
-ZMK_EVENT_IMPL(zmk_mouse_state_changed);
-
-
-=== ARQUIVO: ../zmkpromicro/config/src/uart_switch_left.c ===
-
-#include <zephyr/kernel.h>
-#include <zephyr/logging/log.h>
-#include <zmk/keymap.h>
-#include <zmk/behavior.h>
-#include <zmk/uart_switch_left.h>
-#include <zmk/events/position_state_changed.h>  // necessário para raise_zmk_position_state_changed
-
-LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
-
-// Número de colunas da matriz lógica (Corne = 12 colunas)
-#define MATRIX_COLS 12
-
-// Calcula índice linear a partir de (row, col)
-#define ZMK_KEYMAP_POSITION(row, col) ((row) * MATRIX_COLS + (col))
-
-int uart_switch_simulate_left(uint8_t row, uint8_t col, bool pressed) {
-    uint32_t position = ZMK_KEYMAP_POSITION(row, col);
-
-    struct zmk_position_state_changed event = {
-        .source = ZMK_POSITION_STATE_CHANGE_SOURCE_LOCAL,
-        .state = pressed,
-        .position = position,
-        .timestamp = k_uptime_get(),
-    };
-
-    int ret = raise_zmk_position_state_changed(event);
-    LOG_DBG("uart_switch LEFT %s at (row=%d, col=%d) => position %d, result: %d",
-            pressed ? "press" : "release", row, col, position, ret);
+static int set_int(const struct device *dev, const bool en) {
+    const struct pinnacle_config *config = dev->config;
+    int ret = gpio_pin_interrupt_configure_dt(&config->dr,
+                                              en ? GPIO_INT_EDGE_TO_ACTIVE : GPIO_INT_DISABLE);
+    if (ret < 0) {
+        LOG_ERR("can't set interrupt");
+    }
 
     return ret;
 }
 
-
-=== ARQUIVO: ../zmkpromicro/config/src/uart_receiver_right.c ===
-
-/* uart_receiver_right.c - versão simplificada para int8_t no mouse */
-#include <zephyr/device.h>
-#include <zephyr/drivers/uart.h>
-#include <zephyr/init.h>
-#include <zephyr/kernel.h>
-#include <zephyr/logging/log.h>
-#include <zmk/endpoints.h>
-#include <zmk/hid.h>
-#include <zmk/zmk_mouse_state_changed.h>
-#include <zmk/uart_switch_right.h>
-
-LOG_MODULE_REGISTER(uart_receiver_right, LOG_LEVEL_INF);
-
-/* UART device */
-static const struct device *uart_right = DEVICE_DT_GET(DT_NODELABEL(uart0));
-
-/* Tipos de evento */
-#define EVT_KEYBOARD 0x01
-#define EVT_MOUSE    0x02
-
-/* Buffer UART */
-static uint8_t buf_right[16];
-static int buf_pos_right = 0;
-static int expected_len_right = 0;
-
-/* Estrutura de evento */
-struct uart_event_right_t {
-    uint8_t event_type;
-    union {
-        struct {
-            uint8_t row;
-            uint8_t col;
-            uint8_t pressed;
-        } key;
-        struct {
-            int8_t dx;
-            int8_t dy;
-            int8_t scroll_y;
-            int8_t scroll_x;
-            zmk_mouse_button_flags_t buttons;
-        } mouse;
-    };
-};
-
-/* Fila de eventos */
-#define UART_EVENT_QUEUE_SIZE_RIGHT 32
-K_MSGQ_DEFINE(uart_event_msgq_right, sizeof(struct uart_event_right_t), UART_EVENT_QUEUE_SIZE_RIGHT, 4);
-
-/* Thread stack */
-K_THREAD_STACK_DEFINE(uart_stack_right, 1024);
-static struct k_thread uart_thread_data_right;
-
-void uart_event_thread_right(void *a, void *b, void *c)
-{
-    struct uart_event_right_t event;
-
-    while (1) {
-        k_msgq_get(&uart_event_msgq_right, &event, K_FOREVER);
-
-        switch (event.event_type) {
-        case EVT_KEYBOARD:
-            uart_switch_simulate_right(
-                event.key.row,
-                event.key.col,
-                event.key.pressed ? true : false
-            );
-            break;
-
-        case EVT_MOUSE: {
-            struct zmk_mouse_state_changed ev = {
-                .dx = event.mouse.dx,
-                .dy = event.mouse.dy,
-                .scroll_y = event.mouse.scroll_y,
-                .scroll_x = event.mouse.scroll_x,
-                .buttons = event.mouse.buttons,
-            };
-            raise_zmk_mouse_state_changed(ev);
-            break;
-        }
-        default:
-            LOG_WRN("Evento desconhecido: %02x", event.event_type);
-            break;
-        }
+static int pinnacle_clear_status(const struct device *dev) {
+    int ret = pinnacle_write(dev, PINNACLE_STATUS1, 0);
+    if (ret < 0) {
+        LOG_ERR("Failed to clear STATUS1 register: %d", ret);
     }
+
+    return ret;
 }
 
-/* Callback UART */
-static void uart_cb_right(const struct device *dev, void *user_data)
-{
-    uint8_t c;
-    ARG_UNUSED(user_data);
+static int pinnacle_era_read(const struct device *dev, const uint16_t addr, uint8_t *val) {
+    int ret;
 
-    while (uart_fifo_read(dev, &c, 1) > 0) {
-        if (buf_pos_right == 0 && c != 0xAA) {
-            continue;
-        }
+    set_int(dev, false);
 
-        if (buf_pos_right < (int)sizeof(buf_right)) {
-            buf_right[buf_pos_right++] = c;
-        } else {
-            LOG_ERR("Buffer overflow, resetando");
-            buf_pos_right = 0;
-            expected_len_right = 0;
-            continue;
-        }
-
-        if (buf_pos_right == 2) {
-            if (buf_right[1] == EVT_KEYBOARD) {
-                expected_len_right = 6;  // [AA][type][row][col][pressed][checksum]
-            } else if (buf_right[1] == EVT_MOUSE) {
-                expected_len_right = 8;  // [AA][type][dx][dy][scrollY][scrollX][buttons][checksum]
-            } else {
-                LOG_WRN("Tipo inválido: 0x%02x", buf_right[1]);
-                buf_pos_right = 0;
-                expected_len_right = 0;
-                continue;
-            }
-        }
-
-        if (expected_len_right > 0 && buf_pos_right == expected_len_right) {
-            uint8_t checksum = 0;
-            for (int i = 1; i < expected_len_right - 1; i++) {
-                checksum ^= buf_right[i];
-            }
-
-            if (checksum != buf_right[expected_len_right - 1]) {
-                LOG_WRN("Checksum inválido (exp=0x%02x rec=0x%02x)",
-                        checksum, buf_right[expected_len_right - 1]);
-                buf_pos_right = 0;
-                expected_len_right = 0;
-                continue;
-            }
-
-            struct uart_event_right_t event = { .event_type = buf_right[1] };
-
-            if (event.event_type == EVT_KEYBOARD) {
-                event.key.row = buf_right[2];
-                event.key.col = buf_right[3];
-                event.key.pressed = buf_right[4];
-            } else if (event.event_type == EVT_MOUSE) {
-                event.mouse.dx       = (int8_t)buf_right[2];
-                event.mouse.dy       = (int8_t)buf_right[3];
-                event.mouse.scroll_y = (int8_t)buf_right[4];
-                event.mouse.scroll_x = (int8_t)buf_right[5];
-                event.mouse.buttons  = buf_right[6];
-            }
-
-            int ret = k_msgq_put(&uart_event_msgq_right, &event, K_NO_WAIT);
-            if (ret != 0) {
-                LOG_ERR("Fila cheia, evento descartado");
-            }
-
-            buf_pos_right = 0;
-            expected_len_right = 0;
-        }
+    ret = pinnacle_write(dev, PINNACLE_REG_ERA_HIGH_BYTE, (uint8_t)(addr >> 8));
+    if (ret < 0) {
+        LOG_ERR("Failed to write ERA high byte (%d)", ret);
+        return -EIO;
     }
+
+    ret = pinnacle_write(dev, PINNACLE_REG_ERA_LOW_BYTE, (uint8_t)(addr & 0x00FF));
+    if (ret < 0) {
+        LOG_ERR("Failed to write ERA low byte (%d)", ret);
+        return -EIO;
+    }
+
+    ret = pinnacle_write(dev, PINNACLE_REG_ERA_CONTROL, PINNACLE_ERA_CONTROL_READ);
+    if (ret < 0) {
+        LOG_ERR("Failed to write ERA control (%d)", ret);
+        return -EIO;
+    }
+
+    uint8_t control_val;
+    do {
+
+        ret = pinnacle_seq_read(dev, PINNACLE_REG_ERA_CONTROL, &control_val, 1);
+        if (ret < 0) {
+            LOG_ERR("Failed to read ERA control (%d)", ret);
+            return -EIO;
+        }
+
+    } while (control_val != 0x00);
+
+    ret = pinnacle_seq_read(dev, PINNACLE_REG_ERA_VALUE, val, 1);
+
+    if (ret < 0) {
+        LOG_ERR("Failed to read ERA value (%d)", ret);
+        return -EIO;
+    }
+
+    ret = pinnacle_clear_status(dev);
+
+    set_int(dev, true);
+
+    return ret;
 }
 
-void uart_receiver_right_init(void)
-{
-    if (!device_is_ready(uart_right)) {
-        LOG_ERR("UART device not ready");
+static int pinnacle_era_write(const struct device *dev, const uint16_t addr, uint8_t val) {
+    int ret;
+
+    set_int(dev, false);
+
+    ret = pinnacle_write(dev, PINNACLE_REG_ERA_VALUE, val);
+    if (ret < 0) {
+        LOG_ERR("Failed to write ERA value (%d)", ret);
+        return -EIO;
+    }
+
+    ret = pinnacle_write(dev, PINNACLE_REG_ERA_HIGH_BYTE, (uint8_t)(addr >> 8));
+    if (ret < 0) {
+        LOG_ERR("Failed to write ERA high byte (%d)", ret);
+        return -EIO;
+    }
+
+    ret = pinnacle_write(dev, PINNACLE_REG_ERA_LOW_BYTE, (uint8_t)(addr & 0x00FF));
+    if (ret < 0) {
+        LOG_ERR("Failed to write ERA low byte (%d)", ret);
+        return -EIO;
+    }
+
+    ret = pinnacle_write(dev, PINNACLE_REG_ERA_CONTROL, PINNACLE_ERA_CONTROL_WRITE);
+    if (ret < 0) {
+        LOG_ERR("Failed to write ERA control (%d)", ret);
+        return -EIO;
+    }
+
+    uint8_t control_val;
+    do {
+
+        ret = pinnacle_seq_read(dev, PINNACLE_REG_ERA_CONTROL, &control_val, 1);
+        if (ret < 0) {
+            LOG_ERR("Failed to read ERA control (%d)", ret);
+            return -EIO;
+        }
+
+    } while (control_val != 0x00);
+
+    ret = pinnacle_clear_status(dev);
+
+    set_int(dev, true);
+
+    return ret;
+}
+
+static void pinnacle_report_data(const struct device *dev) {
+    const struct pinnacle_config *config = dev->config;
+    uint8_t packet[3];
+    int ret;
+    ret = pinnacle_seq_read(dev, PINNACLE_STATUS1, packet, 1);
+    if (ret < 0) {
+        LOG_ERR("read status: %d", ret);
         return;
     }
 
-    uart_irq_callback_user_data_set(uart_right, uart_cb_right, NULL);
-    uart_irq_rx_enable(uart_right);
+    LOG_HEXDUMP_DBG(packet, 1, "Pinnacle Status1");
 
-    k_thread_create(&uart_thread_data_right, uart_stack_right,
-                    K_THREAD_STACK_SIZEOF(uart_stack_right),
-                    uart_event_thread_right, NULL, NULL, NULL,
-                    7, 0, K_NO_WAIT);
-
-    LOG_INF("uart_receiver_right init done");
-}
-
-static int uart_receiver_right_sys_init(void)
-{
-    uart_receiver_right_init();
-    return 0;
-}
-
-SYS_INIT(uart_receiver_right_sys_init, APPLICATION, CONFIG_APPLICATION_INIT_PRIORITY);
-
-
-=== ARQUIVO: ../zmkpromicro/config/src/uart_receiver_left.c ===
-
-/* uart_receiver_left.c - versão simplificada com int8_t */
-#include <zephyr/kernel.h>
-#include <zephyr/device.h>
-#include <zephyr/drivers/uart.h>
-#include <zephyr/init.h>
-#include <zephyr/logging/log.h>
-#include <zmk/uart_switch_left.h>
-#include <zmk/uart_move_mouse_left.h>
-
-LOG_MODULE_REGISTER(uart_receiver_left, LOG_LEVEL_INF);
-
-/* UART device */
-static const struct device *uart_left = DEVICE_DT_GET(DT_NODELABEL(uart0));
-
-/* Tipos de evento */
-#define EVT_KEYBOARD 0x01
-#define EVT_MOUSE    0x02
-
-/* Buffer UART */
-static uint8_t uart_left_buf[16];
-static int uart_left_buf_pos = 0;
-static int uart_left_expected_len = 0;
-
-/* Estrutura de evento */
-struct uart_left_event_t {
-    uint8_t event_type;
-    union {
-        struct {
-            uint8_t row;
-            uint8_t col;
-            uint8_t pressed;
-        } key;
-        struct {
-            int8_t dx;
-            int8_t dy;
-            int8_t scroll_y;
-            int8_t scroll_x;
-            uint8_t buttons;
-        } mouse;
-    };
-};
-
-/* Fila de eventos */
-#define UART_LEFT_EVENT_QUEUE_SIZE 32
-K_MSGQ_DEFINE(uart_left_event_msgq, sizeof(struct uart_left_event_t), UART_LEFT_EVENT_QUEUE_SIZE, 4);
-
-/* Thread stack */
-K_THREAD_STACK_DEFINE(uart_left_stack, 1024);
-static struct k_thread uart_left_thread_data;
-
-/* Thread de processamento */
-void uart_left_event_thread(void *a, void *b, void *c)
-{
-    struct uart_left_event_t event;
-
-    while (1) {
-        k_msgq_get(&uart_left_event_msgq, &event, K_FOREVER);
-
-        switch (event.event_type) {
-        case EVT_KEYBOARD:
-            uart_switch_simulate_left(
-                event.key.row,
-                event.key.col,
-                event.key.pressed ? true : false
-            );
-            break;
-
-        case EVT_MOUSE:
-            uart_move_mouse(
-                event.mouse.dx,
-                event.mouse.dy,
-                event.mouse.scroll_y,
-                event.mouse.scroll_x,
-                event.mouse.buttons
-            );
-            break;
-
-        default:
-            LOG_WRN("Evento desconhecido: %02x", event.event_type);
-            break;
-        }
+    // Ignore 0xFF packets that indicate communcation failure, or if SW_DR isn't asserted
+    if (packet[0] == 0xFF || !(packet[0] & PINNACLE_STATUS1_SW_DR)) {
+        return;
     }
-}
-
-/* Callback UART */
-static void uart_left_cb(const struct device *dev, void *user_data)
-{
-    uint8_t c;
-    ARG_UNUSED(user_data);
-
-    while (uart_fifo_read(dev, &c, 1) > 0) {
-        if (uart_left_buf_pos == 0 && c != 0xAA) {
-            continue; // espera byte inicial
-        }
-
-        if (uart_left_buf_pos < (int)sizeof(uart_left_buf)) {
-            uart_left_buf[uart_left_buf_pos++] = c;
-        } else {
-            LOG_ERR("Buffer overflow detectado, resetando");
-            uart_left_buf_pos = 0;
-            uart_left_expected_len = 0;
-            continue;
-        }
-
-        /* Define tamanho esperado */
-        if (uart_left_buf_pos == 2) {
-            if (uart_left_buf[1] == EVT_KEYBOARD) {
-                uart_left_expected_len = 6; // [AA][type][row][col][pressed][checksum]
-            } else if (uart_left_buf[1] == EVT_MOUSE) {
-                uart_left_expected_len = 8; // [AA][type][dx][dy][scrollY][scrollX][buttons][checksum]
-            } else {
-                LOG_WRN("Tipo inválido recebido: 0x%02x", uart_left_buf[1]);
-                uart_left_buf_pos = 0;
-                uart_left_expected_len = 0;
-                continue;
-            }
-        }
-
-        /* Pacote completo */
-        if (uart_left_expected_len > 0 && uart_left_buf_pos == uart_left_expected_len) {
-            /* Checksum */
-            uint8_t checksum = 0;
-            for (int i = 1; i < uart_left_expected_len - 1; i++) {
-                checksum ^= uart_left_buf[i];
-            }
-
-            if (checksum != uart_left_buf[uart_left_expected_len - 1]) {
-                LOG_WRN("Checksum inválido: esperado 0x%02x recebido 0x%02x",
-                        checksum, uart_left_buf[uart_left_expected_len - 1]);
-                uart_left_buf_pos = 0;
-                uart_left_expected_len = 0;
-                continue;
-            }
-
-            /* Cria evento */
-            struct uart_left_event_t event = { .event_type = uart_left_buf[1] };
-
-            if (event.event_type == EVT_KEYBOARD) {
-                event.key.row = uart_left_buf[2];
-                event.key.col = uart_left_buf[3];
-                event.key.pressed = uart_left_buf[4];
-            } else if (event.event_type == EVT_MOUSE) {
-                event.mouse.dx       = (int8_t)uart_left_buf[2];
-                event.mouse.dy       = (int8_t)uart_left_buf[3];
-                event.mouse.scroll_y = (int8_t)uart_left_buf[4];
-                event.mouse.scroll_x = (int8_t)uart_left_buf[5];
-                event.mouse.buttons  = uart_left_buf[6];
-            }
-
-            int ret = k_msgq_put(&uart_left_event_msgq, &event, K_NO_WAIT);
-            if (ret != 0) {
-                LOG_ERR("Fila cheia, evento descartado");
-            }
-
-            uart_left_buf_pos = 0;
-            uart_left_expected_len = 0;
-        }
-    }
-}
-
-/* Inicializa receptor UART */
-void uart_left_receiver_init(void)
-{
-    if (!device_is_ready(uart_left)) {
-        LOG_ERR("UART device not ready");
+    ret = pinnacle_seq_read(dev, PINNACLE_2_2_PACKET0, packet, 3);
+    if (ret < 0) {
+        LOG_ERR("read packet: %d", ret);
         return;
     }
 
-    uart_irq_callback_user_data_set(uart_left, uart_left_cb, NULL);
-    uart_irq_rx_enable(uart_left);
+    LOG_HEXDUMP_DBG(packet, 3, "Pinnacle Packets");
 
-    k_thread_create(&uart_left_thread_data, uart_left_stack,
-                    K_THREAD_STACK_SIZEOF(uart_left_stack),
-                    uart_left_event_thread, NULL, NULL, NULL,
-                    7, 0, K_NO_WAIT);
+    struct pinnacle_data *data = dev->data;
+    uint8_t btn = packet[0] &
+                  (PINNACLE_PACKET0_BTN_PRIM | PINNACLE_PACKET0_BTN_SEC | PINNACLE_PACKET0_BTN_AUX);
 
-    LOG_INF("uart_receiver_left init done");
+    int8_t dx = (int8_t)packet[1];
+    int8_t dy = (int8_t)packet[2];
+
+    if (packet[0] & PINNACLE_PACKET0_X_SIGN) {
+        WRITE_BIT(dx, 7, 1);
+    }
+    if (packet[0] & PINNACLE_PACKET0_Y_SIGN) {
+        WRITE_BIT(dy, 7, 1);
+    }
+
+    if (data->in_int) {
+        LOG_DBG("Clearing status bit");
+        ret = pinnacle_clear_status(dev);
+        data->in_int = true;
+    }
+
+    if (!config->no_taps && (btn || data->btn_cache)) {
+        for (int i = 0; i < 3; i++) {
+            uint8_t btn_val = btn & BIT(i);
+            if (btn_val != (data->btn_cache & BIT(i))) {
+                input_report_key(dev, INPUT_BTN_0 + i, btn_val ? 1 : 0, false, K_FOREVER);
+            }
+        }
+    }
+
+    data->btn_cache = btn;
+
+    input_report_rel(dev, INPUT_REL_X, dx, false, K_FOREVER);
+    input_report_rel(dev, INPUT_REL_Y, dy, true, K_FOREVER);
+
+    return;
 }
 
-static int uart_left_receiver_sys_init(void)
-{
-    uart_left_receiver_init();
+static void pinnacle_work_cb(struct k_work *work) {
+    struct pinnacle_data *data = CONTAINER_OF(work, struct pinnacle_data, work);
+    pinnacle_report_data(data->dev);
+}
+
+static void pinnacle_gpio_cb(const struct device *port, struct gpio_callback *cb, uint32_t pins) {
+    struct pinnacle_data *data = CONTAINER_OF(cb, struct pinnacle_data, gpio_cb);
+
+    LOG_DBG("HW DR asserted");
+    data->in_int = true;
+    k_work_submit(&data->work);
+}
+
+static int pinnacle_adc_sensitivity_reg_value(enum pinnacle_sensitivity sensitivity) {
+    switch (sensitivity) {
+    case PINNACLE_SENSITIVITY_1X:
+        return PINNACLE_TRACKING_ADC_CONFIG_1X;
+    case PINNACLE_SENSITIVITY_2X:
+        return PINNACLE_TRACKING_ADC_CONFIG_2X;
+    case PINNACLE_SENSITIVITY_3X:
+        return PINNACLE_TRACKING_ADC_CONFIG_3X;
+    case PINNACLE_SENSITIVITY_4X:
+        return PINNACLE_TRACKING_ADC_CONFIG_4X;
+    default:
+        return PINNACLE_TRACKING_ADC_CONFIG_1X;
+    }
+}
+
+static int pinnacle_tune_edge_sensitivity(const struct device *dev) {
+    const struct pinnacle_config *config = dev->config;
+    int ret;
+
+    uint8_t x_val;
+    ret = pinnacle_era_read(dev, PINNACLE_ERA_REG_X_AXIS_WIDE_Z_MIN, &x_val);
+    if (ret < 0) {
+        LOG_WRN("Failed to read X val");
+        return ret;
+    }
+
+    LOG_WRN("X val: %d", x_val);
+
+    uint8_t y_val;
+    ret = pinnacle_era_read(dev, PINNACLE_ERA_REG_Y_AXIS_WIDE_Z_MIN, &y_val);
+    if (ret < 0) {
+        LOG_WRN("Failed to read Y val");
+        return ret;
+    }
+
+    LOG_WRN("Y val: %d", y_val);
+
+    ret = pinnacle_era_write(dev, PINNACLE_ERA_REG_X_AXIS_WIDE_Z_MIN, config->x_axis_z_min);
+    if (ret < 0) {
+        LOG_ERR("Failed to set X-Axis Min-Z %d", ret);
+        return ret;
+    }
+    ret = pinnacle_era_write(dev, PINNACLE_ERA_REG_Y_AXIS_WIDE_Z_MIN, config->y_axis_z_min);
+    if (ret < 0) {
+        LOG_ERR("Failed to set Y-Axis Min-Z %d", ret);
+        return ret;
+    }
     return 0;
 }
 
-SYS_INIT(uart_left_receiver_sys_init, APPLICATION, CONFIG_APPLICATION_INIT_PRIORITY);
+static int pinnacle_set_adc_tracking_sensitivity(const struct device *dev) {
+    const struct pinnacle_config *config = dev->config;
 
+    uint8_t val;
+    int ret = pinnacle_era_read(dev, PINNACLE_ERA_REG_TRACKING_ADC_CONFIG, &val);
+    if (ret < 0) {
+        LOG_ERR("Failed to get ADC sensitivity %d", ret);
+    }
 
-=== ARQUIVO: ../zmkpromicro/config/src/uart_switch_right.c ===
+    val &= 0x3F;
+    val |= pinnacle_adc_sensitivity_reg_value(config->sensitivity);
 
-#include <zephyr/kernel.h>
-#include <zephyr/logging/log.h>
-#include <zmk/keymap.h>
-#include <zmk/behavior.h>
-#include <zmk/uart_switch_right.h>
-#include <zmk/events/position_state_changed.h>  // Inclua o header do evento
-
-// #error "!!!!VERIFICANDO SE ESTÁ SENDO COMPILADO!!!!"
-LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
-
-#define MATRIX_COLS 12
-#define ZMK_KEYMAP_POSITION(row, col) ((row) * MATRIX_COLS + (col))
-
-// Função que envia evento position_state_changed via split BLE
-int uart_switch_simulate_right(uint8_t row, uint8_t col, bool pressed) {
-    uint32_t position = ZMK_KEYMAP_POSITION(row, col);
-
-    struct zmk_position_state_changed event = {
-        .source = ZMK_POSITION_STATE_CHANGE_SOURCE_LOCAL,
-        .state = pressed,
-        .position = position,
-        .timestamp = k_uptime_get(),
-    };
-
-    int ret = raise_zmk_position_state_changed(event);
-    LOG_DBG("uart_switch %s at (%d, %d) => position %d, result: %d",
-            pressed ? "press" : "release", row, col, position, ret);
-    return ret;
-}
-
-
-=== ARQUIVO: ../zmkpromicro/config/src/uart_move_mouse_left.c ===
-
-#include <zephyr/kernel.h>
-#include <zephyr/logging/log.h>
-#include <zmk/hid.h>
-#include <zmk/endpoints.h>
-#include <zmk/uart_move_mouse_left.h>
-
-LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
-
-int uart_move_mouse(int8_t dx, int8_t dy, int8_t scroll_y, int8_t scroll_x, zmk_mouse_button_flags_t buttons) {
-
-    // Pega o report global do ZMK
-    struct zmk_hid_mouse_report *report = zmk_hid_get_mouse_report();
-
-    // Atualiza o report global
-    report->body.d_x = dx;
-    report->body.d_y = dy;
-    report->body.buttons = buttons;
-    report->body.d_scroll_y = scroll_y;
-    report->body.d_scroll_x = scroll_x;
-
-    // Envia para o host (USB/BLE)
-    int ret = zmk_endpoints_send_mouse_report();
-    LOG_DBG("UART mouse move dx=%d dy=%d scroll_y=%d scroll_x=%d buttons=0x%02X ret=%d",
-            dx, dy, scroll_y, scroll_x, buttons, ret);
+    ret = pinnacle_era_write(dev, PINNACLE_ERA_REG_TRACKING_ADC_CONFIG, val);
+    if (ret < 0) {
+        LOG_ERR("Failed to set ADC sensitivity %d", ret);
+    }
+    ret = pinnacle_era_read(dev, PINNACLE_ERA_REG_TRACKING_ADC_CONFIG, &val);
+    if (ret < 0) {
+        LOG_ERR("Failed to get ADC sensitivity %d", ret);
+    }
 
     return ret;
 }
+
+static int pinnacle_force_recalibrate(const struct device *dev) {
+    uint8_t val;
+    int ret = pinnacle_seq_read(dev, PINNACLE_CAL_CFG, &val, 1);
+    if (ret < 0) {
+        LOG_ERR("Failed to get cal config %d", ret);
+    }
+
+    val |= 0x01;
+    ret = pinnacle_write(dev, PINNACLE_CAL_CFG, val);
+    if (ret < 0) {
+        LOG_ERR("Failed to force calibration %d", ret);
+    }
+
+    do {
+        pinnacle_seq_read(dev, PINNACLE_CAL_CFG, &val, 1);
+    } while (val & 0x01);
+
+    return ret;
+}
+
+int pinnacle_set_sleep(const struct device *dev, bool enabled) {
+    uint8_t sys_cfg;
+    int ret = pinnacle_seq_read(dev, PINNACLE_SYS_CFG, &sys_cfg, 1);
+    if (ret < 0) {
+        LOG_ERR("can't read sys config %d", ret);
+        return ret;
+    }
+
+    if (((sys_cfg & PINNACLE_SYS_CFG_EN_SLEEP) != 0) == enabled) {
+        return 0;
+    }
+
+    LOG_DBG("Setting sleep: %s", (enabled ? "on" : "off"));
+    WRITE_BIT(sys_cfg, PINNACLE_SYS_CFG_EN_SLEEP_BIT, enabled ? 1 : 0);
+
+    ret = pinnacle_write(dev, PINNACLE_SYS_CFG, sys_cfg);
+    if (ret < 0) {
+        LOG_ERR("can't write sleep config %d", ret);
+        return ret;
+    }
+
+    return ret;
+}
+
+static int pinnacle_init(const struct device *dev) {
+    struct pinnacle_data *data = dev->data;
+    const struct pinnacle_config *config = dev->config;
+    int ret;
+
+    uint8_t fw_id[2];
+    ret = pinnacle_seq_read(dev, PINNACLE_FW_ID, fw_id, 2);
+    if (ret < 0) {
+        LOG_ERR("Failed to get the FW ID %d", ret);
+    }
+
+    LOG_DBG("Found device with FW ID: 0x%02x, Version: 0x%02x", fw_id[0], fw_id[1]);
+
+    data->in_int = false;
+    k_msleep(10);
+    ret = pinnacle_write(dev, PINNACLE_STATUS1, 0); // Clear CC
+    if (ret < 0) {
+        LOG_ERR("can't write %d", ret);
+        return ret;
+    }
+    k_usleep(50);
+    ret = pinnacle_write(dev, PINNACLE_SYS_CFG, PINNACLE_SYS_CFG_RESET);
+    if (ret < 0) {
+        LOG_ERR("can't reset %d", ret);
+        return ret;
+    }
+    k_msleep(20);
+    ret = pinnacle_write(dev, PINNACLE_Z_IDLE, 0x05); // No Z-Idle packets
+    if (ret < 0) {
+        LOG_ERR("can't write %d", ret);
+        return ret;
+    }
+
+    ret = pinnacle_set_adc_tracking_sensitivity(dev);
+    if (ret < 0) {
+        LOG_ERR("Failed to set ADC sensitivity %d", ret);
+        return ret;
+    }
+
+    ret = pinnacle_tune_edge_sensitivity(dev);
+    if (ret < 0) {
+        LOG_ERR("Failed to tune edge sensitivity %d", ret);
+        return ret;
+    }
+    ret = pinnacle_force_recalibrate(dev);
+    if (ret < 0) {
+        LOG_ERR("Failed to force recalibration %d", ret);
+        return ret;
+    }
+
+    if (config->sleep_en) {
+        ret = pinnacle_set_sleep(dev, true);
+        if (ret < 0) {
+            return ret;
+        }
+    }
+
+    uint8_t packet[1];
+    ret = pinnacle_seq_read(dev, PINNACLE_SLEEP_INTERVAL, packet, 1);
+
+    if (ret >= 0) {
+        LOG_DBG("Default sleep interval %d", packet[0]);
+    }
+
+    ret = pinnacle_write(dev, PINNACLE_SLEEP_INTERVAL, 255);
+    if (ret <= 0) {
+        LOG_DBG("Failed to update sleep interaval %d", ret);
+    }
+
+    uint8_t feed_cfg2 = PINNACLE_FEED_CFG2_EN_IM | PINNACLE_FEED_CFG2_EN_BTN_SCRL;
+    if (config->no_taps) {
+        feed_cfg2 |= PINNACLE_FEED_CFG2_DIS_TAP;
+    }
+
+    if (config->no_secondary_tap) {
+        feed_cfg2 |= PINNACLE_FEED_CFG2_DIS_SEC;
+    }
+
+    if (config->rotate_90) {
+        feed_cfg2 |= PINNACLE_FEED_CFG2_ROTATE_90;
+    }
+    ret = pinnacle_write(dev, PINNACLE_FEED_CFG2, feed_cfg2);
+    if (ret < 0) {
+        LOG_ERR("can't write %d", ret);
+        return ret;
+    }
+    uint8_t feed_cfg1 = PINNACLE_FEED_CFG1_EN_FEED;
+    if (config->x_invert) {
+        feed_cfg1 |= PINNACLE_FEED_CFG1_INV_X;
+    }
+
+    if (config->y_invert) {
+        feed_cfg1 |= PINNACLE_FEED_CFG1_INV_Y;
+    }
+    if (feed_cfg1) {
+        ret = pinnacle_write(dev, PINNACLE_FEED_CFG1, feed_cfg1);
+    }
+    if (ret < 0) {
+        LOG_ERR("can't write %d", ret);
+        return ret;
+    }
+
+    data->dev = dev;
+
+    pinnacle_clear_status(dev);
+
+    gpio_pin_configure_dt(&config->dr, GPIO_INPUT);
+    gpio_init_callback(&data->gpio_cb, pinnacle_gpio_cb, BIT(config->dr.pin));
+    ret = gpio_add_callback(config->dr.port, &data->gpio_cb);
+    if (ret < 0) {
+        LOG_ERR("Failed to set DR callback: %d", ret);
+        return -EIO;
+    }
+
+    k_work_init(&data->work, pinnacle_work_cb);
+
+    pinnacle_write(dev, PINNACLE_FEED_CFG1, feed_cfg1);
+
+    set_int(dev, true);
+
+    return 0;
+}
+
+#if IS_ENABLED(CONFIG_PM_DEVICE)
+
+static int pinnacle_pm_action(const struct device *dev, enum pm_device_action action) {
+    switch (action) {
+    case PM_DEVICE_ACTION_SUSPEND:
+        return set_int(dev, false);
+    case PM_DEVICE_ACTION_RESUME:
+        return set_int(dev, true);
+    default:
+        return -ENOTSUP;
+    }
+}
+
+#endif // IS_ENABLED(CONFIG_PM_DEVICE)
+
+#define PINNACLE_INST(n)                                                                           \
+    static struct pinnacle_data pinnacle_data_##n;                                                 \
+    static const struct pinnacle_config pinnacle_config_##n = {                                    \
+        COND_CODE_1(DT_INST_ON_BUS(n, i2c),                                                        \
+                    (.bus = {.i2c = I2C_DT_SPEC_INST_GET(n)}, .seq_read = pinnacle_i2c_seq_read,   \
+                     .write = pinnacle_i2c_write),                                                 \
+                    (.bus = {.spi = SPI_DT_SPEC_INST_GET(n,                                        \
+                                                         SPI_OP_MODE_MASTER | SPI_WORD_SET(8) |    \
+                                                             SPI_TRANSFER_MSB | SPI_MODE_CPHA,     \
+                                                         0)},                                      \
+                     .seq_read = pinnacle_spi_seq_read, .write = pinnacle_spi_write)),             \
+        .rotate_90 = DT_INST_PROP(n, rotate_90),                                                   \
+        .x_invert = DT_INST_PROP(n, x_invert),                                                     \
+        .y_invert = DT_INST_PROP(n, y_invert),                                                     \
+        .sleep_en = DT_INST_PROP(n, sleep),                                                        \
+        .no_taps = DT_INST_PROP(n, no_taps),                                                       \
+        .no_secondary_tap = DT_INST_PROP(n, no_secondary_tap),                                     \
+        .x_axis_z_min = DT_INST_PROP_OR(n, x_axis_z_min, 5),                                       \
+        .y_axis_z_min = DT_INST_PROP_OR(n, y_axis_z_min, 4),                                       \
+        .sensitivity = DT_INST_ENUM_IDX_OR(n, sensitivity, PINNACLE_SENSITIVITY_1X),               \
+        .dr = GPIO_DT_SPEC_GET_OR(DT_DRV_INST(n), dr_gpios, {}),                                   \
+    };                                                                                             \
+    PM_DEVICE_DT_INST_DEFINE(n, pinnacle_pm_action);                                               \
+    DEVICE_DT_INST_DEFINE(n, pinnacle_init, PM_DEVICE_DT_INST_GET(n), &pinnacle_data_##n,          \
+                          &pinnacle_config_##n, POST_KERNEL, CONFIG_INPUT_PINNACLE_INIT_PRIORITY,  \
+                          NULL);
+
+DT_INST_FOREACH_STATUS_OKAY(PINNACLE_INST)
+
+```
+
+
+## arquivo: /home/segodimo/zmkxrepos/cirque-input-module/dts/bindings/vendor-prefixes.txt
+
+```text
+cirque	Cirque Corporation
+
+```
+
+

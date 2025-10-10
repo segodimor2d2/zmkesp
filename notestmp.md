@@ -1,5 +1,115 @@
 
 
+
+esses são os arquivos que achei no repositorio oficial do ZMK:
+/home/segodimo/zmk/app/include/zmk/events/
+
+activity_state_changed.h
+battery_state_changed.h
+ble_active_profile_changed.h
+endpoint_changed.h
+hid_indicators_changed.h
+keycode_state_changed.h
+layer_state_changed.h
+modifiers_state_changed.h
+mouse_button_state_changed.h
+position_state_changed.h
+sensor_event.h
+split_peripheral_status_changed.h
+usb_conn_state_changed.h
+wpm_state_changed.h
+
+eu quero saber se algum desses me ajuda a enviar os dados dx e dy do mouse do peripheral para o central
+
+
+
+eu não estou consegindo user um evento customizado (zmk_mouse_state_changed)
+
+
+---
+
+
+---
+
+/home/segodimo/zmk/app/include/zmk/split/central.h
+cd /home/segodimo/zmk/app/include/zmk/split/
+
+
+
+cd /home/segodimo/zmk/app/include
+
+# Procura todas as funções "send" declaradas em headers (.h)
+grep -Rn "send(" . --include \*.h
+
+
+cd /home/segodimo/zmk/app/src
+# Procura por todas as funções que contenham "send" nos arquivos C
+grep -R "send(" .
+
+grep -R "send" .
+
+
+
+me ajuda a saber onde encontrar no repositorio ou pelo que eu poderia  substituiria o zmk_split_bt_transport_send
+
+
+/home/segodimo/zmk/app/include/zmk/split/transport/central.h
+
+➜  split git:(main) ✗ grep -R "send" .
+./transport/central.h:typedef int (*zmk_split_transport_central_send_command_t)(
+./transport/central.h:    zmk_split_transport_central_send_command_t send_command;
+
+
+
+/home/segodimo/zmk/app/src/split/central.c
+cd /home/segodimo/zmk/app/src/split
+
+
+➜  transport git:(main) ✗ cd /home/segodimo/zmk/app/src/split
+➜  split git:(main) ✗ grep -R "send" .
+./bluetooth/Kconfig:    int "Max number of behavior run events to queue to send to the periphera
+l(s)"
+./bluetooth/Kconfig:    int "Max number of key position state events to queue to send to the cen
+tral"
+./bluetooth/service.c:void send_position_state_callback(struct k_work *work) {
+./bluetooth/service.c:K_WORK_DEFINE(service_position_notify_work, send_position_state_callback);
+./bluetooth/service.c:int send_position_state() {
+./bluetooth/service.c:            return send_position_state();
+./bluetooth/service.c:            LOG_WRN("Failed to queue position state to send (%d)", err);
+./bluetooth/service.c:    return send_position_state();
+./bluetooth/service.c:    return send_position_state();
+./bluetooth/service.c:void send_sensor_state_callback(struct k_work *work) {
+./bluetooth/service.c:K_WORK_DEFINE(service_sensor_notify_work, send_sensor_state_callback);
+./bluetooth/service.c:int send_sensor_state(struct sensor_event ev) {
+./bluetooth/service.c:            return send_sensor_state(ev);
+./bluetooth/service.c:            LOG_WRN("Failed to queue sensor state to send (%d)", err);
+./bluetooth/service.c:    return send_sensor_state(ev);
+./bluetooth/central.c:            LOG_WRN("Failed to queue behavior to send (%d)", err);
+./bluetooth/central.c:static int split_central_bt_send_command(uint8_t source,
+./bluetooth/central.c:    .send_command = split_central_bt_send_command,
+./bluetooth/central_bas_proxy.c:// The second generated attribute is the one used to send GATT n
+otifications
+./central.c:    if (!active_transport || !active_transport->api || !active_transport->api->send_
+command) {
+./central.c:    return active_transport->api->send_command(source, command);
+./central.c:        !active_transport->api->get_available_source_ids || !active_transport->api-
+send_command) {
+./central.c:        ret = active_transport->api->send_command(source_ids[i], command);
+./wired/central.c:static void send_pending_tx_work_cb(struct k_work *work);
+./wired/central.c:static K_WORK_DEFINE(wired_central_tx_work, send_pending_tx_work_cb);
+./wired/central.c:static int split_central_wired_send_command(uint8_t source,
+./wired/central.c:        LOG_WRN("No room to send command to the peripheral %d", source);
+./wired/central.c:    split_central_wired_send_command(0,
+./wired/central.c:static void send_pending_tx_work_cb(struct k_work *work) {
+./wired/central.c:    .send_command = split_central_wired_send_command,
+./wired/peripheral.c:static void send_pending_tx_work_cb(struct k_work *work) {
+./wired/peripheral.c:static K_WORK_DEFINE(send_pending_tx, send_pending_tx_work_cb);
+./wired/peripheral.c:    k_work_submit(&send_pending_tx);
+./wired/peripheral.c:        LOG_WRN("No room to send peripheral to the central (have %d but onl
+y space for %d)",
+➜  split git:(main) ✗ 
+
+
 ---
 
 
@@ -391,4 +501,758 @@ static int mouse_state_listener_cb(const zmk_event_t *eh) {
 ZMK_LISTENER(mouse_state_listener, mouse_state_listener_cb);
 ZMK_SUBSCRIPTION(mouse_state_listener, zmk_mouse_state_changed);
 
+---
 
+Of course! Vamos organizar esses tópicos. O conteúdo que você compartilhou é um compilado de discussões técnicas, principalmente do Discord/Zulip do ZMK, focadas em implementar suporte a *pointing devices* como trackpoints e trackballs em teclados customizados.
+
+Abaixo está um resumo dos temas principais, com os links citados formatados para fácil acesso.
+
+### 🔗 Links dos Principais Tópicos
+
+Aqui está uma tabela com os links importantes mencionados no texto:
+
+| Tópico | Descrição | Link |
+| :--- | :--- | :--- |
+| **PR #778** | Suporte genérico para teclas de mouse (mouse keys) no ZMK. | [GitHub](https://github.com/zmkfirmware/zmk/pull/778) |
+| **PR #1751** | Implementação de suporte a dispositivos PS/2 e Trackpoint. | [GitHub](https://github.com/zmkfirmware/zmk/pull/1751) |
+| **PR #2027** | Refatoração do subsistema de entrada para melhor processamento. | [GitHub](https://github.com/zmkfirmware/zmk/pull/2027) |
+| **Fork do urob** | Fork com o PR de mouse atualizado e outros recursos. | [GitHub](https://github.com/urob/zmk) |
+| **Documentação Mouse** | Documentação (em preview) sobre emulação de mouse no ZMK. | [ZMK Dev](https://deploy-preview-778--zmk.netlify.app/docs/behaviors/mouse-emulation) |
+| **Loja Jiyunsheng** | Fonte no AliExpress para compra de módulos Trackpoint individuais. | [AliExpress](https://a.aliexpress.com/_m07i8FQ) |
+
+### 🖱️ Principais Temas Explicados
+
+1.  **Suporte a "Pointing Devices" no ZMK**: O ZMK, firmware para teclados customizados, estava em processo de adicionar suporte nativo para controles de ponteiro (mouse). As discussões mostram o desenvolvimento de:
+    *   **Mouse Keys**: Comandos de movimento e clique do mouse acionados por combinações de teclas .
+    *   **Drivers para Hardware**: Implementações para diferentes tipos de dispositivos, como trackpoints (PS/2) , trackballs (Pimoroni PIM447)  e sensores ópticos (Pixart PMW33XX) .
+
+2.  **Módulos Trackpoint e Fontes de Aquisição**: Há um interesse prático em integrar trackpoints em teclados, como o Corne . As discussões incluem:
+    *   **Onde Comprar**: A "jiyunsheng Store" no AliExpress é citada como uma fonte para comprar apenas o módulo do trackpoint, sem precisar desmontar um teclado completo .
+    * **Módulos VIK**: Existem PCBs customizadas, como o módulo VIK, projetadas para facilitar a instalação do trackpoint em um teclado .
+
+3.  **Exemplo Prático: Corne com Trackpoint**: Um projeto no GitHub documenta a integração de um trackpoint em um teclado Corne, cobrindo desde a impressão 3D de uma case adaptada até a modificação do firmware QMK com funcionalidades como camada de mouse automática e controle de sensibilidade .
+
+4.  **Miryoku e Teclas de Mouse**: A popular configuração de teclado Miryoku, que tem versões para ZMK e KMonad, utiliza teclas de mouse do X11 em seu layout, demonstrando uma aplicação prática desse recurso .
+
+### 💡 Dicas para Aprofundamento
+
+*   Para usar essas funcionalidades, você precisaria compilar o ZMK a partir de um *fork* que contenha os Pull Requests (PRs) ainda não integrados, como o do [urob](https://github.com/urob/zmk).
+*   Se você está planejando um build, o [projeto do Corne com trackpoint](https://github.com/joh/crkbd-trackpoint) e a documentação do [Miryoku](https://github.com/manna-harbour/miryoku_kmonad)  são excelentes pontos de partida para entender o desafio.
+
+Espero que isso ajude a clarear os assuntos! Existe algum tópico específico, como a compra do trackpoint ou a configuração do firmware, sobre o qual você gostaria de se aprofundar?
+
+
+
+
+
+---
+Excelente, Segodimo 👍
+Esse trecho que você trouxe é uma **linha do tempo e panorama técnico** sobre o **desenvolvimento de suporte a mouse, trackpoint e outros dispositivos apontadores no ZMK** — desde 2021 até 2024.
+
+Vou organizar tudo pra você por **temas**, explicando **o contexto, os objetivos e o que cada link faz**, pra que você entenda o “quebra-cabeça” completo.
+
+---
+
+## 🧭 1. **AliExpress Trackpoint Source**
+
+### 💡 Tema: Compra de Trackpoints (hardware)
+
+Um usuário da comunidade descobriu que a loja **[jiyunsheng Store](https://a.aliexpress.com/_m07i8FQ)** no AliExpress vende **teclados Lenovo com trackpoint integrado** e negociou com o vendedor para vender **somente o stick (mouse stick)**, sem o teclado inteiro.
+
+* **Vendedor:** Zhang Hong
+* **Produto:** “mouse stick without keyboard”
+* **Motivo:** reduzir custos e facilitar integração em teclados custom.
+* **Preço:** cerca de **US$10 com frete grátis**, muito mais barato que comprar um teclado inteiro.
+* **Modelos:** existem várias versões com tamanhos e espaçamento de parafusos diferentes (18.5 mm e 19 mm).
+
+👉 **Link:**
+
+* [jiyunsheng Store no AliExpress](https://a.aliexpress.com/_m07i8FQ)
+
+---
+
+## 🧩 2. **ZMK Input Subsystem Refactor (PR #2027)**
+
+### 💡 Tema: Nova arquitetura de entrada no ZMK (Zephyr 3.5)
+
+Mensagem de **petejohanson**, o criador principal do ZMK, explicando que foi feita uma **grande refatoração** no sistema de entrada (input subsystem).
+
+Antes, todos os eventos de sensores e mouse podiam **se misturar e sair de ordem**.
+Agora, com a nova estrutura, **cada dispositivo precisa de um “input listener”** declarado no DeviceTree, como:
+
+```dts
+/ {
+  cirque_listener {
+    compatible = "zmk,input-listener";
+    device = <&cirque>;
+
+    xy-swap;
+    y-invert;
+    x-invert;
+  };
+};
+```
+
+Ele também explica que, se você quiser usar comportamentos de mouse (`&mkp`, `&mmv`, `&msc`), precisa incluir manualmente:
+
+```dts
+#include <behaviors/mouse_keys.dtsi>
+```
+
+👉 **Pull request (PR #2027):**
+[https://github.com/zmkfirmware/zmk/pull/2027](https://github.com/zmkfirmware/zmk/pull/2027)
+
+---
+
+## 🖱️ 3. **ZMK Trackpoint and Pointer Development**
+
+### 💡 Tema: Atualizações gerais do suporte a ponteiros (mouses, trackballs, trackpoints)
+
+Postagem de petejohanson resumindo o status de desenvolvimento:
+
+* **Mouse buttons** já funcionam no ZMK principal.
+* **Movimento e scroll** estão sendo refeitos com a nova **API de input do Zephyr 3.5**.
+* **Drivers físicos** (trackpads, trackballs, etc.) estão sendo migrados para o novo sistema.
+* Foi criado um branch de testes e validado com **Cirque GlidePoint Uno**.
+
+👉 **Pull requests citados:**
+
+* [PR #2027 (input subsystem refactor)](https://github.com/zmkfirmware/zmk/pull/2027)
+* [PR #2035 (exemplo de driver Cirque refatorado)](https://github.com/zmkfirmware/zmk/pull/2035)
+
+---
+
+## ⚙️ 4. **Drivers de Hardware para Trackballs / Sensores**
+
+### 💡 Tema: Drivers para dispositivos de movimento físico
+
+O usuário **knutkarevoll** cita dois PRs de drivers específicos:
+
+* **Pimoroni PIM447 trackball:**
+  [https://github.com/zmkfirmware/zmk/pull/961](https://github.com/zmkfirmware/zmk/pull/961)
+
+* **Pixart PMW33XX (ex: PMW3360, PMW3389):**
+  [https://github.com/zmkfirmware/zmk/pull/1163](https://github.com/zmkfirmware/zmk/pull/1163)
+
+Esses drivers adicionam suporte direto a sensores ópticos de alta precisão —
+usados em trackballs, mouses e até trackpoints modernos.
+
+---
+
+## 🧠 5. **Generic Mouse Support (PR #778 e forks)**
+
+### 💡 Tema: Primeira implementação genérica de mouse HID no ZMK
+
+Essa foi a base inicial de todo o suporte de mouse no ZMK.
+
+* **PR original:**
+  [https://github.com/zmkfirmware/zmk/pull/778](https://github.com/zmkfirmware/zmk/pull/778)
+* **Versão mais atualizada (fork do urob):**
+  [https://github.com/urob/zmk/tree/mouse-3.2](https://github.com/urob/zmk/tree/mouse-3.2)
+* **Documentação (preview):**
+  [https://deploy-preview-778--zmk.netlify.app/docs/behaviors/mouse-emulation](https://deploy-preview-778--zmk.netlify.app/docs/behaviors/mouse-emulation)
+
+Esse PR introduz os comportamentos:
+
+* `&mkp` → Mouse press
+* `&mmv` → Mouse move
+* `&msc` → Mouse scroll
+
+E permite emular mouse HID em qualquer teclado.
+
+---
+
+## 🔌 6. **PS/2 e Trackpoint Support (PR #1751)**
+
+### 💡 Tema: Adicionar suporte para trackpoints via PS/2
+
+PR que adiciona suporte para dispositivos **PS/2**, como os trackpoints usados em teclados Lenovo.
+
+👉 **Pull request:**
+[https://github.com/zmkfirmware/zmk/pull/1751](https://github.com/zmkfirmware/zmk/pull/1751)
+
+Esse PR depende do fork do **urob** e permite conectar um trackpoint diretamente a um microcontrolador (por exemplo, via GPIO com PS/2 bitbang).
+
+---
+
+## 🧮 7. **Bluetooth Performance Ajustes**
+
+### 💡 Tema: Suavidade do mouse via BLE
+
+Um usuário descobriu que a movimentação do mouse ficava mais suave ao ajustar o intervalo de conexão Bluetooth:
+
+```conf
+CONFIG_BT_PERIPHERAL_PREF_MIN_INT=6
+CONFIG_BT_PERIPHERAL_PREF_MAX_INT=12
+```
+
+Isso reduz a latência entre os pacotes HID.
+
+---
+
+## 💻 8. **Branches e Desenvolvimento Histórico**
+
+* **Branch mouse-pr:** usado em 2022 para testes de mouse.
+
+  > [https://github.com/krikun98/zmk/tree/mouse-pr-acceleration](https://github.com/krikun98/zmk/tree/mouse-pr-acceleration)
+* **WIP docs:**
+
+  > [https://deploy-preview-778--zmk.netlify.app/docs/behaviors/mouse-emulation](https://deploy-preview-778--zmk.netlify.app/docs/behaviors/mouse-emulation)
+
+---
+
+## 🧠 9. **Mouse Keys no Sistema Operacional**
+
+Manna Harbour explica que, mesmo sem suporte HID no firmware, é possível emular o movimento do mouse usando **mouse keys** no próprio sistema operacional.
+
+* X11 (Linux): [https://en.wikipedia.org/wiki/Mouse_keys](https://en.wikipedia.org/wiki/Mouse_keys)
+* Windows: [https://support.microsoft.com/en-us/windows/use-mouse-keys-to-move-the-mouse-pointer-9e0c72c8-b882-7918-8e7b-391fd62adf33](https://support.microsoft.com/en-us/windows/use-mouse-keys-to-move-the-mouse-pointer-9e0c72c8-b882-7918-8e7b-391fd62adf33)
+* macOS: [https://support.apple.com/en-au/guide/mac-help/mh27469/mac](https://support.apple.com/en-au/guide/mac-help/mh27469/mac)
+
+---
+
+## 📚 **Resumo Final**
+
+| Tema                        | Descrição                                          | Links                                                                                                                                                                                                                                                    |
+| --------------------------- | -------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 🛒 Trackpoint AliExpress    | Loja que vende trackpoints puros                   | [jiyunsheng Store](https://a.aliexpress.com/_m07i8FQ)                                                                                                                                                                                                    |
+| 🧩 Input Subsystem Refactor | Nova forma de processar eventos de entrada no ZMK  | [PR #2027](https://github.com/zmkfirmware/zmk/pull/2027)                                                                                                                                                                                                 |
+| 🖱️ Pointer Update          | Migração para novo sistema de entrada (Zephyr 3.5) | [PR #2035](https://github.com/zmkfirmware/zmk/pull/2035)                                                                                                                                                                                                 |
+| ⚙️ Drivers específicos      | PIM447 e PMW33XX                                   | [#961](https://github.com/zmkfirmware/zmk/pull/961), [#1163](https://github.com/zmkfirmware/zmk/pull/1163)                                                                                                                                               |
+| 🧠 Generic Mouse Support    | Emulação HID de mouse no ZMK                       | [#778](https://github.com/zmkfirmware/zmk/pull/778), [urob fork](https://github.com/urob/zmk/tree/mouse-3.2)                                                                                                                                             |
+| 🧩 PS/2 Trackpoint          | Suporte a trackpoints físicos via PS/2             | [#1751](https://github.com/zmkfirmware/zmk/pull/1751)                                                                                                                                                                                                    |
+| ⚡ BLE Performance           | Ajuste de latência para suavizar o mouse           | `CONFIG_BT_PERIPHERAL_PREF_MIN_INT=6`                                                                                                                                                                                                                    |
+| 🖥️ Mouse Keys SO           | Uso do teclado como mouse via sistema operacional  | [X11](https://en.wikipedia.org/wiki/Mouse_keys), [Windows](https://support.microsoft.com/en-us/windows/use-mouse-keys-to-move-the-mouse-pointer-9e0c72c8-b882-7918-8e7b-391fd62adf33), [Mac](https://support.apple.com/en-au/guide/mac-help/mh27469/mac) |
+
+---
+
+Quer que eu te mostre **quais desses PRs ainda estão ativos ou foram integrados ao ZMK principal (em 2025)** e o **estado atual do suporte a mouse/trackpoint** no código oficial?
+
+
+
+
+
+---
+
+Ótimo — essa documentação é super relevante para você, porque ela mostra como integrar um dispositivo de apontamento (trackpoint, touchpad, etc.) dentro de um teclado ZMK, especialmente quando ele estiver numa **parte periférica (split peripheral)**.
+
+Aqui está uma explicação detalhada, seção por seção, com foco no que você precisa para aplicar ao seu projeto:
+
+---
+
+## 📘 Visão geral da página “Pointing Devices – ZMK Firmware”
+
+A página “Pointing Devices” da documentação do ZMK trata de como adicionar e configurar hardware de apontamento dentro de um teclado que executa ZMK. Ela aborda tanto casos de teclados “unibody” (tudo junto) quanto casos split (metades), e discute como fazer a configuração via DeviceTree, como processar os eventos do dispositivo, e como fazer que ele envie os dados corretos para o host.
+
+Link da página:
+**Pointing Devices – ZMK Firmware**
+[https://zmk.dev/docs/development/hardware-integration/pointing](https://zmk.dev/docs/development/hardware-integration/pointing) ([ZMK Firmware][1])
+
+Vou destrinchar os pontos principais:
+
+---
+
+## 1. **Input Device (Dispositivo de entrada / apontamento)**
+
+* Para que ZMK reconheça um hardware de apontamento (trackpad, trackpoint, sensor óptico, etc.), você precisa definir um nó (node) no DeviceTree (arquivo `.overlay` ou `.dts`) para esse dispositivo.
+
+* Esse nó deve estar sob o barramento correspondente (por exemplo, SPI, I2C), ou sob um nó já existente de barramento. Por exemplo:
+
+  ```dts
+  &i2c3 {
+    your_pointer: pointer@0 {
+      compatible = "cirque,pinnacle";
+      reg = <0>;
+      dr-gpios = <&gpio 5 GPIO_ACTIVE_HIGH>;
+      status = "okay";
+    };
+  };
+  ```
+
+  Aqui, `compatible = "cirque,pinnacle"` indica que esse hardware é um dispositivo reconhecido pela driver “Cirque Pinnacle”.
+  Esse nó (device) vai permitir que ZMK use o driver correto para falar com esse hardware.
+
+* Se você estiver usando um teclado split e o apontador estiver numa metade periférica (split peripheral), esse nó deve ir para o overlay daquela metade (lado onde está o hardware).
+
+---
+
+## 2. **Listener e Input Split Device**
+
+Esse é um ponto chave para casos splits:
+
+* **Listener**: Cada dispositivo de entrada (mouse, trackpad) precisa de um “listener” no ZMK. Esse listener fica responsável por **ouvir os eventos** do hardware (movimentos, cliques, scroll), processá-los (por exemplo aplicar inversão, escala) e depois encaminhar para o host via HID.
+
+* Você declara esse listener no DeviceTree também, numa parte `.overlay`. Exemplo:
+
+  ```dts
+  / {
+    glidepoint_listener {
+      compatible = "zmk,input-listener";
+      device = <&glidepoint>;
+      input-processors = <&zip_xy_transform (INPUT_TRANSFORM_XY_SWAP | INPUT_TRANSFORM_X_INVERT)>;
+    };
+  };
+  ```
+
+  Aqui:
+
+  * `device = <&glidepoint>` conecta o listener ao nó de hardware `glidepoint`.
+  * `input-processors` permite que você aplique transformações nos eventos (trocar X/Y, inverter eixos, etc).
+
+* **Input split**: Em um teclado split, para que o lado periférico possa transmitir eventos de apontamento ao lado central e depois ao host, é necessário configurar um dispositivo “input split”. Esse nó também vai no DeviceTree:
+
+  ```dts
+  input-split {
+    compatible = "zmk,input-split";
+    device = <&glidepoint>;
+    input-processors = <...>;
+  };
+  ```
+
+  Isso conecta o listener ao sistema de comunicação split (por exemplo, BLE split), para que os eventos sejam enviados da metade que contém o hardware para a metade central que envia ao host.
+
+---
+
+## 3. **Input Processors (Processadores de entrada)**
+
+Alguns dispositivos geram dados “crus” que precisam de correção ou adaptação antes de ir para o host. Os input processors permitem aplicar essas correções de forma declarativa na configuração.
+
+Exemplos:
+
+* Inverter eixo X ou Y (porque seu hardware está rotacionado)
+* Trocar X e Y (swap)
+* Escalar movimentos para que dx/dy tenham ganho diferente (por exemplo, sensibilidade)
+* Transformar movimento em scroll (em alguns casos)
+
+Você configura esses processadores no DeviceTree junto com o listener ou input-split:
+
+```dts
+input-processors = <&zip_xy_transform (INPUT_TRANSFORM_XY_SWAP | INPUT_TRANSFORM_Y_INVERT)>;
+```
+
+Isso significa: aplicar um processador que troca os eixos e inverte o eixo Y.
+
+---
+
+## 4. **Configuração (Kconfig / opções)**
+
+Para que a funcionalidade de apontamento (mouse) funcione, algumas configurações devem estar habilitadas no firmware:
+
+* `CONFIG_ZMK_POINTING = y` — ativa funcionalidades gerais de apontamento em ZMK. ([ZMK Firmware][2])
+* `CONFIG_ZMK_POINTING_SMOOTH_SCROLLING` — permite “scroll suave” (mais subdivisões no HID) ([ZMK Firmware][2])
+* Também há parâmetros relacionados ao tamanho da pilha de thread de entrada (input thread stack size), especialmente em splits periféricos. ([ZMK Firmware][2])
+
+Essas configurações ficam normalmente em arquivos `.conf` ou `Kconfig.defconfig` do seu projeto.
+
+---
+
+## 5. **Caminho de eventos e fluxo**
+
+Para ilustrar como tudo se encaixa, esse é o fluxo que o ZMK espera:
+
+1. O hardware de apontamento (por exemplo, um trackpoint via SPI) gera eventos (dx, dy, botões).
+2. O driver do hardware (definido pelo nó `compatibile = …`) lê esses valores e converte em eventos internos.
+3. O **input listener** captura esses eventos, aplica **input processors** (se houver), e prepara o evento para envio.
+4. Se for um **split peripheral**, esse evento passa pelo **input-split** para ser transmitido (via BLE split ou transporte interno) para o lado central.
+5. O central recebe esses eventos, e os envia ao host como **HID pointer / mouse** (movimento, botões, scroll).
+
+---
+
+## ✅ Por que isso é importante para você
+
+No seu caso, você está tentando justamente fazer algo parecido: **enviar movimento de mouse da metade periférica para a central / host**. Essa documentação mostra o caminho ideal que o ZMK espera que seja seguido, sem hacks:
+
+* Você precisa definir o hardware no DeviceTree;
+* Criar o listener e possivelmente o input-split se seu apontador for numa metade periférica;
+* Usar input processors conforme necessário para ajustar orientações / ganho;
+* Habilitar as configurações (CONFIG_ZMK_POINTING etc);
+* Deixar o sistema de eventos interno do ZMK + HID cuidar do transporte até o host.
+
+---
+
+Se você quiser, posso te mostrar exatamente como seria o trecho `.overlay` / `.dts` para o seu teclado com trackpoint na metade esquerda/periférica, baseado nessa documentação, adaptado ao seu hardware. Você quer que eu monte isso pra você?
+
+[1]: https://zmk.dev/docs/development/hardware-integration/pointing?utm_source=chatgpt.com "Pointing Devices - ZMK Firmware"
+[2]: https://zmk.dev/docs/config/pointing?utm_source=chatgpt.com "Pointing Device Configuration - ZMK Firmware"
+
+
+
+---
+
+Excelente pergunta — e ela é **muito importante** se você está mexendo com o **ZMK** (ou qualquer projeto baseado no **Zephyr**).
+Vamos detalhar tudo 👇
+
+---
+
+## 🧩 1. O que são arquivos `.dtsi` e `.dts` no ZMK / Zephyr
+
+Os arquivos com extensão **`.dts`** e **`.dtsi`** vêm do sistema **DeviceTree**, usado pelo **Zephyr RTOS** para descrever o **hardware** de uma placa.
+
+Eles **não são código C**, e sim uma **linguagem declarativa** que descreve:
+
+> “quais dispositivos existem neste hardware e como estão conectados”.
+
+O Zephyr (e, portanto, o ZMK) usa o DeviceTree para **gerar automaticamente** código C que configura GPIOs, sensores, drivers de teclado, etc.
+
+---
+
+## ⚙️ 2. Diferença entre `.dts` e `.dtsi`
+
+| Tipo    | Significado                   | Analogia          | Uso típico                                                                           |
+| ------- | ----------------------------- | ----------------- | ------------------------------------------------------------------------------------ |
+| `.dtsi` | **DeviceTree Source Include** | Como um `.h` no C | Arquivo **genérico ou compartilhado** que define partes do hardware reutilizáveis    |
+| `.dts`  | **DeviceTree Source**         | Como um `.c` no C | Arquivo **principal da placa**, que “importa” os `.dtsi` e define os detalhes finais |
+
+### Exemplo prático:
+
+```dts
+// arquivo base: esp32.dtsi
+/ {
+    soc {
+        uart0: uart@3f400000 {
+            compatible = "espressif,esp32-uart";
+            reg = <0x3f400000 0x1000>;
+        };
+    };
+}
+```
+
+```dts
+// arquivo específico: my_keyboard_esp32.dts
+#include "esp32.dtsi"
+
+/ {
+    chosen {
+        zmk,kscan = &kscan0;
+    };
+
+    kscan0: kscan {
+        compatible = "zmk,kscan-gpio";
+        rows = <4>;
+        cols = <12>;
+        row-gpios = <...>;
+        col-gpios = <...>;
+    };
+}
+```
+
+No build, o Zephyr junta tudo (como se fosse um `#include` no C).
+
+---
+
+## 🧱 3. Como o ZMK usa isso
+
+O **ZMK** define seus próprios `.dtsi` e `.dts` para:
+
+* Teclados (`boards/shields/*.dts`)
+* Pontos de integração de sensores e periféricos (`boards/*.dtsi`)
+* Divisão de camadas entre **split central/peripheral**
+
+Por exemplo:
+
+* `boards/shields/corne_left.dtsi` → define a matriz de teclas e pinos.
+* `boards/shields/corne_right.dtsi` → define o lado direito.
+* `boards/shields/corne.dtsi` → define o layout comum entre os dois lados.
+* `boards/shields/corne_left.keymap` → usa o DeviceTree para mapear as teclas.
+
+---
+
+## 🖱️ 4. No contexto do **pointing device**
+
+Na documentação que você leu ([ZMK Pointing Device Integration](https://zmk.dev/docs/development/hardware-integration/pointing)), o DeviceTree é usado para **declarar sensores de movimento** (trackball, giroscópio, touchpad etc).
+
+Exemplo simplificado (para um sensor de movimento no lado **peripheral**):
+
+```dts
+&pro_micro_i2c {
+    status = "okay";
+
+    adxl345@53 {
+        compatible = "adi,adxl345";
+        reg = <0x53>;
+        label = "ADXL345";
+    };
+};
+
+pointing_device {
+    compatible = "zmk,pointing-device";
+    sensor = <&adxl345>;
+};
+```
+
+Esse trecho diz ao Zephyr + ZMK:
+
+> “Há um dispositivo de apontamento conectado ao barramento I2C, usando o sensor ADXL345, e ele será usado como o mouse do teclado”.
+
+Depois disso, o ZMK já sabe qual driver inicializar e como enviar eventos de movimento.
+
+---
+
+## 🧰 5. Onde você encontra isso no ZMK
+
+No repositório oficial:
+
+```
+zmk/
+ ├─ app/
+ ├─ boards/
+ │   ├─ shields/
+ │   │   ├─ corne/
+ │   │   │   ├─ corne_left.dtsi
+ │   │   │   ├─ corne_right.dtsi
+ │   │   │   └─ corne.dtsi
+ │   └─ nice_nano_v2/
+ │       └─ nice_nano_v2.dtsi
+ └─ zephyr/
+```
+
+Cada `.dtsi` combina partes do hardware e é mesclado automaticamente no build (`west build`).
+
+---
+
+## 🧠 6. Resumo visual
+
+```
+           ┌───────────────────────────┐
+           │  ZMK (.conf, .keymap)     │
+           └────────────┬──────────────┘
+                        │
+                        ▼
+               ┌────────────────┐
+               │ DeviceTree (.dts)  │   ← Descreve o teclado/sensor
+               ├────────────────┤
+               │ .dtsi includes │   ← Define hardware base
+               └────────────────┘
+                        │
+                        ▼
+           ┌───────────────────────────┐
+           │  Zephyr gera código C     │
+           │  para configurar drivers  │
+           └───────────────────────────┘
+```
+
+---
+
+Se quiser, posso te mostrar **um exemplo real de `.dtsi` para um sensor de movimento (como o PMW3360)** usado em um teclado split — com explicação linha por linha.
+Quer que eu monte isso?
+
+---
+
+
+# Como eu posso enviar dados dx/dy do peripheral → central?
+
+Olá para todos,
+eu sou muito novato no ZMK e ainda fico perdido com a estrutura do ZMK,
+meu problema é que eu não estou conseguindo `receber` os dados do lado central:
+
+eu quero achar qualquer jeito de poder enviar os dados do mouse  no dentido peripheral → central,
+sem ter que inverter o lado central para que o mouse funcione desse lado,
+
+e eu quero saber se eu posso `transferir` dados de um mouse `dx/dy` do peripheral → central num teclado split.
+
+eu fiz um teste assim:
+
+https://github.com/segodimor2d2/zmkpromicro/commit/51e279078e558592db9dc988e55fc29e57a6c4cd
+
+
+| Arquivo                    | Lado       | Função                                             |
+| -------------------------- | ---------- | -------------------------------------------------- |
+| `mouse_test_sender.c`      | Peripheral | Gera eventos de teste                              |
+| `mouse_tx_listener.c`      | Peripheral | Envia via BLE split                                |
+| `mouse_split_rx_handler.c` | Central    | Recebe bytes BLE, recria `zmk_mouse_state_changed` |
+| `mouse_rx_listener.c`      | Central    | Converte evento em movimento HID                   |
+| `test_left.c`              | Central    | Listener de diagnóstico, confirma se evento chegou |
+
+
+# o que eu estou fazendo?
+
+Eu estou comunicando um esp32 ao nRF52840 via UART de cada lado(esp32+nRF52840 Left/Central e esp32+nRF52840 Right/Peripheral);
+do lado central eu estou enviando dados de um gyroscopo via UART para controlar o mouse e esta perfeito porque que consigo usar assim
+
+
+# uart_move_mouse_left.c
+
+```c
+#include <zephyr/kernel.h>
+#include <zephyr/logging/log.h>
+#include <zmk/hid.h>
+#include <zmk/endpoints.h>
+#include <zmk/uart_move_mouse_left.h>
+
+LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
+
+int uart_move_mouse(int8_t dx, int8_t dy, int8_t scroll_y, int8_t scroll_x, zmk_mouse_button_flags_t buttons) {
+
+    // Pega o report global do ZMK
+    struct zmk_hid_mouse_report *report = zmk_hid_get_mouse_report();
+
+    // Atualiza o report global
+    report->body.d_x = dx;
+    report->body.d_y = dy;
+    report->body.buttons = buttons;
+    report->body.d_scroll_y = scroll_y;
+    report->body.d_scroll_x = scroll_x;
+
+    // Envia para o host (USB/BLE)
+    int ret = zmk_endpoints_send_mouse_report();
+    LOG_DBG("UART mouse move dx=%d dy=%d scroll_y=%d scroll_x=%d buttons=0x%02X ret=%d",
+            dx, dy, scroll_y, scroll_x, buttons, ret);
+
+    return ret;
+}
+```
+
+meu problema aparece quando eu quero enviar os dados dados do peripheral para o central,
+porque não consigo receber os dados que deveriam ser enviados pelo canal bluetooth do zmk como eu deveria poder receber aqui.
+
+
+# mouse_rx_listener.c
+
+```c
+#include <zephyr/logging/log.h>
+#include <zmk/event_manager.h>
+#include "zmk/events/zmk_mouse_state_changed.h"
+#include <zmk/uart_move_mouse_left.h>
+
+LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
+
+int zmk_split_bt_central_receive(const uint8_t *data, size_t len)
+{
+    if (len != sizeof(struct zmk_mouse_state_changed))
+        return -EINVAL;
+
+    const struct zmk_mouse_state_changed *recv = (const struct zmk_mouse_state_changed *)data;
+
+    struct zmk_mouse_state_changed ev = {
+        .dx = recv->dx,
+        .dy = recv->dy,
+        .scroll_x = recv->scroll_x,
+        .scroll_y = recv->scroll_y,
+        .buttons = recv->buttons,
+    };
+    ev.header.event = &zmk_event_zmk_mouse_state_changed;
+
+    ZMK_EVENT_RAISE(ev);
+
+    LOG_INF("Mouse event via BLE Split: dx=%d dy=%d scroll_y=%d scroll_x=%d buttons=0x%02X",
+            ev.dx, ev.dy, ev.scroll_y, ev.scroll_x, ev.buttons);
+
+    uart_move_mouse(ev.dx, ev.dy, ev.scroll_y, ev.scroll_x, ev.buttons);
+
+    return 0;
+}
+```
+
+
+
+
+
+
+
+
+
+---
+
+# How can I send dx/dy data from peripheral → central?
+
+Hello everyone, I'm very new to ZMK and still get lost with its structure.
+my problem is that I can't **receive** the data on the central side.
+I want to find a way to send mouse data from the **peripheral → central** side, without having to swap the central side just to get the mouse working there.
+I want to know if it's possible to **transfer** mouse `dx/dy` data from the **peripheral → central** on a split keyboard.
+I did a test like this: https://github.com/segodimor2d2/zmkpromicro/commit/51e279078e558592db9dc988e55fc29e57a6c4cd
+
+Peripheral:
+mouse_test_sender.c → Test events
+mouse_tx_listener.c → BLE send
+
+Central:
+mouse_split_rx_handler.c → BLE receive
+mouse_rx_listener.c → HID movement
+test_left.c → Event confirmation
+
+### What am I trying to do?
+
+I have an ESP32 communicating with an nRF52840 via UART on **each side** (ESP32 + nRF52840 Left/Central and ESP32 + nRF52840 Right/Peripheral). On the **central side**, I am sending gyroscope data via UART to control the mouse, and it works perfectly when I use it this way.
+
+### uart_move_mouse_left.c
+
+```c
+int uart_move_mouse(int8_t dx, int8_t dy, int8_t scroll_y, int8_t scroll_x, zmk_mouse_button_flags_t buttons) {
+    struct zmk_hid_mouse_report *report = zmk_hid_get_mouse_report();
+    report->body.d_x = dx;
+    report->body.d_y = dy;
+    report->body.buttons = buttons;
+    report->body.d_scroll_y = scroll_y;
+    report->body.d_scroll_x = scroll_x;
+    int ret = zmk_endpoints_send_mouse_report();
+    return ret;
+}
+```
+
+My problem appears when I try to send this data from the **peripheral to the central**, because I can't receive the data that should be sent through ZMK's Bluetooth channel, as I should be able to receive it here:
+
+### mouse_rx_listener.c
+
+https://github.com/segodimor2d2/zmkpromicro/blob/master/config/src/mouse_rx_listener.c
+
+
+---
+
+Hello everyone, I'm very new to ZMK and still get lost with its structure.
+
+my problem is that I can't receive the data on the central side.
+I want to find a way to send mouse data from the peripheral → central side, without having to swap the central side just to get the mouse working there.
+I want to know if it's possible to transfer mouse dx/dy data from the peripheral → central on a split keyboard.
+I did a test like this:
+https://github.com/segodimor2d2/zmkpromicro/commit/51e279078e558592db9dc988e55fc29e57a6c4cd
+
+Peripheral:
+mouse_test_sender.c → Test events
+mouse_tx_listener.c → BLE send
+
+Central:
+mouse_split_rx_handler.c → BLE receive
+mouse_rx_listener.c → HID movement
+test_left.c → Event confirmation
+
+What am I trying to do?
+I have an ESP32 communicating with an nRF52840 via UART on each side (ESP32 + nRF52840 Left/Central and ESP32 + nRF52840 Right/Peripheral). On the central side, I am sending gyroscope data via UART to control the mouse, and it works perfectly when I use it this way.
+
+uart_move_mouse_left.c
+https://github.com/segodimor2d2/zmkpromicro/blob/master/config/src/uart_move_mouse_left.c
+
+int uart_move_mouse(int8_t dx, int8_t dy, int8_t scroll_y, int8_t scroll_x, zmk_mouse_button_flags_t buttons) {
+    struct zmk_hid_mouse_report *report = zmk_hid_get_mouse_report();
+    report->body.d_x = dx;
+    report->body.d_y = dy;
+    report->body.buttons = buttons;
+    report->body.d_scroll_y = scroll_y;
+    report->body.d_scroll_x = scroll_x;
+    int ret = zmk_endpoints_send_mouse_report();
+    return ret;
+}
+
+
+My problem appears when I try to send this data from the peripheral to the central, because I can't receive the data that should be sent through ZMK's Bluetooth channel, as I should be able to receive it here:
+
+mouse_rx_listener.c
+https://github.com/segodimor2d2/zmkpromicro/blob/master/config/src/mouse_rx_listener.c
+GitHub
+test receiver central fallido · segodimor2d2/zmkpromicro@51e2790
+test receiver central fallido · segodimor2d2/zmkpromicro@51e2790
+GitHub
+zmkpromicro/config/src/uart_move_mouse_left.c at master · segodimo...
+Contribute to segodimor2d2/zmkpromicro development by creating an account on GitHub.
+GitHub
+zmkpromicro/config/src/mouse_rx_listener.c at master · segodimor2d...
+Contribute to segodimor2d2/zmkpromicro development by creating an account on GitHub.
+Contribute to segodimor2d2/zmkpromicro development by creating an account on GitHub.
+
+
+| File                      | Side       | Function                                              |
+| ------------------------- | ---------- | ----------------------------------------------------- |
+| `mouse_test_sender.c`     | Peripheral | Generates test events                                 |
+| `mouse_tx_listener.c`     | Peripheral | Sends via BLE split                                   |
+| `mouse_split_rx_handler.c`| Central    | Receives BLE bytes, recreates `zmk_mouse_state_changed` |
+| `mouse_rx_listener.c`     | Central    | Converts event into HID movement                      |
+| `test_left.c`             | Central    | Diagnostic listener, confirms if event arrived        |

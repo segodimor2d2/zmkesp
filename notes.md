@@ -8,8 +8,8 @@ $$$$
 ---
 
 ## corne
-
-- testar setas com o botão FN e não com numbes trocaria pelas F1 F2 F3
+ 
+- ? e / com uma mão só
 
 
 
@@ -24467,14 +24467,17 @@ Boa — achei onde `input_report_rel()` (e o mecanismo de input em geral) está 
 
 ## 🔍 Onde está `input_report_rel()` no Zephyr
 
-No Zephyr, as funções `input_report_rel()`, `input_report_key()`, etc., são definidas como **interfaces estáticas/inline** no *header* de input, e depois encaminhadas para uma função mais genérica `input_report()` que faz o despacho dos eventos.
+No Zephyr, as funções `input_report_rel()`, `input_report_key()`, etc.,
+são definidas como **interfaces estáticas/inline** no *header* de input,
+e depois encaminhadas para uma função mais genérica `input_report()` que faz o despacho dos eventos.
 
 Você pode ver isso na documentação da API de input:
 
 * `input_report_rel()` está declarada no `input.h` como:
 
   > `static int input_report_rel (const struct device *dev, uint16_t code, int32_t value, bool sync, k_timeout_t timeout)` — reporta um evento **INPUT_EV_REL**. ([docs.zephyrproject.org][1])
-* A função central `input_report()` também está declarada ali, como a função que todos os eventos (rel, key, abs) acabam chamando. ([docs.zephyrproject.org][1])
+* A função central `input_report()` também está declarada ali,
+como a função que todos os eventos (rel, key, abs) acabam chamando. ([docs.zephyrproject.org][1])
 
 ---
 
@@ -24555,6 +24558,7 @@ Se quiser, posso te mandar os links exatos no repositório oficial Zephyr (vers�
 ---
 $$$$
 /home/segodimo/zmk/zephyr/subsys/input/input.c
+e /home/segodimo/zmk/zephyr/subsys/input/input.c
 
 aqui esta o codigo do input.c no zmk/zephyr/subsys/input/input.c, eu eu quero entender que parâmetros são os que esta recebendo input_report?
 também eu quero saber se ele precisa que eu chame o input_report com todos os parametros para ele rodar
@@ -24770,3 +24774,634 @@ Mas lembre-se: o “sucesso” aqui quer dizer “o evento foi aceito pelo subsi
 
 Quer que eu te mostre **como capturar e confirmar que o evento chegou de fato no listener ZMK (zmk_mouse_state_changed)**?
 Assim você consegue validar o fluxo completo do input_report → evento ZMK.
+
+
+
+
+| Valor         | Comportamento                                                                                                 | Quando usar                                                                                                            |
+| ------------- | ------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `K_FOREVER`   | Bloqueia indefinidamente até que haja espaço na fila. O thread que chamou fica **parado até liberar espaço**. | Quando você quer garantir que **nenhum evento seja perdido**, mesmo que isso cause bloqueio temporário.                |
+| `K_MSEC(100)` | Espera até 100 ms para a fila liberar espaço; se não liberar, retorna erro `-EAGAIN`.                         | Quando você quer que o código **continue rodando mesmo se a fila estiver cheia**, útil para debug e evitar travamento. |
+
+
+
+      input_report_rel(dev, INPUT_REL_X, dx, false, K_FOREVER);
+ret = input_report_rel(dev, INPUT_REL_X, dx, false, K_MSEC(100));
+
+
+
+| Timeout       | O que acontece se a fila estiver cheia  | Risco                       |
+| ------------- | --------------------------------------- | --------------------------- |
+| `K_FOREVER`   | Espera para sempre → pode travar        | ⚠️ travamento               |
+| `K_MSEC(100)` | Espera 100 ms → retorna erro se não der | ✅ seguro para debug         |
+| `K_NO_WAIT`   | Nem espera → retorna erro imediatamente | ⚡ bom para alta performance |
+
+
+---
+
+mostre **como capturar e confirmar que o evento chegou de fato no listener ZMK (zmk_mouse_state_changed)**
+
+
+
+Perfeito 🔥 — essa é **a forma mais direta de saber se o evento realmente percorreu o caminho completo** dentro do **Zephyr → ZMK → listener**.
+Vamos montar passo a passo o **teste completo**, com logs e confirmações reais no listener (`mouse_state_listener.c`).
+
+---
+
+## 🧩 Contexto
+
+Você está chamando:
+
+```c
+input_report_rel(dev, INPUT_REL_X, dx, false, K_MSEC(100));
+```
+
+Essa chamada **gera um evento** do tipo `input_event`.
+O Zephyr (através de `input.c`) entrega isso para **todos os listeners registrados** via:
+
+```c
+STRUCT_SECTION_FOREACH(input_listener, listener)
+```
+
+No ZMK, há um listener chamado `zmk_mouse_state_changed_listener` (ou similar), que reage aos eventos de movimento e envia `zmk_mouse_state_changed` pelo Event Manager do ZMK.
+
+---
+
+## ✅ Objetivo
+
+Queremos **ver na prática**:
+
+1. Que o `input_report_rel()` realmente gerou um evento.
+2. Que o listener (`zmk_mouse_state_changed`) o **recebeu**.
+3. Que o evento foi processado corretamente (por exemplo, logado via `LOG_INF`).
+
+---
+
+## 🧠 Como funciona o caminho do evento
+
+```
+uart_move_mouse_right()
+ └── input_report_rel()            ← gera evento Zephyr
+      └── input.c → input_process()
+           └── chama todos os listeners registrados
+                └── mouse_state_listener.c → callback()
+                     └── gera zmk_mouse_state_changed()
+```
+
+---
+
+## 🧰 Passo 1 — Adicionar logs no listener
+
+Edite o arquivo:
+
+```
+zmk/app/src/mouse_state_listener.c
+```
+
+E adicione logs no callback que processa os eventos (normalmente algo como `zmk_mouse_state_changed_listener_callback`):
+
+```c
+#include <zephyr/logging/log.h>
+LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
+
+static int mouse_state_listener_cb(const struct zmk_mouse_state_changed *ev) {
+    LOG_INF("🖱️ Mouse event received!");
+    LOG_INF("dx=%d dy=%d scroll_x=%d scroll_y=%d buttons=%d",
+            ev->dx, ev->dy, ev->scroll_x, ev->scroll_y, ev->buttons);
+    return 0;
+}
+```
+
+---
+
+## 🧰 Passo 2 — Confirmar que o listener está registrado
+
+Mais abaixo no mesmo arquivo, **confirme a linha:**
+
+```c
+ZMK_LISTENER(mouse_state_listener, mouse_state_listener_cb);
+ZMK_SUBSCRIPTION(mouse_state_listener, zmk_mouse_state_changed);
+```
+
+Se ela **não estiver lá**, o evento nunca será recebido.
+
+---
+
+## 🧰 Passo 3 — Adicionar logs no `uart_move_mouse_right()`
+
+No seu arquivo:
+
+```c
+int uart_move_mouse_right(int8_t dx,
+                          int8_t dy,
+                          int8_t scroll_y,
+                          int8_t scroll_x,
+                          uint8_t buttons) {
+    int ret;
+
+    LOG_INF("➡️ Enviando movimento dx=%d dy=%d", dx, dy);
+
+    ret = input_report_rel(dev, INPUT_REL_X, dx, false, K_MSEC(100));
+    if (ret) {
+        LOG_ERR("Falha ao enfileirar X: %d", ret);
+    }
+
+    ret = input_report_rel(dev, INPUT_REL_Y, dy, true, K_MSEC(100));
+    if (ret) {
+        LOG_ERR("Falha ao enfileirar Y: %d", ret);
+    }
+
+    LOG_INF("Evento enviado para fila de input!");
+    return 0;
+}
+```
+
+---
+
+## 🧰 Passo 4 — Verificar logs na execução
+
+Quando você compilar e rodar o firmware, o log no serial deve mostrar algo assim:
+
+```
+[00:00:01.234,000] <inf> zmk: ➡️ Enviando movimento dx=5 dy=-2
+[00:00:01.235,000] <inf> zmk: Evento enviado para fila de input!
+[00:00:01.240,000] <inf> zmk: 🖱️ Mouse event received!
+[00:00:01.241,000] <inf> zmk: dx=5 dy=-2 scroll_x=0 scroll_y=0 buttons=0
+```
+
+👉 Isso confirma:
+
+* O `input_report_rel()` foi executado com sucesso (`ret == 0`);
+* O listener ZMK **recebeu o evento e processou**;
+* O evento percorreu o pipeline completo.
+
+---
+
+## 🧩 Dica de depuração extra
+
+Se quiser ter **100% de certeza** que o Zephyr entregou o evento para o listener (antes mesmo de virar um `zmk_mouse_state_changed`),
+você pode logar também **no `input_process()`** em:
+
+```
+zmk/zephyr/subsys/input/input.c
+```
+
+Adicione:
+
+```c
+LOG_DBG("input_process(): entregando evento type=%d code=%d value=%d dev=%p",
+        evt->type, evt->code, evt->value, evt->dev);
+```
+
+Isso mostra o fluxo exato entre o `input_report_rel()` e o `listener`.
+
+---
+
+## ✅ Resumo
+
+| Etapa                       | Onde logar       | Confirma o quê                |
+| --------------------------- | ---------------- | ----------------------------- |
+| `input_report_rel()`        | seu código UART  | evento gerado                 |
+| `input_process()`           | Zephyr `input.c` | evento entregue aos listeners |
+| `mouse_state_listener_cb()` | ZMK listener     | evento processado no ZMK      |
+
+---
+
+Quer que eu te monte uma versão de `mouse_state_listener.c` **com todos esses logs prontos**, para você copiar e testar direto?
+
+
+
+## 🧰 Passo 1 — Adicionar logs no listener
+
+eu prciso criar o arquivo zmk/app/src/mouse_state_listener.c?
+
+
+
+Excelente pergunta 🔍 — e a resposta depende **do que você quer fazer**: se quer **observar** o listener existente do ZMK ou **criar o seu próprio** listener customizado.
+
+Vamos entender direitinho 👇
+
+---
+
+## 🧠 1️⃣ O arquivo `mouse_state_listener.c` já existe no ZMK
+
+Sim — o ZMK **já vem** com um listener chamado **`mouse_state_listener.c`**, que fica no código-fonte principal do ZMK (não no seu `config/`).
+
+O caminho é algo como:
+
+```
+zmk/app/src/mouse_state_listener.c
+```
+
+📍 Esse arquivo é **parte do núcleo do ZMK**, e é onde o evento `zmk_mouse_state_changed` é processado.
+É ele que recebe os eventos gerados por `input_report_rel()` (via `input_process()` → `input_listener` → `zmk_mouse_state_changed`).
+
+---
+
+## 🧩 2️⃣ Você **não precisa criar** esse arquivo
+
+Você só precisa **editar** (ou instrumentar temporariamente) o arquivo existente no repositório do ZMK para inserir logs, **caso queira confirmar que o evento está chegando**.
+
+➡️ Ou seja:
+**NÃO crie** um novo `mouse_state_listener.c` dentro do seu `config/src`.
+Isso geraria conflito, porque já existe um listener com o mesmo nome e macro `ZMK_LISTENER()`.
+
+---
+
+## 🧰 3️⃣ Onde você pode ver esse arquivo
+
+No seu diretório local do ZMK (onde está o código clonado), abra:
+
+```
+/home/segodimo/zmk/app/src/mouse_state_listener.c
+```
+
+Dentro, você verá algo como:
+
+```c
+#include <zephyr/logging/log.h>
+#include <zmk/event_manager.h>
+#include <zmk/events/mouse_state_changed.h>
+
+LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
+
+static int mouse_state_listener_cb(const struct zmk_mouse_state_changed *ev) {
+    // Aqui o ZMK processa o evento de movimento do mouse
+    return 0;
+}
+
+ZMK_LISTENER(mouse_state_listener, mouse_state_listener_cb);
+ZMK_SUBSCRIPTION(mouse_state_listener, zmk_mouse_state_changed);
+```
+
+---
+
+## 🧠 4️⃣ O que fazer agora
+
+👉 Basta **editar esse arquivo** e colocar logs dentro da callback, por exemplo:
+
+```c
+static int mouse_state_listener_cb(const struct zmk_mouse_state_changed *ev) {
+    LOG_INF("🖱️ Listener ZMK recebeu evento: dx=%d dy=%d scroll_x=%d scroll_y=%d buttons=%d",
+            ev->dx, ev->dy, ev->scroll_x, ev->scroll_y, ev->buttons);
+    return 0;
+}
+```
+
+Depois, recompila normalmente com:
+
+```bash
+west build -p always -s app -b nice_nano_v2 -- -DSHIELD=corne_right -DZMK_CONFIG=/home/segodimo/zmkpromicro/config
+```
+
+E observa no log serial o fluxo completo do evento 🧩
+
+---
+
+## 🧠 5️⃣ Alternativa: criar seu próprio listener (opcional)
+
+Se quiser criar um **listener personalizado** (para não mexer no ZMK original),
+você **pode criar um novo arquivo** em:
+
+```
+/home/segodimo/zmkpromicro/config/src/my_mouse_logger.c
+```
+
+Com o conteúdo:
+
+```c
+#include <zephyr/logging/log.h>
+#include <zmk/event_manager.h>
+#include <zmk/events/mouse_state_changed.h>
+
+LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
+
+static int my_mouse_logger_cb(const struct zmk_mouse_state_changed *ev) {
+    LOG_INF("🧩 [MEU LISTENER] dx=%d dy=%d scroll_x=%d scroll_y=%d buttons=%d",
+            ev->dx, ev->dy, ev->scroll_x, ev->scroll_y, ev->buttons);
+    return 0;
+}
+
+ZMK_LISTENER(my_mouse_logger, my_mouse_logger_cb);
+ZMK_SUBSCRIPTION(my_mouse_logger, zmk_mouse_state_changed);
+```
+
+Isso **não interfere** no listener original e te permite logar separadamente.
+
+---
+
+## ✅ Resumo rápido
+
+| Caso                                                     | O que fazer                                                 |
+| -------------------------------------------------------- | ----------------------------------------------------------- |
+| Só quer testar se o evento chega                         | Editar `zmk/app/src/mouse_state_listener.c`                 |
+| Quer logar sem alterar o ZMK original                    | Criar `config/src/my_mouse_logger.c`                        |
+| Quer criar um listener customizado para debug permanente | Use `ZMK_LISTENER()` e `ZMK_SUBSCRIPTION()` no `config/src` |
+
+---
+
+Quer que eu te gere esse arquivo `my_mouse_logger.c` já formatado e pronto para copiar direto pro seu `/config/src/` (com logs e macros)?
+
+
+
+✅ **Sim, exatamente.**
+
+Se você criar um listener customizado (por exemplo `my_mouse_logger.c`) e fizer uma **subscrição para o evento** `zmk_mouse_state_changed`,
+você estará **escutando o mesmo evento** que o listener oficial do ZMK (`mouse_state_listener.c`) recebe.
+
+Ou seja:
+➡️ **Se o seu listener customizado for acionado, isso confirma 100% que o evento `zmk_mouse_state_changed` chegou de fato ao Event Manager do ZMK.**
+
+---
+
+### 🔍 Entendendo o fluxo
+
+O fluxo de eventos no ZMK funciona assim:
+
+```
+input_report_rel() 
+   ↓
+input_listener (Zephyr)
+   ↓
+zmk_event_manager - dispara evento → zmk_mouse_state_changed
+   ↓
+Todos os listeners inscritos (ZMK_SUBSCRIPTION) são chamados:
+   • mouse_state_listener (do ZMK original)
+   • my_mouse_logger (o seu, se você criar)
+   • outros, se existirem
+```
+
+Então, o seu listener customizado (`my_mouse_logger`) é **um observador paralelo**:
+ele recebe **a mesma estrutura `zmk_mouse_state_changed`** e com os **mesmos valores** que o listener oficial (`mouse_state_listener`) receberá.
+
+---
+
+### 🧩 Exemplo funcional
+
+Você pode criar no seu projeto:
+
+```
+/home/segodimo/zmkpromicro/config/src/my_mouse_logger.c
+```
+
+Com o conteúdo:
+
+```c
+#include <zephyr/logging/log.h>
+#include <zmk/event_manager.h>
+#include <zmk/events/mouse_state_changed.h>
+
+LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
+
+static int my_mouse_logger_cb(const struct zmk_mouse_state_changed *ev) {
+    LOG_INF("🧩 [DEBUG] Evento mouse chegou! dx=%d dy=%d scroll_x=%d scroll_y=%d buttons=%d",
+            ev->dx, ev->dy, ev->scroll_x, ev->scroll_y, ev->buttons);
+    return 0;
+}
+
+ZMK_LISTENER(my_mouse_logger, my_mouse_logger_cb);
+ZMK_SUBSCRIPTION(my_mouse_logger, zmk_mouse_state_changed);
+```
+
+Depois compile novamente:
+
+```bash
+west build -p always -s app -b nice_nano_v2 -- -DSHIELD=corne_right -DZMK_CONFIG=/home/segodimo/zmkpromicro/config
+```
+
+E veja no log serial (`west flash && west espressif monitor` ou via `screen /dev/ttyACM0 115200`) algo como:
+
+```
+[00:00:02.315,123] <inf> zmk: 🧩 [DEBUG] Evento mouse chegou! dx=3 dy=-1 scroll_x=0 scroll_y=0 buttons=0
+```
+
+---
+
+### 🧠 Interpretação:
+
+* Se essa mensagem **aparecer**, significa que o evento `zmk_mouse_state_changed` foi **criado**, **publicado** e **entregue com sucesso** aos listeners.
+* Portanto, o `input_report_rel()` → `zmk_event_manager` → `mouse_state_listener` estão **funcionando corretamente**.
+
+---
+
+Quer que eu te mostre também **como logar o retorno do `input_report_rel()`** e confirmar que ele gerou mesmo o evento antes do listener?
+Assim você consegue ver o **caminho completo**: função → evento → listener.
+
+
+
+/home/segodimo/zmk/app/include/zmk/events/mouse_state_changed.h
+cd /home/segodimo/zmk/app/include/zmk/events/
+
+
+
+➜  zmkesp git:(main) ✗ cd /home/segodimo/zmk/app/include/zmk/events/
+
+➜  events git:(main) ✗ tree                  
+.
+├── activity_state_changed.h
+├── battery_state_changed.h
+├── ble_active_profile_changed.h
+├── endpoint_changed.h
+├── hid_indicators_changed.h
+├── keycode_state_changed.h
+├── layer_state_changed.h
+├── modifiers_state_changed.h
+├── mouse_button_state_changed.h
+├── position_state_changed.h
+├── sensor_event.h
+├── split_peripheral_status_changed.h
+├── usb_conn_state_changed.h
+└── wpm_state_changed.h
+
+1 directory, 14 files
+➜  events git:(main) ✗ 
+---
+
+
+Excelente observação — e sim, isso é importante 👇
+
+O evento **`zmk_mouse_state_changed`** **não existe** no repositório oficial do ZMK.
+Ele não está em `app/include/zmk/events/` porque **o ZMK ainda não implementa um evento interno de movimento de mouse** (apenas de botões, `mouse_button_state_changed.h`).
+
+---
+
+### 🧩 O que existe hoje no ZMK
+
+O ZMK só tem eventos para:
+
+* **Teclas e camadas** → `keycode_state_changed.h`, `layer_state_changed.h`
+* **Mouse buttons (clique)** → `mouse_button_state_changed.h`
+* **WPM, BLE, bateria, etc.**
+
+Ou seja, o movimento do mouse (dx/dy/scroll) **não é tratado como evento ZMK**.
+Quando você usa `input_report_rel()`, ele envia o evento **via o subsistema `input` do Zephyr**, não via o **event manager do ZMK**.
+
+---
+
+### ⚙️ Então por que aparece o nome “`zmk_mouse_state_changed`” em exemplos?
+
+Porque **muitos forks e projetos customizados** (como o seu) criam **um evento personalizado** com esse nome para conseguir interceptar e enviar movimentos de mouse entre o split (peripheral ↔ central).
+
+Você pode fazer o mesmo.
+
+---
+
+### 🛠️ Como criar o evento `zmk_mouse_state_changed`
+
+1. Crie o arquivo:
+
+```
+app/include/zmk/events/mouse_state_changed.h
+```
+
+2. Adicione o conteúdo:
+
+```c
+#pragma once
+
+#include <zephyr/kernel.h>
+#include <zmk/event_manager.h>
+
+struct zmk_mouse_state_changed {
+    int8_t dx;
+    int8_t dy;
+    int8_t scroll_x;
+    int8_t scroll_y;
+};
+
+ZMK_EVENT_DECLARE(zmk_mouse_state_changed);
+```
+
+3. Crie o listener:
+
+   ```
+   app/src/mouse_state_listener.c
+   ```
+
+   ```c
+   #include <zephyr/logging/log.h>
+   LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
+
+   #include <zmk/events/mouse_state_changed.h>
+
+   int mouse_state_listener(const struct zmk_event_header *eh) {
+       const struct zmk_mouse_state_changed *ev =
+           as_zmk_mouse_state_changed(eh);
+       if (!ev)
+           return 0;
+
+       LOG_INF("Mouse movement received: dx=%d dy=%d scroll_x=%d scroll_y=%d",
+               ev->dx, ev->dy, ev->scroll_x, ev->scroll_y);
+       return 0;
+   }
+
+   ZMK_LISTENER(mouse_state_listener, mouse_state_listener);
+   ZMK_SUBSCRIPTION(mouse_state_listener, zmk_mouse_state_changed);
+   ```
+
+---
+
+### ✅ Resultado
+
+Assim você cria um **listener customizado de debug** que confirma que o evento realmente chegou (via log).
+Quando `input_report_rel()` gerar um movimento (no lado peripheral, por exemplo), você pode manualmente disparar o evento:
+
+```c
+struct zmk_mouse_state_changed ev = {
+    .dx = dx,
+    .dy = dy,
+    .scroll_x = 0,
+    .scroll_y = 0,
+};
+ZMK_EVENT_RAISE(new_zmk_mouse_state_changed(&ev));
+```
+
+E ver no log do lado central:
+
+```
+[00:00:05.123,456] <inf> zmk: Mouse movement received: dx=5 dy=-3 scroll_x=0 scroll_y=0
+```
+
+---
+
+Se quiser, posso te mostrar **onde no pipeline do Zephyr `input_report_rel()` termina** e **como interceptar o evento lá antes de gerar o HID report**, pra você entender o fluxo completo.
+Quer que eu te mostre isso também?
+
+
+
+---
+
+Qual é a seguinte etapa do fluxo apos enviar dados para o input_report_rel?
+
+https://github.com/segodimor2d2/zmkpromicro/blob/b9e7aac534da6103ae13fa167be1babd4ebcad7e/config/src/uart_move_mouse_right.c#L33
+aqui estou passando dx/dy para input_report_rel, e consegui testar resposta diferentes de zero,
+infelizmente eu não posso ver os logs do promicro nrf52840 no terminal,
+por isso estou testando enviando eventos de teclado send_key, se o input_report_rel for enviando aparece teclas pressionadas
+
+eu ainda não estou conseguindo gerar movimentos/eventos de mouse que o zmk usa (zmk_endpoints_send_mouse_report)
+por isso eu quero testar passo a passo o fluxo,
+mais depois de passar os dados usando input_report_rel eu não sei o que testar...
+
+Eu pedi para GPT me ajudar a analizar os fluxos mas cada vez ele entraga coisas diferentes:
+
+
+---
+## fluxo 1
+
+```
+uart_move_mouse_right()
+ └── input_report_rel()            ← gera evento Zephyr
+      └── input.c → input_process()
+           └── chama todos os listeners registrados
+                └── mouse_state_listener.c → callback()
+                     └── gera zmk_mouse_state_changed()
+```
+
+
+---
+## fluxo 2
+
+```
+input_report_rel() 
+   ↓
+input_listener (Zephyr)
+   ↓
+zmk_event_manager - dispara evento → zmk_mouse_state_changed
+   ↓
+Todos os listeners inscritos (ZMK_SUBSCRIPTION) são chamados:
+   • mouse_state_listener (do ZMK original)
+   • my_mouse_logger (o seu, se você criar)
+   • outros, se existirem
+```
+
+---
+
+## fluxo 3
+
+| Etapa                       | Onde logar       | Confirma o quê                |
+| --------------------------- | ---------------- | ----------------------------- |
+| `input_report_rel()`        | seu código UART  | evento gerado                 |
+| `input_process()`           | Zephyr `input.c` | evento entregue aos listeners |
+| `mouse_state_listener_cb()` | ZMK listener     | evento processado no ZMK      |
+
+---
+## fluxo 4
+
+| Camada                      | Arquivo                                | Descrição                                             |
+| --------------------------- | -------------------------------------- | ----------------------------------------------------- |
+| **Driver (Zephyr)**         | `drivers/input/input_pinnacle.c`       | Lê o sensor, gera eventos Zephyr.                     |
+| **Infraestrutura (Zephyr)** | `zephyr/subsys/input/input_core.c`     | Despacha eventos para listeners.                      |
+| **Listener (ZMK)**          | `zmk/src/input_listener.c`             | Recebe `input_event`, cria `zmk_mouse_state_changed`. |
+| **Evento ZMK**              | `zmk/src/events/mouse_state_changed.c` | Define o evento e estrutura.                          |
+| **Envio HID (ZMK)**         | `zmk/src/hid_listener.c`               | Recebe o evento e envia via BLE/USB.                  |
+
+---
+
+## fluxo do cirque-input-module
+
+| Camada                     | Responsabilidade                                    | Exemplo                                                   |
+| -------------------------- | --------------------------------------------------- | --------------------------------------------------------- |
+| **Driver (Zephyr)**        | Lê o hardware e emite eventos genéricos.            | `input_pinnacle.c` lê dx/dy e chama `input_report_rel()`. |
+| **Zephyr Input Subsystem** | Distribui eventos genéricos para quem quiser ouvir. | Encaminha `INPUT_REL_X` pro ZMK.                          |
+| **ZMK Listener**           | Converte evento genérico → evento ZMK.              | Cria `zmk_mouse_state_changed`.                           |
+| **ZMK HID**                | Envia evento via Bluetooth/USB.                     | `zmk_hid_mouse_movement_update()`.                        |

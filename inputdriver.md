@@ -1,5 +1,3 @@
-qual seria o input_listener(Zephyr) que iria a ouvir os eventos input_report_rel no seguinte código?
-e como eu poderia testar se ele estava recebendo?
 
 # Projeto da pasta: /home/segodimo/zmkxrepos/cirque-input-module/
 

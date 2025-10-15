@@ -1256,3 +1256,155 @@ Contribute to segodimor2d2/zmkpromicro development by creating an account on Git
 | `mouse_split_rx_handler.c`| Central    | Receives BLE bytes, recreates `zmk_mouse_state_changed` |
 | `mouse_rx_listener.c`     | Central    | Converts event into HID movement                      |
 | `test_left.c`             | Central    | Diagnostic listener, confirms if event arrived        |
+
+---
+
+
+$$$$
+
+meu objetivo e fazer fluxo que eu montei no meu projeto:
+
+[Função de teste no periférico] → envia movimento via split → [listener no central] → gera evento de mouse → PC
+
+eu segui o exemplo que você me enviou:
+
+Então precisamos de **duas coisas principais**:
+
+1. Um **input device virtual** no periférico — que gera eventos manualmente.
+2. Um **listener** no central — que recebe esses eventos e envia o movimento de mouse real para o host.
+
+---
+
+## ⚙️ 1️⃣ Criar o *input split device* e o *listener* (parte comum)
+
+No arquivo **compartilhado** (`keyboard.dtsi`):
+
+```dts
+/ {
+    split_inputs {
+        #address-cells = <1>;
+        #size-cells = <0>;
+
+        test_split: test_split@0 {
+            compatible = "zmk,input-split";
+            reg = <0>;
+        };
+    };
+
+    test_listener: test_listener {
+        compatible = "zmk,input-listener";
+        status = "disabled";
+        device = <&test_split>;
+    };
+};
+```
+
+➡️ Explicação:
+
+* `test_split`: o canal de comunicação entre periférico e central.
+* `test_listener`: o “ouvido” do lado central que vai receber os dados do split.
+
+---
+
+## 🧩 2️⃣ Lado periférico — simular o evento
+
+No arquivo **peripheral.overlay**:
+
+```dts
+#include "keyboard.dtsi"
+
+// Dizemos que o split usa um "input device" virtual
+&test_split {
+    // aponta pra um dispositivo fictício que você vai controlar no código
+    device = <&test_input>;
+};
+
+// Nosso dispositivo virtual
+test_input: test_input {
+    compatible = "zmk,input-device";
+};
+```
+
+Agora, no **código C** do seu periférico (por exemplo, em `src/test_mouse.c`), você pode simular eventos:
+
+```c
+#include <zephyr/kernel.h>
+#include <zmk/input/input.h>
+#include <zmk/endpoints.h>
+#include <zmk/mouse.h>
+
+void send_test_mouse_event(void) {
+    struct zmk_mouse_move_event event = {
+        .dx = 10,  // move 10 unidades no eixo X
+        .dy = 0,   // sem movimento Y
+    };
+
+    // envia o evento como se fosse um movimento real
+    ZMK_EVENT_RAISE(new_zmk_mouse_move_event(&event));
+}
+
+void main(void) {
+    while (1) {
+        k_sleep(K_SECONDS(2));   // a cada 2 segundos
+        send_test_mouse_event(); // envia o movimento
+    }
+}
+```
+
+💡 **O que isso faz:**
+A cada 2 segundos, o lado periférico manda um evento de “mover o mouse 10px pra direita” pelo canal *split*.
+
+---
+
+## 🧭 3️⃣ Lado central — ativar o listener
+
+No arquivo **central.overlay**:
+
+```dts
+#include "keyboard.dtsi"
+
+&test_listener {
+    status = "okay";
+};
+```
+
+Esse listener vai receber o evento vindo do split e transformá-lo num **relatório HID de mouse real** que é enviado ao computador.
+
+---
+
+## 🔄 Fluxo do que acontece
+
+```
+(peripheral)
+send_test_mouse_event()
+  ↓
+input_split (test_split)
+  ↓ via BLE
+(central)
+test_listener recebe evento
+  ↓
+zmk_hid_send_report(mouse_move)
+  ↓
+Computador vê o movimento do mouse 🎯
+```
+
+---
+
+## 💬 Resumo fácil
+
+| Peça            | Onde fica  | O que faz                                   |
+| --------------- | ---------- | ------------------------------------------- |
+| `test_input`    | periférico | gera o evento de movimento                  |
+| `test_split`    | ambos      | envia/recebe eventos via BLE entre os lados |
+| `test_listener` | central    | transforma o evento em HID de mouse         |
+
+
+
+aqui no arquivo inputdriver.md com um exemplo de referencia para um input driver que usa o zmk,
+por favor me ajuda a entender como funciona e o fluxo do inputdriver.md
+
+eu implementei a minha estrutura assim como você me indicou no inicio e ficou assim como esta no arquivo zmkpromicro.md.
+
+agora que vc tem todo o contexto, o inputdriver.md, o zmkpromicro.md o o que vc me indicou eu e usando bem como referencia o exemplo do repositório oficial que esta no inputdriver.md,
+quero que me ajude a descobrir o que esta faltando no meu zmkpromicro.md para funcionar meu teste.
+

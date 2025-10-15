@@ -1,21 +1,20 @@
 $$$$
 
 
+---
+# print_allfiles_path.py
 
+python print_allfiles_path.py /home/segodimo/zmkesp
 
+python print_allfiles_path.py /home/segodimo/zmkpromicro
+python ../zmkesp/print_allfiles_path.py /home/segodimo/zmkpromicro
 
+python print_allfiles_path.py /home/segodimo/zmkxrepos/cirque-input-module/
 
 ---
 
 ## corne
  
-- ? e / com uma mão só
-
-
-
-
-
----
 
 
 - remapear puntos
@@ -49,13 +48,6 @@ $$$$
 
 --- --- ---
 
----
-
-$$$$
-python print_allfiles_path.py /home/segodimo/zmkesp
-
-python print_allfiles_path.py /home/segodimo/zmkxrepos/cirque-input-module/
-
 
 ---
 
@@ -76,7 +68,7 @@ ls /dev/tty*
 
 
 # ESP
-mpremote fs ls
+mpre¿¿¿¿mote fs ls
 
 mpremote repl
 
@@ -25405,3 +25397,1397 @@ Todos os listeners inscritos (ZMK_SUBSCRIPTION) são chamados:
 | **Zephyr Input Subsystem** | Distribui eventos genéricos para quem quiser ouvir. | Encaminha `INPUT_REL_X` pro ZMK.                          |
 | **ZMK Listener**           | Converte evento genérico → evento ZMK.              | Cria `zmk_mouse_state_changed`.                           |
 | **ZMK HID**                | Envia evento via Bluetooth/USB.                     | `zmk_hid_mouse_movement_update()`.                        |
+
+
+
+
+
+
+
+
+---
+
+me explica de um jeito facil de entander a seguiente documentação:
+
+https://docs.zephyrproject.org/3.5.0/services/input/index.html
+
+Beleza — vou te explicar a documentação do “Input” do Zephyr de um jeito bem mais simples, com analogias, para você entender o que cada parte faz. Se quiser, posso ainda “traduzir pra código” ou mostrar exemplos.
+
+---
+
+## Visão geral — o que é esse serviço de **Input**
+
+O “subsystem de input” no Zephyr é uma camada que ajuda a tratar eventos de entrada vindos de dispositivos (botões, sensores, touch, joystick etc) e enviar esses eventos para quem quiser “escutar” (sua aplicação).
+
+Ou seja: dispositivos geram dados (“pressionou botão”, “movimento no eixo X”), esses dados viram **eventos de input**, e sua aplicação pode registrar “ouvintes” (callbacks) para reagir a esses eventos.
+
+---
+
+## Principais conceitos
+
+Aqui vão os 4 conceitos centrais que você precisa guardar:
+
+| Conceito                                | Explicação simples                                                                                 | Quem “usa” / quando                              |
+| --------------------------------------- | -------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
+| **input_event**                         | Uma estrutura que representa um evento: qual dispositivo, que tipo (botão, movimento), qual valor. | Quando você quer transmitir ou receber um evento |
+| **input device (dispositivo de input)** | Algo que produz esses eventos — ex: um botão, sensor de toque, joystick                            | O driver/hardware que reporta eventos            |
+| **Funções de “report”**                 | Métodos que o dispositivo usa para “relatar” um evento para o subsistema                           | Dentro do driver do dispositivo                  |
+| **Callbacks / listeners**               | Funções da aplicação que recebem esses eventos para fazer algo (responder)                         | No seu código que quer “escutar” o input         |
+
+---
+
+## Partes da documentação com cara de “complexas”, explicadas
+
+Agora, vamos “desconstruir” cada seção da documentação com analogias:
+
+### 1. **Input Events**
+
+* A struct **`input_event`** é tipo um envelope que diz:
+  – “Esse evento veio de tal dispositivo (ou `NULL` se não tiver um dispositivo específico).”
+  – Tipo de evento (botão, movimento relativo, movimento absoluto etc.).
+  – Código do evento (qual botão, qual eixo etc.).
+  – Valor do evento (pressionado? quanto se moveu?).
+  – Um bit `sync` que indica “olha, o dispositivo já “estabilizou” — todos os eixos reportados etc.”
+
+Então, cada evento “puxado” é um pacote com essas informações.
+
+### 2. **Input Devices**
+
+* Um dispositivo “fala” com o sistema de input chamando funções como `input_report()`, ou variantes específicas (`input_report_key()`, `input_report_abs()`, `input_report_rel()`).
+* Essas funções pegam o evento e enviam para o subsistema.
+* O argumento `dev` indica qual dispositivo fez isso (ou `NULL` se for “genérico”).
+
+Analogamente: dispositivo = “orquestrador de eventos”, e ele “fala” pro subsistema dizendo “uma tecla foi pressionada”, “meu eixo X mudou”.
+
+### 3. **Application API (API para usar nos apps)**
+
+* Sua aplicação pode registrar **callbacks** para receber eventos.
+  – Usa a macro `INPUT_CALLBACK_DEFINE(_dev, _callback)`.
+  – Se `_dev` não for `NULL`, você vai receber apenas eventos desse dispositivo. Se for `NULL`, você vai receber todos (sem filtro).
+* Depende de como o sistema foi configurado: se estiver em **modo síncrono**, o callback é chamado direto no contexto do driver; se estiver em **modo com thread de input**, os eventos são enfileirados e entregues por uma thread de input.
+
+Então o uso típico é: “eu quero fazer algo sempre que um botão X for pressionado” → registro callback, no evento verifico se é esse botão, etc.
+
+### 4. **Kscan Compatibility**
+
+* Existe uma funcionalidade antiga chamada **Kscan (Keyboard Scan)**.
+* Para compatibilidade, dispositivos que geram eventos X/Y ou touch podem ser conectados a aplicativos que esperam usar Kscan, se você ativar **`CONFIG_INPUT`** e **`CONFIG_KSCAN`**, e declarar no devicetree uma node com `zephyr,kscan-input`.
+* Basicamente: ponte entre o novo modelo de input e APIs antigas de “scanner de teclado”.
+
+### 5. **API Reference & Definições de eventos**
+
+* A documentação lista todas as macros, funções e estruturas públicas que você pode usar (e herdar).
+* Também lista os **tipos de evento** (ex: `INPUT_EV_KEY`, `INPUT_EV_REL`, `INPUT_EV_ABS` etc) e os **códigos de evento** (ex: `INPUT_KEY_A`, `INPUT_BTN_START`, `INPUT_ABS_X` etc) que padronizam o que cada evento representa.
+
+Por exemplo, se você quer reportar que o botão “A” foi pressionado, usará `INPUT_EV_KEY` com código `INPUT_KEY_A`.
+
+---
+
+## Um exemplo “em palavras” de uso
+
+Para tornar ainda mais concreto:
+
+1. Você está escrevendo o driver de um joystick.
+2. Quando o usuário move o joystick para a direita, seu driver chama
+
+   ```c
+   input_report_abs(dev, INPUT_ABS_X, valor_x, sync = false, timeout);
+   ```
+3. Quando ele solta ou “para”, você pode chamar com `sync = true`, indicando que o ciclo de reporte está completo.
+4. Na sua aplicação, você fez algo tipo:
+
+   ```c
+   INPUT_CALLBACK_DEFINE(NULL, my_input_cb);
+   ```
+
+   para “escutar” todos os eventos.
+5. Sua função `my_input_cb(struct input_event *evt)` recebe os eventos, checa `evt->type` e `evt->code`, pra saber “é botão?”, “é eixo X?”, se é o dispositivo certo, etc.
+6. Você age conforme: por exemplo, se for botão “Start”, você inicia algo no jogo, se for movimento no eixo, movimenta um objeto.
+
+---
+
+Se quiser, posso te mostrar um **exemplo de código completo**, com driver + app, usando essa API do Zephyr, para deixar mais claro ainda. Você quer isso?
+
+---
+
+Beleza — vou te explicar a documentação do “Input” do Zephyr de um jeito bem mais simples, com analogias, para você entender o que cada parte faz. Se quiser, posso ainda “traduzir pra código” ou mostrar exemplos.
+
+---
+
+## Visão geral — o que é esse serviço de **Input**
+
+O “subsystem de input” no Zephyr é uma camada que ajuda a tratar eventos de entrada vindos de dispositivos (botões, sensores, touch, joystick etc) e enviar esses eventos para quem quiser “escutar” (sua aplicação).
+
+Ou seja: dispositivos geram dados (“pressionou botão”, “movimento no eixo X”), esses dados viram **eventos de input**, e sua aplicação pode registrar “ouvintes” (callbacks) para reagir a esses eventos.
+
+---
+
+## Principais conceitos
+
+Aqui vão os 4 conceitos centrais que você precisa guardar:
+
+| Conceito                                | Explicação simples                                                                                 | Quem “usa” / quando                              |
+| --------------------------------------- | -------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
+| **input_event**                         | Uma estrutura que representa um evento: qual dispositivo, que tipo (botão, movimento), qual valor. | Quando você quer transmitir ou receber um evento |
+| **input device (dispositivo de input)** | Algo que produz esses eventos — ex: um botão, sensor de toque, joystick                            | O driver/hardware que reporta eventos            |
+| **Funções de “report”**                 | Métodos que o dispositivo usa para “relatar” um evento para o subsistema                           | Dentro do driver do dispositivo                  |
+| **Callbacks / listeners**               | Funções da aplicação que recebem esses eventos para fazer algo (responder)                         | No seu código que quer “escutar” o input         |
+
+---
+
+## Partes da documentação com cara de “complexas”, explicadas
+
+Agora, vamos “desconstruir” cada seção da documentação com analogias:
+
+### 1. **Input Events**
+
+* A struct **`input_event`** é tipo um envelope que diz:
+  – “Esse evento veio de tal dispositivo (ou `NULL` se não tiver um dispositivo específico).”
+  – Tipo de evento (botão, movimento relativo, movimento absoluto etc.).
+  – Código do evento (qual botão, qual eixo etc.).
+  – Valor do evento (pressionado? quanto se moveu?).
+  – Um bit `sync` que indica “olha, o dispositivo já “estabilizou” — todos os eixos reportados etc.”
+
+Então, cada evento “puxado” é um pacote com essas informações.
+
+### 2. **Input Devices**
+
+* Um dispositivo “fala” com o sistema de input chamando funções como `input_report()`, ou variantes específicas (`input_report_key()`, `input_report_abs()`, `input_report_rel()`).
+* Essas funções pegam o evento e enviam para o subsistema.
+* O argumento `dev` indica qual dispositivo fez isso (ou `NULL` se for “genérico”).
+
+Analogamente: dispositivo = “orquestrador de eventos”, e ele “fala” pro subsistema dizendo “uma tecla foi pressionada”, “meu eixo X mudou”.
+
+### 3. **Application API (API para usar nos apps)**
+
+* Sua aplicação pode registrar **callbacks** para receber eventos.
+  – Usa a macro `INPUT_CALLBACK_DEFINE(_dev, _callback)`.
+  – Se `_dev` não for `NULL`, você vai receber apenas eventos desse dispositivo. Se for `NULL`, você vai receber todos (sem filtro).
+* Depende de como o sistema foi configurado: se estiver em **modo síncrono**, o callback é chamado direto no contexto do driver; se estiver em **modo com thread de input**, os eventos são enfileirados e entregues por uma thread de input.
+
+Então o uso típico é: “eu quero fazer algo sempre que um botão X for pressionado” → registro callback, no evento verifico se é esse botão, etc.
+
+### 4. **Kscan Compatibility**
+
+* Existe uma funcionalidade antiga chamada **Kscan (Keyboard Scan)**.
+* Para compatibilidade, dispositivos que geram eventos X/Y ou touch podem ser conectados a aplicativos que esperam usar Kscan, se você ativar **`CONFIG_INPUT`** e **`CONFIG_KSCAN`**, e declarar no devicetree uma node com `zephyr,kscan-input`.
+* Basicamente: ponte entre o novo modelo de input e APIs antigas de “scanner de teclado”.
+
+### 5. **API Reference & Definições de eventos**
+
+* A documentação lista todas as macros, funções e estruturas públicas que você pode usar (e herdar).
+* Também lista os **tipos de evento** (ex: `INPUT_EV_KEY`, `INPUT_EV_REL`, `INPUT_EV_ABS` etc) e os **códigos de evento** (ex: `INPUT_KEY_A`, `INPUT_BTN_START`, `INPUT_ABS_X` etc) que padronizam o que cada evento representa.
+
+Por exemplo, se você quer reportar que o botão “A” foi pressionado, usará `INPUT_EV_KEY` com código `INPUT_KEY_A`.
+
+---
+
+## Um exemplo “em palavras” de uso
+
+Para tornar ainda mais concreto:
+
+1. Você está escrevendo o driver de um joystick.
+2. Quando o usuário move o joystick para a direita, seu driver chama
+
+   ```c
+   input_report_abs(dev, INPUT_ABS_X, valor_x, sync = false, timeout);
+   ```
+3. Quando ele solta ou “para”, você pode chamar com `sync = true`, indicando que o ciclo de reporte está completo.
+4. Na sua aplicação, você fez algo tipo:
+
+   ```c
+   INPUT_CALLBACK_DEFINE(NULL, my_input_cb);
+   ```
+
+   para “escutar” todos os eventos.
+5. Sua função `my_input_cb(struct input_event *evt)` recebe os eventos, checa `evt->type` e `evt->code`, pra saber “é botão?”, “é eixo X?”, se é o dispositivo certo, etc.
+6. Você age conforme: por exemplo, se for botão “Start”, você inicia algo no jogo, se for movimento no eixo, movimenta um objeto.
+
+---
+
+Se quiser, posso te mostrar um **exemplo de código completo**, com driver + app, usando essa API do Zephyr, para deixar mais claro ainda. Você quer isso?
+
+
+Excelente pergunta 🖱️ — e ótimo passo seguinte!
+Vamos fazer **um exemplo bem simples** que mostra como gerar e tratar **movimentos do mouse** no subsistema de *Input* do Zephyr.
+
+---
+
+## 🎯 Objetivo
+
+👉 Criar um “dispositivo de input” que envia movimentos do mouse (eixo X/Y).
+👉 A aplicação vai receber esses eventos e imprimir o deslocamento.
+
+---
+
+## ⚙️ `prj.conf`
+
+Primeiro, habilite o sistema de input no Zephyr:
+
+```ini
+CONFIG_INPUT=y
+CONFIG_INPUT_LOG_LEVEL_DBG=y
+CONFIG_LOG=y
+```
+
+---
+
+## 🧩 Estrutura do projeto
+
+```
+app/
+├── src/main.c           ← aplicação que escuta os eventos
+└── src/fake_mouse.c     ← dispositivo que envia movimentos
+```
+
+---
+
+## 🖱️ `src/fake_mouse.c` – simulando movimento de mouse
+
+```c
+#include <zephyr/input/input.h>
+#include <zephyr/kernel.h>
+#include <zephyr/logging/log.h>
+
+LOG_MODULE_REGISTER(fake_mouse, LOG_LEVEL_INF);
+
+static const struct device *dev;
+
+void fake_mouse_move(void)
+{
+    // Movimento relativo no eixo X e Y
+    struct input_event evt_x = {
+        .dev = dev,
+        .type = INPUT_EV_REL,
+        .code = INPUT_REL_X,
+        .value = 10,     // move 10 unidades à direita
+        .sync = false,   // ainda não terminou o conjunto
+    };
+
+    struct input_event evt_y = {
+        .dev = dev,
+        .type = INPUT_EV_REL,
+        .code = INPUT_REL_Y,
+        .value = -5,     // move 5 unidades para cima
+        .sync = true,    // agora finaliza o conjunto
+    };
+
+    LOG_INF("Enviando movimento: X=10, Y=-5");
+
+    // Reporta eventos (X depois Y)
+    input_report(dev, &evt_x, K_FOREVER);
+    input_report(dev, &evt_y, K_FOREVER);
+}
+
+static int fake_mouse_init(const struct device *dev_in)
+{
+    dev = dev_in;
+    LOG_INF("Fake mouse inicializado.");
+
+    // Espera 2 segundos e envia movimento
+    k_sleep(K_SECONDS(2));
+    fake_mouse_move();
+
+    return 0;
+}
+
+DEVICE_DEFINE(fake_mouse, "FAKE_MOUSE", fake_mouse_init, NULL,
+              NULL, NULL, POST_KERNEL, CONFIG_KERNEL_INIT_PRIORITY_DEFAULT,
+              NULL);
+```
+
+🧠 **Explicando:**
+
+* Tipo `INPUT_EV_REL` → evento de movimento relativo (como mouse).
+* Código `INPUT_REL_X` e `INPUT_REL_Y` → eixos X e Y.
+* `value` → quanto se moveu.
+* `sync = true` → indica que terminou o conjunto de eventos desse “frame”.
+
+---
+
+## 💻 `src/main.c` – recebendo os eventos
+
+```c
+#include <zephyr/kernel.h>
+#include <zephyr/logging/log.h>
+#include <zephyr/input/input.h>
+
+LOG_MODULE_REGISTER(main, LOG_LEVEL_INF);
+
+// Callback para todos os eventos de input
+static void my_input_cb(struct input_event *evt)
+{
+    if (evt->type == INPUT_EV_REL) {
+        if (evt->code == INPUT_REL_X) {
+            LOG_INF("🖱️ Movimento no eixo X: %d", evt->value);
+        } else if (evt->code == INPUT_REL_Y) {
+            LOG_INF("🖱️ Movimento no eixo Y: %d", evt->value);
+        }
+    }
+}
+
+// Registra o callback (NULL = escuta todos os dispositivos)
+INPUT_CALLBACK_DEFINE(NULL, my_input_cb);
+
+void main(void)
+{
+    LOG_INF("Sistema iniciado. Aguardando eventos de mouse...");
+}
+```
+
+---
+
+## 🧾 Saída esperada
+
+Quando rodar:
+
+```
+[00:00:00.000,000] <inf> main: Sistema iniciado. Aguardando eventos de mouse...
+[00:00:02.000,000] <inf> fake_mouse: Enviando movimento: X=10, Y=-5
+[00:00:02.001,000] <inf> main: 🖱️ Movimento no eixo X: 10
+[00:00:02.002,000] <inf> main: 🖱️ Movimento no eixo Y: -5
+```
+
+---
+
+## 🧠 Conceitos aplicados
+
+| Conceito                     | Significado                                                                  |
+| ---------------------------- | ---------------------------------------------------------------------------- |
+| `INPUT_EV_REL`               | Tipo de evento relativo (para mouse, trackball, etc)                         |
+| `INPUT_REL_X`, `INPUT_REL_Y` | Eixos de movimento                                                           |
+| `value`                      | Valor do deslocamento em cada eixo                                           |
+| `sync`                       | Marca o fim do conjunto de relatórios (útil pra sincronizar múltiplos eixos) |
+
+---
+
+Se quiser, posso te mostrar uma **versão estendida** com:
+
+* Clique do mouse (`INPUT_BTN_LEFT`);
+* Scroll do mouse (`INPUT_REL_WHEEL`);
+* E como isso poderia ser enviado por UART entre dois dispositivos (ex: teclado split com trackball no lado esquerdo).
+
+Quer que eu monte essa versão completa também?
+
+---
+
+
+Excelente pergunta 🔥 — agora estamos entrando no território certo: **como o movimento de mouse funciona dentro do ZMK**, que é construído **em cima do Zephyr**.
+
+💡 O legal é que o ZMK **usa o subsistema de input do Zephyr** por baixo dos panos — mas adiciona sua própria camada de **eventos e listeners** (`mouse_state_changed`, `sensor_event`, etc.) que são integrados ao sistema HID (para enviar o movimento ao computador via Bluetooth/USB).
+
+---
+
+## 🧭 Visão geral — como o ZMK trata o mouse
+
+Aqui vai o fluxo geral simplificado:
+
+```
+[sensor/trackball ou driver customizado]
+        ↓
+gera um evento de input (dx, dy, scroll)
+        ↓
+listener ZMK (mouse_state_listener.c)
+        ↓
+atualiza o estado global do mouse (zmk_mouse)
+        ↓
+envia o relatório HID (via BLE ou USB)
+```
+
+Então, o equivalente ao nosso “fake mouse” no Zephyr seria um **sensor driver** (ou UART listener) que gera eventos `zmk_mouse_movement_update(dx, dy)`.
+
+---
+
+## 🧱 Estrutura mínima no ZMK
+
+Vamos montar um exemplo conceitual com **dois arquivos**:
+
+```
+zmkpromicro/config/src/mouse_state_listener.c  ← recebe dados dx/dy
+zmkpromicro/config/include/zmk/uart_move_mouse_left.h  ← (simula o envio)
+```
+
+> 📌 Esse exemplo pode ser adaptado tanto pra UART, I2C ou um sensor real (trackball, joystick etc).
+
+---
+
+## 🧩 1. Enviando movimento (por UART, I2C, ou sensor)
+
+Um exemplo simples de “módulo” que chama funções ZMK para mover o mouse:
+
+```c
+// include/zmk/uart_move_mouse_left.h
+#pragma once
+
+#include <zmk/mouse.h>
+
+// Função que envia movimento do mouse
+static inline int uart_move_mouse_left(void) {
+    // move o mouse 10 unidades pra esquerda e 0 no Y
+    struct mouse_movement movement = {
+        .x = -10,
+        .y = 0,
+        .wheel = 0,
+    };
+    return zmk_mouse_movement_update(&movement);
+}
+```
+
+🧠 **Explicando:**
+
+* `zmk_mouse_movement_update()` é uma função interna do ZMK que atualiza o estado do mouse.
+* Ele gera um evento que depois o ZMK envia para o host (via BLE/USB HID).
+
+---
+
+## 🖱️ 2. Listener que reage ao evento
+
+Agora criamos o listener para processar os dados recebidos (por exemplo, vindos de UART, de outro lado do teclado split):
+
+```c
+// src/mouse_state_listener.c
+#include <zephyr/kernel.h>
+#include <zephyr/logging/log.h>
+#include <zmk/mouse.h>
+#include <zmk/event_manager.h>
+#include <zmk/events/mouse_button_state_changed.h>
+#include <zmk/events/mouse_motion_state_changed.h>
+#include <zmk/uart_move_mouse_left.h>
+
+LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
+
+// Exemplo simples: a cada 2 segundos, move o mouse um pouco
+void mouse_test_thread(void) {
+    while (true) {
+        uart_move_mouse_left(); // envia movimento
+        LOG_INF("Movendo mouse para a esquerda");
+        k_sleep(K_SECONDS(2));
+    }
+}
+
+K_THREAD_DEFINE(mouse_test_tid, 1024, mouse_test_thread, NULL, NULL, NULL, 5, 0, 0);
+```
+
+🧠 **O que esse código faz:**
+
+* Cria uma thread simples que chama nossa função a cada 2 segundos.
+* Cada chamada gera um evento de movimento do mouse.
+* O ZMK automaticamente:
+
+  * Atualiza o estado interno (`zmk_mouse.c`);
+  * Dispara `mouse_motion_state_changed`;
+  * E envia o movimento como HID para o computador.
+
+---
+
+## 📤 3. O que acontece no ZMK internamente
+
+Quando `zmk_mouse_movement_update()` é chamado:
+
+1. Ele adiciona o deslocamento `dx, dy` ao estado global.
+2. Emite um evento `mouse_motion_state_changed`.
+3. O `zmk_hid.c` (ou `zmk_hid_mouse.c`) pega esse evento.
+4. Constrói e envia o **relatório HID de movimento do mouse** via BLE/USB.
+
+Esse relatório é o que o computador interpreta como:
+
+> “O cursor do mouse se moveu.”
+
+---
+
+## 🧠 4. Diferenças entre Zephyr puro e ZMK
+
+| Conceito          | Zephyr (puro)               | ZMK                                                              |
+| ----------------- | --------------------------- | ---------------------------------------------------------------- |
+| Evento            | `input_event`               | `mouse_motion_state_changed`, `mouse_button_state_changed`, etc. |
+| Função usada      | `input_report()`            | `zmk_mouse_movement_update()`                                    |
+| Destino do evento | Callback de app             | Sistema HID do ZMK (BLE/USB)                                     |
+| Driver de input   | Você implementa manualmente | Usa o `event_manager` do ZMK                                     |
+| Sincronização     | `sync` no evento            | Internamente no HID report                                       |
+
+---
+
+## 📋 5. Logs esperados
+
+Quando você compilar e rodar (por exemplo, no lado esquerdo do Corne):
+
+```
+<inf> zmk: Movendo mouse para a esquerda
+<dbg> zmk_mouse: dx=-10, dy=0, wheel=0
+<dbg> zmk_hid_mouse: enviando relatório HID
+```
+
+E no seu computador o ponteiro do mouse realmente se move.
+
+---
+
+## 🧩 6. Caso split (exemplo real)
+
+Se seu teclado for *split*, e o trackball estiver no lado **peripheral**, você normalmente:
+
+* envia `dx/dy` via **UART** ou **BLE split transport**;
+* o lado **central** recebe esses dados;
+* e chama `zmk_mouse_movement_update()`.
+
+Um exemplo simples de envio seria:
+
+```c
+// peripheral
+zmk_split_bt_transport_send(MOUSE_DATA, &movement, sizeof(movement));
+```
+
+E no central:
+
+```c
+// quando recebe o pacote
+zmk_mouse_movement_update(&movement);
+```
+
+---
+
+## ✅ Resumo
+
+| Etapa           | Função                                 | Papel                        |
+| --------------- | -------------------------------------- | ---------------------------- |
+| Gerar movimento | `zmk_mouse_movement_update(&movement)` | Atualiza o estado do mouse   |
+| Evento ZMK      | `mouse_motion_state_changed`           | Notifica que houve movimento |
+| Envio HID       | `zmk_hid_mouse_send_report()`          | Envia movimento ao PC        |
+| Reação no PC    | Cursor se move                         | 🎯 sucesso!                  |
+
+---
+
+Se quiser, posso te montar **um exemplo completo de ZMK split**, com:
+
+* envio de `dx, dy, wheel` via UART;
+* lado *peripheral* e *central* configurados;
+* e os dois chamando as funções corretas (`uart_move_mouse_left.h`, `mouse_state_listener.c`, etc.).
+
+Quer que eu monte esse exemplo?
+
+
+
+
+
+---
+
+Beleza — vamos “desmenuçar” essa página de **Pointing Devices (dispositivos apontadores / mouse, trackpad etc.)** do ZMK, em uma linguagem simples, pra você entender o que cada parte quer dizer e o que você precisa fazer.
+
+---
+
+## 🎯 Visão geral do que essa página fala
+
+Essa página explica **como integrar hardware de “apontar”** (mouse, trackpad, sensores de movimento) dentro de um teclado que roda ZMK. Ela mostra:
+
+1. Como declarar o dispositivo (via devicetree / `.overlay`).
+2. Como fazer o “listener” que vai escutar os eventos desse dispositivo e transformá-los em movimento para o host (computador).
+3. Como lidar com o caso de teclado *split* (quando uma parte do teclado — “periférico” — é separada da outra parte “central”).
+4. Como ajustar os dados (rotacionar eixo, inverter) usando “processors”.
+5. Que configuração (Kconfig) habilitar para que ZMK suporte apontar.
+
+---
+
+Agora vamos por partes.
+
+---
+
+## 🧩 1. **Input Device** — definir o dispositivo apontador no hardware
+
+Para que ZMK “saiba” que você tem um sensor de apontar (por exemplo,
+um trackpad ou sensor SPI / I2C), você precisa adicionar uma **node** no devicetree
+(arquivo `.overlay` ou `.dts`) descrevendo o dispositivo:
+
+* Você declara sob qual barramento ele está (SPI, I2C etc).
+* Define parâmetros como pinos de chip select, frequência SPI, pinos de interrupção,
+sensibilidade, etc.
+
+Exemplo simplificado (da documentação):
+
+```c
+&pro_micro_spi {
+    status = "okay";
+    cs-gpios = <&pro_micro 19 GPIO_ACTIVE_LOW>;
+
+    glidepoint: glidepoint@0 {
+        compatible = "cirque,pinnacle";
+        reg = <0>;
+        spi-max-frequency = <1000000>;
+        status = "okay";
+        dr-gpios = <&pro_micro 5 (GPIO_ACTIVE_HIGH)>;
+
+        sensitivity = "4x";
+        sleep;
+        no-taps;
+    };
+};
+```
+
+No exemplo:
+
+* `glidepoint` é o dispositivo de apontar (driver “cirque,pinnacle”).
+* `dr-gpios` é o pino de “data ready” / interrupção.
+* Algumas propriedades específicas (`sensitivity`, `sleep`, `no-taps`) são extras para esse driver.
+
+Se for um teclado *split*, você deve colocar essa definição no lado (central ou periférico) que tenha o hardware.
+
+---
+
+## 👂 2. **Listener e input split device**
+
+Depois de definir o hardware, você precisa **ouvir** os eventos desse dispositivo
+e “conectar” isso com o mecanismo HID do ZMK.
+
+* Você define um node `compatible = "zmk,input-listener"` no devicetree,
+apontando para o dispositivo acima:
+
+  ```dts
+  glidepoint_listener {
+      compatible = "zmk,input-listener";
+      device = <&glidepoint>;
+  };
+  ```
+
+  Isso diz “este listener vai escutar o dispositivo `glidepoint`”.
+
+* Se o dispositivo de apontar estiver num **periférico** (lado remoto),
+você também usa um node `input-split`. Esse node atua como “proxy”:
+ele recebe os eventos vindos do periférico e “repassa” para o central como se fosse local.
+
+  Isso exige que tanto o periférico quanto o central conheçam esse `input-split`
+  node no devicetree compartilhado, e que você faça override no periférico dizendo
+  “este `input-split` está ligado a este dispositivo”.
+
+* Também existe a opção de adicionar **input processors** (ver próximo item)
+no listener / split.
+
+---
+
+## 🔄 3. **Input Processors**
+
+Nem todo sensor de apontar vai “falar direito” com o computador. Exemplo de problema:
+
+* Seu sensor está montado “virado” (eixo X vira eixo Y, etc).
+* Os eixos precisam ser invertidos.
+* Você quer trocar “horizontal/inversão” para se adequar ao layout.
+
+Para resolver isso, ZMK permite que você associe “processors” aos listeners:
+
+```dts
+glidepoint_listener {
+    compatible = "zmk,input-listener";
+    device = <&glidepoint>;
+    input-processors = <&zip_xy_transform (INPUT_TRANSFORM_XY_SWAP | INPUT_TRANSFORM_X_INVERT | INPUT_TRANSFORM_Y_INVERT)>;
+};
+```
+
+Nesse exemplo:
+
+* `zip_xy_transform` é um processor que combina e transforma eixos.
+* `INPUT_TRANSFORM_XY_SWAP` troca X ↔ Y.
+* `INPUT_TRANSFORM_X_INVERT` inverte o eixo X.
+* `INPUT_TRANSFORM_Y_INVERT` inverte o eixo Y.
+
+Ou seja: antes de mandar para o host, você “ajusta” os valores para estarem no formato correto.
+
+---
+
+## ⚙️ 4. **Configuração (Kconfig)**
+
+Para que o suporte a apontar funcione, algumas **configurações precisam estar ativas**:
+
+* `ZMK_POINTING` — habilita o suporte à dispositivos apontadores no firmware.
+* Também ativar suporte ao protocolo (SPI / I2C etc) que seu hardware usa.
+
+Você pode ativar isso no `Kconfig.defconfig` ou no arquivo de configuração do teclado.
+
+Se o hardware de apontar for opcional, você pode deixar `CONFIG_ZMK_POINTING=y` nas configurações do usuário.
+
+---
+
+## 🧠 5. **Resumo em “passos práticos”**
+
+Para você poder integrar um sensor apontador no seu layout ZMK, faça, em ordem:
+
+1. No devicetree `.overlay`, declare o dispositivo (SPI / I2C) com suas propriedades (endereço, pinos, frequência).
+2. Declare um listener (`zmk,input-listener`) apontando para esse dispositivo.
+3. Se for teclado *split* com o sensor no lado periférico, use `input-split` nodes para repassar eventos ao lado central.
+4. Se necessário, adicione `input-processors` ao listener para ajustar os dados (inversão, swap, etc).
+5. Ative `ZMK_POINTING` e o tipo de comunicação (SPI / I2C) nas configs do firmware (Kconfig).
+6. Compile e teste — o ZMK, quando rodar, vai “ouvir” os eventos do seu sensor, processar (transformadores) e enviar os movimentos via HID (BLE ou USB) para o computador.
+
+---
+
+Se você quiser, posso pegar aquele exemplo que fizemos do “mouse no Zephyr” e converter num exemplo **ZMK completo** (com devicetree `.overlay`, listener, processors etc), para fixar bem. Você quer que eu monte isso pra seu layout específico (por exemplo, Corne, Lily58, etc)?
+
+
+
+# o que é um listener?
+
+Perfeito 😎 — essa parte da documentação do **ZMK** pode parecer bem densa, mas vamos destrinchar **de um jeito simples e direto**, pra você entender o que são **listeners** e **input split devices**, especialmente em teclados *split* (como o Corne, Lily58, etc.).
+
+---
+
+## 🧠 Conceitos básicos
+
+Antes de tudo:
+
+* **Input device** → é o hardware que envia eventos (por exemplo: um sensor de movimento, um touchpad ou trackball).
+* **Listener** → é o “ouvido” do ZMK: ele **escuta os eventos** do input device e **os converte** em algo que o computador entende (um *mouse HID report*, por exemplo).
+* **Input Split Device** → é o “mensageiro” entre os dois lados do teclado split. Ele **envia os dados de movimento** do lado *periférico* (onde está o sensor) para o lado *central* (que se conecta via USB/Bluetooth ao PC).
+
+---
+
+## 🧩 Situação prática
+
+Imagine um teclado **Corne split**, onde o **lado direito** tem um **trackball**:
+
+| Lado     | Função                                 |
+| -------- | -------------------------------------- |
+| Direito  | Periférico (tem o trackball)           |
+| Esquerdo | Central (se conecta via USB/Bluetooth) |
+
+Quando você move o trackball, o periférico precisa mandar esse movimento pro central, que então envia o evento de *mouse* para o computador.
+É aí que entram o **listener** e o **input split device**. 👇
+
+---
+
+## ⚙️ Como isso funciona passo a passo
+
+### 1️⃣ Criação de um "listener" e de um "input split"
+
+No arquivo **compartilhado** (`keyboard.dtsi`), você define os dois:
+¿
+```c
+/ {
+    split_inputs {
+        #address-cells = <1>;
+        #size-cells = <0>;
+
+        glidepoint_split: glidepoint_split@0 {
+            compatible = "zmk,input-split";
+            reg = <0>;
+        };
+    };
+
+    glidepoint_listener: glidepoint_listener {
+        compatible = "zmk,input-listener";
+        status = "disabled";       // desativado aqui
+        device = <&glidepoint_split>; // escuta o input-split
+    };
+};
+```
+
+➡️ **Explicando:**
+
+* `glidepoint_split`: é o *input split device* — ele faz a ponte entre o periférico e o central.
+* `glidepoint_listener`: é o *listener* — ele processa o que vem do `glidepoint_split` (movimentos, cliques, etc.).
+* Ele começa desativado (`disabled`), pois o mesmo arquivo é usado pelos dois lados do teclado.
+
+---
+
+### 2️⃣ Configurando o lado periférico
+
+No arquivo `peripheral.overlay`:
+
+```c
+#include "keyboard.dtsi"
+
+// O sensor de verdade (ex: trackball SPI)
+&pro_micro_spi {
+    glidepoint: glidepoint@0 {
+        /* configuração real do sensor */
+    };
+};
+
+// Dizemos que o glidepoint_split deve usar esse sensor
+&glidepoint_split {
+    device = <&glidepoint>;
+
+    // Correções opcionais de direção e eixos
+    input-processors = <&zip_xy_transform (INPUT_TRANSFORM_XY_SWAP | INPUT_TRANSFORM_X_INVERT | INPUT_TRANSFORM_Y_INVERT)>;
+};
+```
+
+➡️ **Explicando:**
+
+* `device = <&glidepoint>` → conecta o *split* ao seu *input real* (ex: trackball SPI).
+* `input-processors` → opcional, serve pra ajustar eixos (inverter X/Y, etc.).
+
+O periférico então manda os dados de movimento pro central via BLE ou UART (dependendo da configuração do split).
+
+---
+
+### 3️⃣ Configurando o lado central
+
+No arquivo `central.overlay`:
+
+```dts
+#include "keyboard.dtsi"
+
+&glidepoint_listener {
+    status = "okay";   // agora ativamos o listener
+};
+```
+
+➡️ **Explicando:**
+
+* Aqui o listener finalmente é ativado.
+* Ele começa a receber os dados do `input-split` (enviados pelo lado periférico) e a gerar relatórios HID de mouse para o PC.
+
+---
+
+## 🔄 Resumo do fluxo
+
+```
+[Trackball / Sensor] → (listener no periférico) → input-split → via BLE → input-split no central → listener → HID Mouse → PC
+```
+
+---
+
+## 💡 Dica prática
+
+No **ZMK**, isso é útil quando:
+
+* você tem um *trackball*, *touchpad* ou *sensor óptico* integrado ao teclado split;
+* e quer que ele funcione como mouse mesmo que esteja só em um dos lados.
+
+---
+
+Se quiser, posso te mostrar um **exemplo completo e mínimo** (com `glidepoint_split` + listener funcionando como mouse) adaptado para o seu **Corne com nice!nano**, só me confirma:
+👉 você quer usar **SPI**, **I2C** ou **GPIO analógico** pro sensor (ex: um sensor de movimento ou trackball)?
+
+
+
+
+---
+
+$$$$
+# imagine que eu quero criar um listener mas o input split device é uma função do lado pheripheral que vai enviar um evento de mouse de teste, como eu poderia fazer isso?
+
+
+Perfeito 🔥 — agora você está entrando no ponto **exato** de como o ZMK processa os eventos internamente.
+Você quer **criar um listener**, mas o “input split device” (no lado periférico) **não é um hardware real** — é uma função que envia um **evento de mouse de teste** para o lado central.
+
+Vamos destrinchar isso passo a passo de um jeito bem simples.
+
+---
+
+
+$$$$
+
+Você quer simular isto:
+
+```
+[Função de teste no periférico] → envia movimento via split → [listener no central] → gera evento de mouse → PC
+```
+
+Então precisamos de **duas coisas principais**:
+
+1. Um **input device virtual** no periférico — que gera eventos manualmente.
+2. Um **listener** no central — que recebe esses eventos e envia o movimento de mouse real para o host.
+
+---
+
+## ⚙️ 1️⃣ Criar o *input split device* e o *listener* (parte comum)
+
+No arquivo **compartilhado** (`keyboard.dtsi`):
+
+```dts
+/ {
+    split_inputs {
+        #address-cells = <1>;
+        #size-cells = <0>;
+
+        test_split: test_split@0 {
+            compatible = "zmk,input-split";
+            reg = <0>;
+        };
+    };
+
+    test_listener: test_listener {
+        compatible = "zmk,input-listener";
+        status = "disabled";
+        device = <&test_split>;
+    };
+};
+```
+
+➡️ Explicação:
+
+* `test_split`: o canal de comunicação entre periférico e central.
+* `test_listener`: o “ouvido” do lado central que vai receber os dados do split.
+
+---
+
+## 🧩 2️⃣ Lado periférico — simular o evento
+
+No arquivo **peripheral.overlay**:
+
+```dts
+#include "keyboard.dtsi"
+
+// Dizemos que o split usa um "input device" virtual
+&test_split {
+    // aponta pra um dispositivo fictício que você vai controlar no código
+    device = <&test_input>;
+};
+
+// Nosso dispositivo virtual
+test_input: test_input {
+    compatible = "zmk,input-device";
+};
+```
+
+Agora, no **código C** do seu periférico (por exemplo, em `src/test_mouse.c`), você pode simular eventos:
+
+```c
+#include <zephyr/kernel.h>
+#include <zmk/input/input.h>
+#include <zmk/endpoints.h>
+#include <zmk/mouse.h>
+
+void send_test_mouse_event(void) {
+    struct zmk_mouse_move_event event = {
+        .dx = 10,  // move 10 unidades no eixo X
+        .dy = 0,   // sem movimento Y
+    };
+
+    // envia o evento como se fosse um movimento real
+    ZMK_EVENT_RAISE(new_zmk_mouse_move_event(&event));
+}
+
+void main(void) {
+    while (1) {
+        k_sleep(K_SECONDS(2));   // a cada 2 segundos
+        send_test_mouse_event(); // envia o movimento
+    }
+}
+```
+
+💡 **O que isso faz:**
+A cada 2 segundos, o lado periférico manda um evento de “mover o mouse 10px pra direita” pelo canal *split*.
+
+---
+
+## 🧭 3️⃣ Lado central — ativar o listener
+
+No arquivo **central.overlay**:
+
+```dts
+#include "keyboard.dtsi"
+
+&test_listener {
+    status = "okay";
+};
+```
+
+Esse listener vai receber o evento vindo do split e transformá-lo num **relatório HID de mouse real** que é enviado ao computador.
+
+---
+
+## 🔄 Fluxo do que acontece
+
+```
+(peripheral)
+send_test_mouse_event()
+  ↓
+input_split (test_split)
+  ↓ via BLE
+(central)
+test_listener recebe evento
+  ↓
+zmk_hid_send_report(mouse_move)
+  ↓
+Computador vê o movimento do mouse 🎯
+```
+
+---
+
+## 💬 Resumo fácil
+
+| Peça            | Onde fica  | O que faz                                   |
+| --------------- | ---------- | ------------------------------------------- |
+| `test_input`    | periférico | gera o evento de movimento                  |
+| `test_split`    | ambos      | envia/recebe eventos via BLE entre os lados |
+| `test_listener` | central    | transforma o evento em HID de mouse         |
+
+---
+
+Se quiser, posso montar um exemplo **completo e funcional** (com `.overlay`, `.dtsi` e `.c`) simulando um evento de mouse a cada 2 segundos — perfeito pra testar no seu **ZMK com nice!nano**.
+
+Quer que eu monte esse exemplo completo pra você?
+
+
+para criar esse exemplo eu preciso criar um novo arquivo keyboard.dtsi?
+
+
+
+Excelente pergunta — e **sim**, é isso mesmo 👏
+Mas vamos com calma, porque o *porquê* disso é importante pra entender como o ZMK organiza os arquivos e como o split funciona internamente.
+
+---
+
+## 🧠 Contexto rápido
+
+No **ZMK**, os arquivos `.overlay`, `.dtsi` e `.dts` servem para descrever o hardware e como o firmware deve se comportar.
+
+Em teclados **split**, há 3 tipos de arquivo principais:
+
+| Tipo                    | Função                                                        | Exemplo                    |
+| ----------------------- | ------------------------------------------------------------- | -------------------------- |
+| `.dtsi`                 | Arquivo **compartilhado** entre o lado central e o periférico | `keyboard.dtsi`            |
+| `.overlay` (central)    | Arquivo **específico do lado central**                        | `corne_central.overlay`    |
+| `.overlay` (peripheral) | Arquivo **específico do lado periférico**                     | `corne_peripheral.overlay` |
+
+---
+
+## 💡 Então sim: você vai criar um `keyboard.dtsi`
+
+Ele serve justamente para colocar **as partes comuns**, como o `input-split` e o `listener`.
+
+A ideia é:
+
+* o **central** e o **periférico** **incluem esse mesmo arquivo** (`#include "keyboard.dtsi"`),
+* mas **cada um ativa só o que precisa** (por exemplo, o listener fica desativado no periférico e ativado no central).
+
+---
+
+## 📁 Estrutura de arquivos ideal
+
+Seu projeto (por exemplo, no `zmkpromicro/config/`) ficaria assim:
+
+```
+config/
+├── boards/
+│   └── arm/
+│       ├── corne_central.overlay
+│       └── corne_peripheral.overlay
+├── keyboard.dtsi
+└── src/
+    └── test_mouse.c
+```
+
+---
+
+## 📜 O conteúdo do `keyboard.dtsi`
+
+Você pode colocar exatamente isso dentro:
+
+```dts
+/ {
+    split_inputs {
+        #address-cells = <1>;
+        #size-cells = <0>;
+
+        test_split: test_split@0 {
+            compatible = "zmk,input-split";
+            reg = <0>;
+        };
+    };
+
+    test_listener: test_listener {
+        compatible = "zmk,input-listener";
+        status = "disabled"; // desativado por padrão
+        device = <&test_split>;
+    };
+};
+```
+
+---
+
+## 📜 No periférico (`corne_peripheral.overlay`)
+
+```dts
+#include "keyboard.dtsi"
+
+// cria um "input device" de teste
+test_input: test_input {
+    compatible = "zmk,input-device";
+};
+
+// conecta o input device com o split
+&test_split {
+    device = <&test_input>;
+};
+```
+
+---
+
+## 📜 No central (`corne_central.overlay`)
+
+```dts
+#include "keyboard.dtsi"
+
+// ativa o listener
+&test_listener {
+    status = "okay";
+};
+```
+
+---
+
+## ⚙️ E o código-fonte (`src/test_mouse.c`)
+
+Esse arquivo vai simular um evento de movimento do mouse de tempos em tempos:
+
+```c
+#include <zephyr/kernel.h>
+#include <zmk/events/mouse_move_state_changed.h>
+#include <zmk/event_manager.h>
+
+void main(void) {
+    while (1) {
+        k_sleep(K_SECONDS(2));
+
+        struct zmk_mouse_move_state_changed move = {
+            .dx = 10, // mover 10 unidades no eixo X
+            .dy = 0,
+        };
+
+        ZMK_EVENT_RAISE(new_zmk_mouse_move_state_changed(&move));
+    }
+}
+```
+
+---
+
+## 🔄 Resumo visual
+
+```
+[keyboard.dtsi]  → define listener e input-split (compartilhado)
+     ↑
+ ┌───────────────┐         ┌────────────────┐
+ │ periférico    │         │ central        │
+ │ test_input.c  │ → envia →│ test_listener │ → HID → PC
+ └───────────────┘         └────────────────┘
+```
+
+---
+
+Se quiser, eu posso te montar **os três arquivos prontos** (dtsi + central.overlay + peripheral.overlay + C) num exemplo mínimo de projeto pronto pra compilar no ZMK, pra você testar direto com seu `nice!nano`.
+Quer que eu gere esses arquivos completos pra você?
+
+
+
+
+Perfeito, agora ficou fácil esclarecer 😎
+
+No seu exemplo:
+
+* O **`test_listener`** **não é um arquivo C**.
+* Ele **existe como um nó no Device Tree** (`keyboard.dtsi`) e serve como configuração para o ZMK.
+* Ou seja, ele **não vai no CMakeLists.txt**, porque não é código que precisa ser compilado, é apenas uma **descrição de hardware / configuração**.
+
+---
+
+### Onde ele “fica” na prática
+
+| Elemento        | Onde está / implementado                   | Função                                                                                                          |
+| --------------- | ------------------------------------------ | --------------------------------------------------------------------------------------------------------------- |
+| `test_listener` | `keyboard.dtsi`                            | Nó Device Tree que diz “tem um listener conectado ao split”. O ZMK lê isso no build e gera o código necessário. |
+| Código C real   | `test_mouse.c` (periférico)                | Gera eventos de teste e envia pelo split.                                                                       |
+| Listener C real | já vem no ZMK (interno, não precisa criar) | Recebe eventos do split no lado central e envia relatório HID de mouse.                                         |
+
+💡 Ou seja: o ZMK **já implementa internamente** a parte do listener em C — o `test_listener` é só a referência no Device Tree para ativar e configurar esse listener.
+
+---
+
+### Resumindo o fluxo
+
+```
+[periférico: test_input + test_mouse.c] → envia evento
+[test_split] → canal de comunicação via BLE
+[central: test_listener node ativo] → transforma em HID
+[PC] → recebe movimento do mouse
+```
+
+Então você só precisa:
+
+1. Definir o `test_listener` no `.dtsi` (como você fez).
+2. Ativar ele no `.overlay` do central (`status = "okay"`).
+3. Criar o código C no periférico que gera o evento (`test_mouse.c`).
+4. Incluir `test_mouse.c` no `CMakeLists.txt` do periférico.
+
+Nada do `test_listener` vai no `CMakeLists.txt`.
+
+---
+
+Se quiser, posso te desenhar **um esquema completo mostrando todos os arquivos e fluxos**, pra ficar claríssimo como `test_input`, `test_split` e `test_listener` se conectam.
+
+Quer que eu faça isso?
+
+
+
+
+➜  zmk git:(main) ✗ cd ../zmkpromicro
+➜  zmkpromicro git:(master) ✗ tree         
+.
+├── boards
+│   └── shields
+├── build.yaml
+├── config
+│   ├── corne.keymap
+│   ├── corne_left.conf
+│   ├── corne_left.overlay
+│   ├── corne_right.conf
+│   ├── corne_right.overlay
+│   ├── keyboard.dtsi
+│   └── west.yml
+│   ├── include
+│   │   └── zmk
+│   │       ├── uart_move_mouse_left.h
+│   │       ├── uart_move_mouse_right.h
+│   │       ├── uart_switch_left.h
+│   │       ├── uart_switch_right.h
+│   │       └── zmk_mouse_state_changed.h
+│   ├── src
+│   │   ├── CMakeLists.txt
+│   │   ├── test_mouse.c
+│   │   ├── uart_move_mouse_left.c
+│   │   ├── uart_move_mouse_right.c
+│   │   ├── uart_receiver_left.c
+│   │   ├── uart_receiver_right.c
+│   │   ├── uart_switch_left.c
+│   │   ├── uart_switch_right.c
+│   │   └── zmk_mouse_state_changed.c
+├── README.md
+└── zephyr
+    └── module.yml
+
+9 directories, 31 files
+➜  zmkpromicro git:(master) ✗ 
+
+
+
+Perfeito, Segodimo — agora com os dois arquivos (`inputdriver.md` e `zmkpromicro.md`) analisados, dá pra ver exatamente **por que seu fluxo ainda não está completo** e o que está faltando pra o seu teste “periférico → split → listener → PC” funcionar.
+
+---
+
+## 🧭 Comparativo: `inputdriver.md` (exemplo oficial) × seu `zmkpromicro.md`
+
+O `inputdriver.md` mostra como um *input driver* da Zephyr/ZMK funciona internamente (o caso do `input_pinnacle`).
+
+No `input_pinnacle.c` o fluxo básico é:
+
+```
+[Driver de hardware]
+ → input_report_rel(dev, INPUT_REL_X, dx)
+ → Zephyr input core (input.c)
+ → input_listener callback (via INPUT_CALLBACK_DEFINE)
+ → Evento ZMK (ou HID report)
+```
+
+---
+
+## ✅ O que seu projeto já tem
+
+1. **Evento customizado `zmk_mouse_state_changed`**
+
+   * Definido corretamente (`.h` + `.c` com `ZMK_EVENT_IMPL`).
+   * Periférico (`test_mouse.c`) gera o evento a cada 2s com `ZMK_EVENT_RAISE(ev)`.
+   * Transmitido via *split* automaticamente pelo sistema do ZMK.
+2. **Lado central**
+
+   * Recebe eventos `zmk_mouse_state_changed` (porque o *split sync* já propaga).
+   * Funções `uart_move_mouse_left()` e `uart_move_mouse_right()`
+   já sabem enviar relatórios HID de mouse com `zmk_endpoints_send_mouse_report()`.
+
+---
+
+## 🚫 O que está faltando (ponto crucial)
+
+### ❌ Falta um *listener* no central que reaja ao evento `zmk_mouse_state_changed`.
+
+O `ZMK_EVENT_RAISE(ev)` **só cria e propaga o evento**, mas nada acontece se ninguém o ouvir.
+
+No exemplo do *input driver* (`inputdriver.md`), quem “ouve” é o *input listener* registrado com:
+
+```c
+INPUT_CALLBACK_DEFINE(dev, callback_function);
+```
+
+ou, no ZMK, com o sistema de eventos:
+
+```c
+ZMK_LISTENER(nome_do_listener, funcao_callback);
+ZMK_SUBSCRIPTION(nome_do_listener, zmk_mouse_state_changed);
+```
+
+👉 Isso é o **elo que liga o evento ao movimento real do mouse**.
+
+---
+
+## 🧩 Como corrigir: criar um listener no central
+
+Crie um arquivo `config/src/mouse_state_listener.c` com:
+
+```c
+#include <zephyr/kernel.h>
+#include <zephyr/logging/log.h>
+#include <zmk/event_manager.h>
+#include <zmk/hid.h>
+#include <zmk/endpoints.h>
+#include "zmk/zmk_mouse_state_changed.h"
+
+LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
+
+static int on_mouse_state_changed(const zmk_event_t *eh) {
+    const struct zmk_mouse_state_changed *ev = as_zmk_mouse_state_changed(eh);
+    if (!ev) {
+        LOG_WRN("Evento inválido");
+        return 0;
+    }
+
+    LOG_INF("Mouse move dx=%d dy=%d", ev->dx, ev->dy);
+
+    struct zmk_hid_mouse_report *report = zmk_hid_get_mouse_report();
+    report->body.d_x = ev->dx;
+    report->body.d_y = ev->dy;
+    zmk_endpoints_send_mouse_report();
+
+    return 0;
+}
+
+ZMK_LISTENER(mouse_state_listener, on_mouse_state_changed);
+ZMK_SUBSCRIPTION(mouse_state_listener, zmk_mouse_state_changed);
+```
+
+E no `CMakeLists.txt` do `src/` adicione dentro do bloco `if(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)`:
+
+```cmake
+${CMAKE_CURRENT_LIST_DIR}/mouse_state_listener.c
+```
+
+---
+
+## 🔄 Resultado do fluxo final
+
+```
+(periférico)
+  test_mouse_thread()  →  ZMK_EVENT_RAISE(zmk_mouse_state_changed)
+      ↓
+(split BLE)
+      ↓
+(central)
+  mouse_state_listener.on_mouse_state_changed()
+      ↓
+  zmk_endpoints_send_mouse_report()
+      ↓
+Computador move o cursor 🖱️
+```
+
+---
+
+## 🧠 Recapitulando
+
+| Etapa           | Função                                     | Arquivo                  | Status                |
+| --------------- | ------------------------------------------ | ------------------------ | --------------------- |
+| Gera evento     | `ZMK_EVENT_RAISE(zmk_mouse_state_changed)` | `test_mouse.c`           | ✅                     |
+| Envia via split | Automático (ZMK split sync)                | —                        | ✅                     |
+| Recebe e reage  | `on_mouse_state_changed()`                 | ❌ *Faltando*             |                       |
+| Move mouse real | `zmk_endpoints_send_mouse_report()`        | `mouse_state_listener.c` | ✅ após criar listener |
+
+---
+
+Se quiser, posso te ajudar a integrar isso diretamente no `zmkpromicro.md` com o patch completo do arquivo e do `CMakeLists.txt`.
+Quer que eu gere exatamente como ficaria o seu `zmkpromicro.md` corrigido com o listener funcionando?
+

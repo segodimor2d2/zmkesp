@@ -1,7 +1,24 @@
-
-
-
 # Projeto da pasta: /home/segodimo/zmkpromicro
+
+## arquivo: /home/segodimo/zmkpromicro/README.md
+
+```markdown
+# Recomendação realista
+- Se você precisa de código .c adicional como uart_receiver.c, siga esta estrutura:
+- Tenha um fork do repositório ZMK
+- No seu fork do ZMK, edite CMakeLists.txt para incluir:
+- add_subdirectory(${ZMK_CONFIG}/src)
+- Mantenha tudo seu (configs e código) no zmk-config/, e só altere o CMakeLists.txt do ZMK uma vez.
+
+## Vá até o final do arquivo zmk/app/CMakeLists.txt e adicione isso 
+### Incluir código do zmk-config/src de fora do repositório
+add_subdirectory(${ZMK_CONFIG}/src ${CMAKE_CURRENT_BINARY_DIR}/zmk_config_src)
+
+
+## compilation test
+// #error "!!!!VERIFICANDO SE ESTÁ SENDO COMPILADO!!!!"
+
+```
 
 
 ## arquivo: /home/segodimo/zmkpromicro/config/include/zmk/uart_move_mouse_right.h
@@ -23,27 +40,17 @@ int uart_move_mouse_right(
 ```
 
 
-## arquivo: /home/segodimo/zmkpromicro/config/include/zmk/zmk_mouse_state_changed.h
+## arquivo: /home/segodimo/zmkpromicro/config/include/zmk/input_mouse.h
 
 ```c
 #pragma once
 
-#include <zephyr/types.h>
-#include <zephyr/kernel.h>
-#include <zmk/event_manager.h>
+#include <zephyr/device.h>
 
-struct zmk_mouse_state_changed {
-    zmk_event_t header;  // CORRETO: typedef do event manager
-    int8_t dx;
-    int8_t dy;
-    // int8_t scroll_x;
-    // int8_t scroll_y;
-    // uint8_t buttons;
-};
-
-ZMK_EVENT_DECLARE(zmk_mouse_state_changed);
-
-
+int zmk_input_mouse_report(const struct device *dev,
+                          int8_t dx, int8_t dy,
+                          int8_t scroll_x, int8_t scroll_y,
+                          uint8_t buttons);
 
 ```
 
@@ -108,10 +115,10 @@ int uart_switch_simulate_right(uint8_t row, uint8_t col, bool pressed);
 zephyr_include_directories(${ZMK_CONFIG}/include)
 zephyr_include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../include)
 
-# Fonte comum (sempre incluída)
-target_sources(app PRIVATE
-  ${CMAKE_CURRENT_LIST_DIR}/zmk_mouse_state_changed.c
-)
+# # Fonte comum (sempre incluída)
+# target_sources(app PRIVATE
+#   ${CMAKE_CURRENT_LIST_DIR}/zmk_mouse_state_changed.c
+# )
 
 if(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
   # Central (lado esquerdo)
@@ -122,6 +129,8 @@ if(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
     # ${CMAKE_CURRENT_LIST_DIR}/mouse_rx_listener.c
     # ${CMAKE_CURRENT_LIST_DIR}/mouse_state_listener.c
     # ${CMAKE_CURRENT_LIST_DIR}/test_left.c
+    ${CMAKE_CURRENT_LIST_DIR}/mouse_state_listener.c
+    ${CMAKE_CURRENT_LIST_DIR}/zmk_input_mouse.c  # Adicionar aqui
   )
 else()
   # Peripheral (lado direito)
@@ -129,39 +138,14 @@ else()
     ${CMAKE_CURRENT_LIST_DIR}/uart_receiver_right.c
     ${CMAKE_CURRENT_LIST_DIR}/uart_switch_right.c
     ${CMAKE_CURRENT_LIST_DIR}/uart_move_mouse_right.c
-    ${CMAKE_CURRENT_LIST_DIR}/my_mouse_logger.c
+    ${CMAKE_CURRENT_LIST_DIR}/test_mouse.c
+    ${CMAKE_CURRENT_LIST_DIR}/zmk_input_mouse.c  # Adicionar aqui
+    # ${CMAKE_CURRENT_LIST_DIR}/my_mouse_logger.c
     # ${CMAKE_CURRENT_LIST_DIR}/mouse_tx_listener.c
     # ${CMAKE_CURRENT_LIST_DIR}/mouse_test_sender.c
     # ${CMAKE_CURRENT_LIST_DIR}/test_right.c
-    ${CMAKE_CURRENT_LIST_DIR}/test_mouse.c
   )
 endif()
-
-```
-
-
-## arquivo: /home/segodimo/zmkpromicro/config/src/zmk_mouse_state_changed.c
-
-```c
-#include <zephyr/kernel.h>
-#include <zmk/event_manager.h>
-#include "zmk/zmk_mouse_state_changed.h"
-
-void test_mouse_thread(void) {
-    while (1) {
-        k_sleep(K_SECONDS(2));
-
-        struct zmk_mouse_state_changed ev = {
-            .dx = 10,
-            .dy = 0,
-        };
-        ZMK_EVENT_RAISE(ev);
-    }
-}
-
-
-// Implementa o evento para o linker
-ZMK_EVENT_IMPL(zmk_mouse_state_changed);
 
 ```
 
@@ -175,11 +159,16 @@ ZMK_EVENT_IMPL(zmk_mouse_state_changed);
 #include <zephyr/device.h>
 #include <zmk/uart_move_mouse_right.h>
 #include <zmk/uart_switch_right.h>
-#include "zmk/zmk_mouse_state_changed.h"
 
 LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 
-const struct device *dev;
+
+// const struct device *dev;
+// static const struct device *dev = DEVICE_DT_GET_ANY(zmk_input_device);
+// static const struct device *dev = DEVICE_DT_GET(DT_CHOSEN(zmk_input_device));
+
+// Obter o dispositivo do mouse input
+// static const struct device *mouse_dev = DEVICE_DT_GET(DT_NODELABEL(zmk_input_mouse));
 
 #define MATRIX_COLS 12
 #define ZMK_KEYMAP_POSITION(row, col) ((row) * MATRIX_COLS + (col))
@@ -210,16 +199,16 @@ int uart_move_mouse_right(int8_t dx,
     //
     // if (ret_x == 0 && ret_y == 0) {
     // //
-        struct zmk_mouse_state_changed ev = {
-            .dx = dx,
-            .dy = dy
-            // .scroll_y = scroll_y,
-            // .scroll_x = scroll_x,
-            // .buttons = buttons,
-        };
-
-        ZMK_EVENT_RAISE(ev);
-        send_key(1, 1); // A → sucesso
+        // struct zmk_mouse_state_changed ev = {
+        //     .dx = dx,
+        //     .dy = dy
+        //     // .scroll_y = scroll_y,
+        //     // .scroll_x = scroll_x,
+        //     // .buttons = buttons,
+        // };
+        //
+        // ZMK_EVENT_RAISE(ev);
+        // send_key(1, 1); // A → sucesso
     //
     // } else {
     //     send_key(2, 2); // X → erro
@@ -228,6 +217,7 @@ int uart_move_mouse_right(int8_t dx,
 
     // LOG_INF(ret);
 
+    send_key(1, 1); // A → sucesso
 
 
     return 0;
@@ -465,28 +455,58 @@ SYS_INIT(uart_receiver_right_sys_init, APPLICATION, CONFIG_APPLICATION_INIT_PRIO
 
 ```c
 #include <zephyr/kernel.h>
-#include <zmk/event_manager.h>
-#include "zmk/zmk_mouse_state_changed.h"
+#include <zephyr/device.h>
+#include <zmk/input_mouse.h>
 
-// Thread que gera eventos
-static void test_mouse_thread(void) {
+#include <zephyr/input/input.h>
+#include <zephyr/devicetree.h>
+#include <zmk/event_manager.h>
+
+#include <zmk/uart_switch_right.h>
+
+// Obter o dispositivo do mouse input
+static const struct device *mouse_dev = DEVICE_DT_GET(DT_NODELABEL(zmk_input_mouse));
+
+// Função auxiliar para enviar uma tecla
+static void send_key(uint8_t row, uint8_t col) {
+    uart_switch_simulate_right(row, col, true);   // Pressionar
+    k_msleep(20);
+    uart_switch_simulate_right(row, col, false);  // Soltar
+    k_msleep(20);
+}
+
+// Thread de teste para gerar eventos de mouse periodicamente
+// static void test_mouse_thread(void) {
+void test_mouse_thread(void *, void *, void *) {
+
     while (1) {
         k_sleep(K_SECONDS(2));
 
-        struct zmk_mouse_state_changed ev = {
-            .dx = 10,
-            .dy = 0,
-        };
+        // // Instancia o evento
+        // struct zmk_mouse_state_changed ev = {
+        //     .dx = 10,
+        //     .dy = 0,
+        // };
+        // // Envia o evento pelo sistema de eventos do ZMK
+        // ZMK_EVENT_RAISE(ev);
 
-        ZMK_EVENT_RAISE(ev);
-    }
+        int ret = zmk_input_mouse_report(mouse_dev, 10, 0, 0, 0, 0);
+
+        // input_report_rel(dev, INPUT_REL_X, 10, false, K_FOREVER);
+        // input_report_rel(dev, INPUT_REL_Y, 0, true, K_FOREVER);
+
+    
+        if (ret < 0) {
+            send_key(0, 3);  // Simula tecla 'e'
+        }
+
+        // Teste com envio de tecla
+        send_key(0, 6);  // Simula tecla 'Y'
+        
 }
 
 // Cria o thread
 K_THREAD_DEFINE(test_mouse_id, 1024, test_mouse_thread, NULL, NULL, NULL, 7, 0, 0);
-
-// Subscrever eventos — se você quiser reagir a este evento, defina um listener separado
-// ZMK_SUBSCRIPTION(test_mouse, zmk_mouse_state_changed);
 
 ```
 
@@ -716,6 +736,133 @@ int uart_switch_simulate_right(uint8_t row, uint8_t col, bool pressed) {
             pressed ? "press" : "release", row, col, position, ret);
     return ret;
 }
+
+```
+
+
+## arquivo: /home/segodimo/zmkpromicro/config/src/zmk_input_mouse.c
+
+```c
+#include <zephyr/input/input.h>
+#include <zephyr/kernel.h>
+#include <zephyr/logging/log.h>
+#include <zmk/event_manager.h>
+#include <zmk/events/mouse_event.h>
+
+LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
+
+#if IS_ENABLED(CONFIG_ZMK_SPLIT)
+#include <zmk/split/bluetooth/service.h>
+#endif
+
+#define DT_DRV_COMPAT zmk_input_mouse
+
+struct zmk_input_mouse_data {
+    bool in_int;
+    const struct device *dev;
+    struct k_work work;
+};
+
+struct zmk_input_mouse_config {
+    // Configurações se necessário
+};
+
+static void zmk_input_mouse_work_cb(struct k_work *work) {
+    struct zmk_input_mouse_data *data = CONTAINER_OF(work, struct zmk_input_mouse_data, work);
+    
+    // Aqui você processaria os dados do mouse se necessário
+    // Mas o principal é que os eventos serão enviados via BLE
+}
+
+#if IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_PERIPHERAL)
+// No peripheral, enviamos os dados via BLE
+static int zmk_input_mouse_report_peripheral(const struct device *dev, 
+                                           int8_t dx, int8_t dy, 
+                                           int8_t scroll_x, int8_t scroll_y,
+                                           uint8_t buttons) {
+    
+    int ret = zmk_split_bt_mouse_data_send(dx, dy, scroll_x, scroll_y, buttons);
+    
+    if (ret < 0) {
+        LOG_ERR("Failed to send mouse data via BLE: %d", ret);
+        return ret;
+    }
+    
+    LOG_DBG("Mouse data sent: dx=%d, dy=%d", dx, dy);
+    return 0;
+}
+#endif
+
+#if IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)  
+// No central, reportamos os dados para o sistema de input
+static int zmk_input_mouse_report_central(const struct device *dev,
+                                        int8_t dx, int8_t dy,
+                                        int8_t scroll_x, int8_t scroll_y,
+                                        uint8_t buttons) {
+    
+    // Report movimento relativo
+    if (dx != 0) {
+        input_report_rel(dev, INPUT_REL_X, dx, false, K_FOREVER);
+    }
+    if (dy != 0) {
+        input_report_rel(dev, INPUT_REL_Y, dy, false, K_FOREVER);
+    }
+    
+    // Report scroll
+    if (scroll_x != 0) {
+        input_report_rel(dev, INPUT_REL_HWHEEL, scroll_x, false, K_FOREVER);
+    }
+    if (scroll_y != 0) {
+        input_report_rel(dev, INPUT_REL_WHEEL, scroll_y, false, K_FOREVER);
+    }
+    
+    // Report botões
+    for (int i = 0; i < 8; i++) {
+        uint8_t btn_state = (buttons & BIT(i)) ? 1 : 0;
+        input_report_key(dev, INPUT_BTN_0 + i, btn_state, false, K_FOREVER);
+    }
+    
+    // Sincroniza todos os eventos
+    input_report_rel(dev, INPUT_EV_SYN, INPUT_SYN_REPORT, true, K_FOREVER);
+    
+    return 0;
+}
+#endif
+
+// Função pública para reportar dados do mouse
+int zmk_input_mouse_report(const struct device *dev,
+                          int8_t dx, int8_t dy,
+                          int8_t scroll_x, int8_t scroll_y,
+                          uint8_t buttons) {
+    
+#if IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_PERIPHERAL)
+    return zmk_input_mouse_report_peripheral(dev, dx, dy, scroll_x, scroll_y, buttons);
+#elif IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
+    return zmk_input_mouse_report_central(dev, dx, dy, scroll_x, scroll_y, buttons);
+#else
+    // Para configuração não-split
+    return zmk_input_mouse_report_central(dev, dx, dy, scroll_x, scroll_y, buttons);
+#endif
+}
+
+static int zmk_input_mouse_init(const struct device *dev) {
+    struct zmk_input_mouse_data *data = dev->data;
+    
+    data->dev = dev;
+    k_work_init(&data->work, zmk_input_mouse_work_cb);
+    
+    LOG_INF("ZMK Input Mouse initialized");
+    return 0;
+}
+
+#define ZMK_INPUT_MOUSE_INST(n) \
+    static struct zmk_input_mouse_data zmk_input_mouse_data_##n; \
+    static const struct zmk_input_mouse_config zmk_input_mouse_config_##n = {}; \
+    DEVICE_DT_INST_DEFINE(n, zmk_input_mouse_init, NULL, \
+                         &zmk_input_mouse_data_##n, &zmk_input_mouse_config_##n, \
+                         POST_KERNEL, CONFIG_INPUT_INIT_PRIORITY, NULL);
+
+DT_INST_FOREACH_STATUS_OKAY(ZMK_INPUT_MOUSE_INST)
 
 ```
 

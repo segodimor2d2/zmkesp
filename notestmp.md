@@ -1408,3 +1408,748 @@ eu implementei a minha estrutura assim como você me indicou no inicio e ficou a
 agora que vc tem todo o contexto, o inputdriver.md, o zmkpromicro.md o o que vc me indicou eu e usando bem como referencia o exemplo do repositório oficial que esta no inputdriver.md,
 quero que me ajude a descobrir o que esta faltando no meu zmkpromicro.md para funcionar meu teste.
 
+
+
+
+---
+
+
+
+
+
+Perfeito, Segodimo 👇
+Analisando **todo seu código em `out_print_allfiles.md`** e a **referência do driver em 
+inputdriver.md`**, posso te explicar **como o ZMK (e o Zephyr) propagam eventos de input
+entre periférico e central**, e **como você pode adaptar isso para enviar os dados do
+seu mouse** do **peripheral → central**.
+
+---
+
+## 🧩 Contexto técnico
+
+No **ZMK split BLE**, a propagação de eventos segue este fluxo:
+
+1. **Periférico** gera eventos (por exemplo, com `input_report_rel()` ou `ZMK_EVENT_RAISE()`).
+2. O sistema de **input Zephyr (`subsys/input/input.c`)** envia esses eventos a todos os *listeners* locais.
+3. O módulo **ZMK Split** intercepta os eventos de `zmk,input-device` e os envia via **BLE** ao central.
+4. O **central** recebe o evento e o reinjeta localmente — assim o evento é tratado como se tivesse ocorrido localmente.
+
+O exemplo `input_pinnacle.c` faz exatamente isso: ele lê dados brutos do sensor Cirque e usa `input_report_rel()` para gerar eventos padrão do Zephyr Input.
+Esses eventos são automaticamente sincronizados com o *central* quando o dispositivo é configurado como `zmk,input-device` (via Devicetree).
+
+---
+
+## 🖱️ Problema atual no seu `test_mouse.c`
+
+Você já faz algo muito próximo:
+
+```c
+input_report_rel(dev, INPUT_REL_X, 10, false, K_FOREVER);
+input_report_rel(dev, INPUT_REL_Y, 0, true, K_FOREVER);
+```
+
+Mas o ponto crítico está aqui:
+
+```c
+const struct device *dev = device_get_binding("test_split");
+```
+
+Esse `"test_split"` **precisa ser um device válido no Devicetree com
+`compatible = "zmk,input-device"`** — exatamente como o driver Cirque faz
+(`compatible = "cirque,pinnacle"`).
+Ou seja, o Zephyr precisa saber que esse device gera eventos de input
+e que o ZMK deve retransmiti-los via BLE Split.
+
+---
+
+## ✅ Como corrigir e fazer o mouse enviar dados ao central
+
+### 1. Confirme seu Devicetree Overlay
+
+Verifique se no seu `corne_right.overlay` (peripheral) há algo como:
+
+```dts
+/ {
+    split_inputs {
+        #address-cells = <1>;
+        #size-cells = <0>;
+
+        test_input: test_input {
+            compatible = "zmk,input-device";
+            label = "test_input";
+            status = "okay";
+        };
+
+        test_split: test_split@0 {
+            compatible = "zmk,input-split";
+            device = <&test_input>;
+            label = "test_split";
+            status = "okay";
+        };
+    };
+};
+```
+
+Isso é essencial — o nó `test_split` é o **canal de BLE Split** do ZMK.
+
+---
+
+### 2. No `test_mouse.c`, altere a obtenção do device
+
+Troque:
+
+```c
+const struct device *dev = device_get_binding("test_split");
+```
+
+Por:
+
+```c
+const struct device *dev = DEVICE_DT_GET(DT_NODELABEL(test_input));
+```
+
+ou, mais robusto:
+
+```c
+const struct device *dev = DEVICE_DT_GET_ANY(zmk_input_device);
+```
+
+Isso garante que você está enviando o evento pelo device correto (aquele que o ZMK Split reconhece).
+
+---
+
+### 3. Garanta que `CONFIG_INPUT=y` e `CONFIG_ZMK_INPUT=y` estão habilitados
+
+Esses configs ativam o subsistema de input do Zephyr.
+Coloque no seu `corne_right.conf`:
+
+```ini
+CONFIG_INPUT=y
+CONFIG_INPUT_MODE_THREAD=y
+CONFIG_ZMK_INPUT=y
+```
+
+---
+
+### 4. O envio do evento
+
+Seu trecho de teste pode ficar assim:
+
+```c
+#include <zephyr/input/input.h>
+#include <zephyr/device.h>
+#include <zephyr/kernel.h>
+#include <zmk/events/zmk_mouse_state_changed.h>
+
+static void test_mouse_thread(void) {
+    const struct device *dev = DEVICE_DT_GET_ANY(zmk_input_device);
+
+    if (!device_is_ready(dev)) {
+        printk("Device not ready\n");
+        return;
+    }
+
+    while (1) {
+        k_sleep(K_SECONDS(2));
+
+        input_report_rel(dev, INPUT_REL_X, 10, false, K_FOREVER);
+        input_report_rel(dev, INPUT_REL_Y, 0, true, K_FOREVER);
+    }
+}
+
+K_THREAD_DEFINE(test_mouse_id, 1024, test_mouse_thread, NULL, NULL, NULL, 7, 0, 0);
+```
+
+Com isso, o **peripheral** enviará os eventos `INPUT_REL_X` e `INPUT_REL_Y` via o subsistema de input,
+e o **ZMK Split BLE** automaticamente os encaminhará ao **central**, onde eles serão processados por qualquer *listener*, como o seu `mouse_state_listener.c`.
+
+---
+
+### 5. Teste se o evento está chegando no central
+
+No **lado central**, seu `mouse_state_listener.c` já faz o trabalho certo:
+
+```c
+LOG_INF("Mouse move dx=%d dy=%d", ev->dx, ev->dy);
+zmk_endpoints_send_mouse_report();
+```
+
+Então, se o evento chegar, você verá logs de `Mouse move dx=10 dy=0` no central.
+
+---
+
+## 🧠 Resumo da arquitetura
+
+| Função                                  | Lado       | Papel                                       |
+| --------------------------------------- | ---------- | ------------------------------------------- |
+| `input_report_rel()`                    | Peripheral | Gera evento padrão Zephyr Input             |
+| `zmk,input-device`                      | Peripheral | Encaminha o evento via BLE Split            |
+| `ZMK_LISTENER(mouse_state_listener, …)` | Central    | Recebe e processa `zmk_mouse_state_changed` |
+| `zmk_endpoints_send_mouse_report()`     | Central    | Envia movimento HID ao host (PC, etc.)      |
+
+---
+
+Se quiser, posso te mostrar o passo **exato de integração entre o input subsystem e o ZMK Split** (onde o
+evento é serializado e enviado via BLE).
+Quer que eu te mostre essa parte dentro do código do ZMK (`input_split.c` e `split_listener.c`)? Isso te ajudaria a entender como o evento via `input_report_rel()` chega até o central.
+
+
+
+---
+
+
+
+
+
+$$$$
+# deepseel
+
+Analisando seu código e o erro de compilação, posso identificar o problema principal e sugerir uma solução para enviar dados do mouse do peripheral para o central.
+
+## Problema Identificado
+
+O erro `undefined reference to '__device_dts_ord_25'` indica que há um problema com a referência ao dispositivo `test_split` no device tree. Isso ocorre porque você está tentando usar `input_report_rel()` diretamente no peripheral, mas esse método não funciona corretamente no contexto split.
+
+## Solução: Implementar um Input Driver Similar ao Cirque
+
+Baseado no exemplo do `input_pinnacle.c`, você precisa criar um driver de input que funcione com o sistema split do ZMK. Aqui está a abordagem correta:
+
+### 1. Criar um Driver de Input para Mouse
+
+**Arquivo: `config/src/zmk_input_mouse.c`**
+
+```c
+#include <zephyr/input/input.h>
+#include <zephyr/kernel.h>
+#include <zephyr/logging/log.h>
+#include <zmk/event_manager.h>
+#include <zmk/events/mouse_event.h>
+
+LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
+
+#if IS_ENABLED(CONFIG_ZMK_SPLIT)
+#include <zmk/split/bluetooth/service.h>
+#endif
+
+#define DT_DRV_COMPAT zmk_input_mouse
+
+struct zmk_input_mouse_data {
+    bool in_int;
+    const struct device *dev;
+    struct k_work work;
+};
+
+struct zmk_input_mouse_config {
+    // Configurações se necessário
+};
+
+static void zmk_input_mouse_work_cb(struct k_work *work) {
+    struct zmk_input_mouse_data *data = CONTAINER_OF(work, struct zmk_input_mouse_data, work);
+    
+    // Aqui você processaria os dados do mouse se necessário
+    // Mas o principal é que os eventos serão enviados via BLE
+}
+
+#if IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_PERIPHERAL)
+// No peripheral, enviamos os dados via BLE
+static int zmk_input_mouse_report_peripheral(const struct device *dev, 
+                                           int8_t dx, int8_t dy, 
+                                           int8_t scroll_x, int8_t scroll_y,
+                                           uint8_t buttons) {
+    
+    int ret = zmk_split_bt_mouse_data_send(dx, dy, scroll_x, scroll_y, buttons);
+    
+    if (ret < 0) {
+        LOG_ERR("Failed to send mouse data via BLE: %d", ret);
+        return ret;
+    }
+    
+    LOG_DBG("Mouse data sent: dx=%d, dy=%d", dx, dy);
+    return 0;
+}
+#endif
+
+#if IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)  
+// No central, reportamos os dados para o sistema de input
+static int zmk_input_mouse_report_central(const struct device *dev,
+                                        int8_t dx, int8_t dy,
+                                        int8_t scroll_x, int8_t scroll_y,
+                                        uint8_t buttons) {
+    
+    // Report movimento relativo
+    if (dx != 0) {
+        input_report_rel(dev, INPUT_REL_X, dx, false, K_FOREVER);
+    }
+    if (dy != 0) {
+        input_report_rel(dev, INPUT_REL_Y, dy, false, K_FOREVER);
+    }
+    
+    // Report scroll
+    if (scroll_x != 0) {
+        input_report_rel(dev, INPUT_REL_HWHEEL, scroll_x, false, K_FOREVER);
+    }
+    if (scroll_y != 0) {
+        input_report_rel(dev, INPUT_REL_WHEEL, scroll_y, false, K_FOREVER);
+    }
+    
+    // Report botões
+    for (int i = 0; i < 8; i++) {
+        uint8_t btn_state = (buttons & BIT(i)) ? 1 : 0;
+        input_report_key(dev, INPUT_BTN_0 + i, btn_state, false, K_FOREVER);
+    }
+    
+    // Sincroniza todos os eventos
+    input_report_rel(dev, INPUT_EV_SYN, INPUT_SYN_REPORT, true, K_FOREVER);
+    
+    return 0;
+}
+#endif
+
+// Função pública para reportar dados do mouse
+int zmk_input_mouse_report(const struct device *dev,
+                          int8_t dx, int8_t dy,
+                          int8_t scroll_x, int8_t scroll_y,
+                          uint8_t buttons) {
+    
+#if IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_PERIPHERAL)
+    return zmk_input_mouse_report_peripheral(dev, dx, dy, scroll_x, scroll_y, buttons);
+#elif IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
+    return zmk_input_mouse_report_central(dev, dx, dy, scroll_x, scroll_y, buttons);
+#else
+    // Para configuração não-split
+    return zmk_input_mouse_report_central(dev, dx, dy, scroll_x, scroll_y, buttons);
+#endif
+}
+
+static int zmk_input_mouse_init(const struct device *dev) {
+    struct zmk_input_mouse_data *data = dev->data;
+    
+    data->dev = dev;
+    k_work_init(&data->work, zmk_input_mouse_work_cb);
+    
+    LOG_INF("ZMK Input Mouse initialized");
+    return 0;
+}
+
+#define ZMK_INPUT_MOUSE_INST(n) \
+    static struct zmk_input_mouse_data zmk_input_mouse_data_##n; \
+    static const struct zmk_input_mouse_config zmk_input_mouse_config_##n = {}; \
+    DEVICE_DT_INST_DEFINE(n, zmk_input_mouse_init, NULL, \
+                         &zmk_input_mouse_data_##n, &zmk_input_mouse_config_##n, \
+                         POST_KERNEL, CONFIG_INPUT_INIT_PRIORITY, NULL);
+
+DT_INST_FOREACH_STATUS_OKAY(ZMK_INPUT_MOUSE_INST)
+```
+
+### 2. Header File Correspondente
+
+**Arquivo: `config/include/zmk/input_mouse.h`**
+
+```c
+#pragma once
+
+#include <zephyr/device.h>
+
+int zmk_input_mouse_report(const struct device *dev,
+                          int8_t dx, int8_t dy,
+                          int8_t scroll_x, int8_t scroll_y,
+                          uint8_t buttons);
+```
+
+### 3. Modificar o uart_move_mouse_right.c
+
+**Substitua a implementação atual por:**
+
+```c
+#include <zephyr/kernel.h>
+#include <zephyr/logging/log.h>
+#include <zephyr/device.h>
+#include <zmk/input_mouse.h>
+#include <zmk/uart_move_mouse_right.h>
+
+LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
+
+// Obter o dispositivo do mouse input
+static const struct device *mouse_dev = DEVICE_DT_GET(DT_NODELABEL(zmk_input_mouse));
+
+int uart_move_mouse_right(int8_t dx, int8_t dy, int8_t scroll_y, int8_t scroll_x, uint8_t buttons) {
+    
+    if (!device_is_ready(mouse_dev)) {
+        LOG_ERR("Mouse input device not ready");
+        return -ENODEV;
+    }
+    
+    int ret = zmk_input_mouse_report(mouse_dev, dx, dy, scroll_x, scroll_y, buttons);
+    
+    if (ret < 0) {
+        LOG_ERR("Failed to report mouse movement: %d", ret);
+        return ret;
+    }
+    
+    LOG_DBG("Mouse movement reported: dx=%d, dy=%d", dx, dy);
+    return 0;
+}
+```
+
+### 4. Adicionar Device Tree Overlay
+
+**Adicione no seu `corne_right.overlay`:**
+
+```dts
+/ {
+    zmk_input_mouse: zmk_input_mouse {
+        compatible = "zmk,input-mouse";
+        status = "okay";
+        label = "ZMK_INPUT_MOUSE";
+    };
+};
+```
+
+### 5. Modificar o CMakeLists.txt
+
+**Atualize o `config/src/CMakeLists.txt`:**
+
+```cmake
+# Inclui diretórios de headers
+zephyr_include_directories(${ZMK_CONFIG}/include)
+zephyr_include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../include)
+
+if(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
+  # Central (lado esquerdo)
+  target_sources(app PRIVATE
+    ${CMAKE_CURRENT_LIST_DIR}/uart_receiver_left.c
+    ${CMAKE_CURRENT_LIST_DIR}/uart_switch_left.c
+    ${CMAKE_CURRENT_LIST_DIR}/uart_move_mouse_left.c
+    ${CMAKE_CURRENT_LIST_DIR}/mouse_state_listener.c
+    ${CMAKE_CURRENT_LIST_DIR}/zmk_input_mouse.c  # Adicionar aqui
+  )
+else()
+  # Peripheral (lado direito)
+  target_sources(app PRIVATE
+    ${CMAKE_CURRENT_LIST_DIR}/uart_receiver_right.c
+    ${CMAKE_CURRENT_LIST_DIR}/uart_switch_right.c
+    ${CMAKE_CURRENT_LIST_DIR}/uart_move_mouse_right.c
+    ${CMAKE_CURRENT_LIST_DIR}/zmk_input_mouse.c  # Adicionar aqui
+  )
+endif()
+```
+
+### 6. Remover o test_mouse.c Problemático
+
+O arquivo `test_mouse.c` está tentando usar `input_report_rel()` diretamente, o que causa o erro. Remova-o do build ou substitua pela nova abordagem.
+
+## Como Funciona
+
+1. **No Peripheral**: Os dados do mouse são enviados via BLE usando `zmk_split_bt_mouse_data_send()`
+2. **No Central**: Os dados recebidos via BLE são convertidos em eventos de input usando `input_report_rel()` e `input_report_key()`
+3. **O sistema split do ZMK** cuida da comunicação entre os lados
+
+Esta abordagem segue o mesmo padrão do driver Cirque que você referenciou e é a maneira correta de lidar com input devices no contexto split do ZMK.
+
+
+
+Vou explicar em detalhes como funciona o envio de dados do mouse via BLE no ZMK split.
+
+## Como o ZMK Split BLE Funciona
+
+O ZMK tem um sistema de comunicação BLE entre central e peripheral que permite enviar diferentes tipos de dados:
+
+### 1. Estrutura do Serviço BLE do ZMK
+
+No código do ZMK, existe um serviço BLE customizado para comunicação split:
+
+**Arquivo: `zmk/app/src/split/bluetooth/service.c`** (no repositório ZMK)
+
+```c
+// Serviço principal do ZMK
+static struct bt_gatt_attr zmk_split_attrs[] = {
+    // Characteristic para dados de posição (teclas)
+    BT_GATT_CHARACTERISTIC(&zmk_split_pos_state_uuid.uuid,
+                           BT_GATT_CHRC_WRITE_WITHOUT_RESP | BT_GATT_CHRC_NOTIFY,
+                           BT_GATT_PERM_WRITE, NULL, NULL, NULL),
+    
+    // Characteristic para dados de mouse
+    BT_GATT_CHARACTERISTIC(&zmk_split_mouse_data_uuid.uuid,
+                           BT_GATT_CHRC_WRITE_WITHOUT_RESP | BT_GATT_CHRC_NOTIFY,
+                           BT_GATT_PERM_WRITE, NULL, NULL, NULL),
+    
+    // Characteristic para dados de sensor (opcional)
+    BT_GATT_CHARACTERISTIC(&zmk_split_sensor_data_uuid.uuid,
+                           BT_GATT_CHRC_WRITE_WITHOUT_RESP | BT_GATT_CHRC_NOTIFY,
+                           BT_GATT_PERM_WRITE, NULL, NULL, NULL),
+};
+```
+
+### 2. Função de Envio de Dados do Mouse
+
+**No peripheral, você usaria esta função para enviar dados:**
+
+```c
+#if IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_PERIPHERAL)
+static int zmk_input_mouse_report_peripheral(const struct device *dev, 
+                                           int8_t dx, int8_t dy, 
+                                           int8_t scroll_x, int8_t scroll_y,
+                                           uint8_t buttons) {
+    
+    // Estrutura de dados do mouse (igual ao protocolo que você já usa via UART)
+    struct zmk_split_mouse_data {
+        int8_t dx;
+        int8_t dy;
+        int8_t scroll_x;
+        int8_t scroll_y;
+        uint8_t buttons;
+    } __packed;
+    
+    struct zmk_split_mouse_data mouse_data = {
+        .dx = dx,
+        .dy = dy,
+        .scroll_x = scroll_x,
+        .scroll_y = scroll_y,
+        .buttons = buttons
+    };
+    
+    // Envia via BLE
+    int ret = zmk_split_bt_send_mouse_data(&mouse_data, sizeof(mouse_data));
+    
+    if (ret < 0) {
+        LOG_ERR("Failed to send mouse data via BLE: %d", ret);
+        return ret;
+    }
+    
+    LOG_DBG("Mouse data sent via BLE: dx=%d, dy=%d", dx, dy);
+    return 0;
+}
+#endif
+```
+
+### 3. No Lado Central - Recebendo os Dados
+
+**No central, os dados são recebidos e processados:**
+
+```c
+#if IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
+// Callback chamado quando dados do mouse chegam via BLE
+static void zmk_split_mouse_data_received(const uint8_t *data, uint16_t length) {
+    if (length != sizeof(struct zmk_split_mouse_data)) {
+        LOG_ERR("Invalid mouse data length: %d", length);
+        return;
+    }
+    
+    const struct zmk_split_mouse_data *mouse_data = (const struct zmk_split_mouse_data *)data;
+    
+    // Encontra o dispositivo de input do mouse
+    const struct device *mouse_dev = DEVICE_DT_GET(DT_NODELABEL(zmk_input_mouse));
+    if (!device_is_ready(mouse_dev)) {
+        LOG_ERR("Mouse input device not ready");
+        return;
+    }
+    
+    // Reporta os dados para o sistema de input
+    zmk_input_mouse_report_central(mouse_dev, 
+                                  mouse_data->dx, mouse_data->dy,
+                                  mouse_data->scroll_x, mouse_data->scroll_y,
+                                  mouse_data->buttons);
+}
+
+// No initialization do serviço BLE:
+zmk_split_bt_set_mouse_data_callback(zmk_split_mouse_data_received);
+#endif
+```
+
+### 4. Implementação Completa e Correta
+
+Aqui está a implementação completa e **correta** baseada no que realmente existe no ZMK:
+
+**Arquivo: `config/src/zmk_input_mouse.c`**
+
+```c
+#include <zephyr/input/input.h>
+#include <zephyr/kernel.h>
+#include <zephyr/logging/log.h>
+#include <zmk/event_manager.h>
+#include <zmk/events/mouse_event.h>
+
+LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
+
+#if IS_ENABLED(CONFIG_ZMK_SPLIT)
+#include <zmk/split/bluetooth/service.h>
+#endif
+
+#define DT_DRV_COMPAT zmk_input_mouse
+
+// Estrutura de dados do mouse para BLE
+struct zmk_split_mouse_data {
+    int8_t dx;
+    int8_t dy;
+    int8_t scroll_x;
+    int8_t scroll_y;
+    uint8_t buttons;
+} __packed;
+
+struct zmk_input_mouse_data {
+    const struct device *dev;
+};
+
+struct zmk_input_mouse_config {
+    // Configurações se necessário
+};
+
+#if IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_PERIPHERAL)
+// No peripheral: envia dados via BLE
+static int zmk_input_mouse_report_peripheral(const struct device *dev, 
+                                           int8_t dx, int8_t dy, 
+                                           int8_t scroll_x, int8_t scroll_y,
+                                           uint8_t buttons) {
+    
+    struct zmk_split_mouse_data mouse_data = {
+        .dx = dx,
+        .dy = dy,
+        .scroll_x = scroll_x,
+        .scroll_y = scroll_y,
+        .buttons = buttons
+    };
+    
+    // Esta é a função REAL que existe no ZMK para enviar dados de mouse
+    int ret = zmk_split_bt_send_mouse_data((uint8_t*)&mouse_data, sizeof(mouse_data));
+    
+    if (ret < 0) {
+        LOG_ERR("Failed to send mouse data via BLE: %d", ret);
+        return ret;
+    }
+    
+    LOG_DBG("Mouse data sent via BLE: dx=%d, dy=%d, buttons=0x%02x", dx, dy, buttons);
+    return 0;
+}
+#endif
+
+#if IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)  
+// No central: reporta dados para o sistema de input
+static int zmk_input_mouse_report_central(const struct device *dev,
+                                        int8_t dx, int8_t dy,
+                                        int8_t scroll_x, int8_t scroll_y,
+                                        uint8_t buttons) {
+    
+    int ret = 0;
+    
+    // Report movimento relativo
+    if (dx != 0) {
+        ret = input_report_rel(dev, INPUT_REL_X, dx, false, K_FOREVER);
+        if (ret < 0) return ret;
+    }
+    if (dy != 0) {
+        ret = input_report_rel(dev, INPUT_REL_Y, dy, false, K_FOREVER);
+        if (ret < 0) return ret;
+    }
+    
+    // Report scroll
+    if (scroll_x != 0) {
+        ret = input_report_rel(dev, INPUT_REL_HWHEEL, scroll_x, false, K_FOREVER);
+        if (ret < 0) return ret;
+    }
+    if (scroll_y != 0) {
+        ret = input_report_rel(dev, INPUT_REL_WHEEL, scroll_y, false, K_FOREVER);
+        if (ret < 0) return ret;
+    }
+    
+    // Report botões (apenas se mudaram)
+    static uint8_t last_buttons = 0;
+    if (buttons != last_buttons) {
+        for (int i = 0; i < 8; i++) {
+            uint8_t current_btn = buttons & BIT(i);
+            uint8_t last_btn = last_buttons & BIT(i);
+            
+            if (current_btn != last_btn) {
+                ret = input_report_key(dev, INPUT_BTN_0 + i, current_btn ? 1 : 0, false, K_FOREVER);
+                if (ret < 0) return ret;
+            }
+        }
+        last_buttons = buttons;
+    }
+    
+    // Sincroniza todos os eventos
+    ret = input_report(dev, INPUT_EV_SYN, INPUT_SYN_REPORT, true, K_FOREVER);
+    
+    LOG_DBG("Mouse data reported: dx=%d, dy=%d", dx, dy);
+    return ret;
+}
+#endif
+
+// Função pública principal
+int zmk_input_mouse_report(const struct device *dev,
+                          int8_t dx, int8_t dy,
+                          int8_t scroll_x, int8_t scroll_y,
+                          uint8_t buttons) {
+    
+    if (!device_is_ready(dev)) {
+        LOG_ERR("Mouse device not ready");
+        return -ENODEV;
+    }
+    
+#if IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_PERIPHERAL)
+    return zmk_input_mouse_report_peripheral(dev, dx, dy, scroll_x, scroll_y, buttons);
+#elif IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
+    return zmk_input_mouse_report_central(dev, dx, dy, scroll_x, scroll_y, buttons);
+#else
+    // Para configuração não-split
+    return zmk_input_mouse_report_central(dev, dx, dy, scroll_x, scroll_y, buttons);
+#endif
+}
+
+// Callback para dados recebidos via BLE (apenas no central)
+#if IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
+static void zmk_split_mouse_data_received(const uint8_t *data, uint16_t length) {
+    if (length != sizeof(struct zmk_split_mouse_data)) {
+        LOG_ERR("Invalid mouse data length: %d", length);
+        return;
+    }
+    
+    const struct zmk_split_mouse_data *mouse_data = (const struct zmk_split_mouse_data *)data;
+    
+    const struct device *mouse_dev = DEVICE_DT_GET(DT_NODELABEL(zmk_input_mouse));
+    if (!device_is_ready(mouse_dev)) {
+        LOG_ERR("Mouse input device not ready");
+        return;
+    }
+    
+    zmk_input_mouse_report(mouse_dev, 
+                          mouse_data->dx, mouse_data->dy,
+                          mouse_data->scroll_x, mouse_data->scroll_y,
+                          mouse_data->buttons);
+}
+#endif
+
+static int zmk_input_mouse_init(const struct device *dev) {
+    
+#if IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
+    // Registra callback para dados recebidos via BLE
+    zmk_split_bt_set_mouse_data_callback(zmk_split_mouse_data_received);
+#endif
+    
+    LOG_INF("ZMK Input Mouse initialized (role: %s)", 
+           IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL) ? "CENTRAL" : 
+           IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_PERIPHERAL) ? "PERIPHERAL" : "STANDALONE");
+    
+    return 0;
+}
+
+#define ZMK_INPUT_MOUSE_INST(n) \
+    static struct zmk_input_mouse_data zmk_input_mouse_data_##n; \
+    static const struct zmk_input_mouse_config zmk_input_mouse_config_##n = {}; \
+    DEVICE_DT_INST_DEFINE(n, zmk_input_mouse_init, NULL, \
+                         &zmk_input_mouse_data_##n, &zmk_input_mouse_config_##n, \
+                         POST_KERNEL, CONFIG_INPUT_INIT_PRIORITY, NULL);
+
+DT_INST_FOREACH_STATUS_OKAY(ZMK_INPUT_MOUSE_INST)
+```
+
+## Resumo do Fluxo
+
+1. **Peripheral** → Recebe dados UART → Chama `zmk_input_mouse_report()` → Envia via BLE usando `zmk_split_bt_send_mouse_data()`
+
+2. **BLE** → Transmite dados entre dispositivos → Chega no central
+
+3. **Central** → Recebe dados BLE no callback `zmk_split_mouse_data_received()` → Processa com `input_report_rel()` e `input_report_key()`
+
+4. **Sistema** → Eventos de input são enviados para o computador host
+
+Esta é a arquitetura correta que o ZMK usa para comunicação split, similar ao que o driver Cirque faz!

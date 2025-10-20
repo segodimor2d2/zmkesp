@@ -29625,6 +29625,132 @@ Esta arquitetura resolve o erro de compilação e implementa corretamente o envi
 
 
 
+
+
+
+
+
+---
+
+
+
+
+
+Excelente pergunta — o driver do **Cirque Pinnacle** que você enviou é um exemplo perfeito para entender **como o ZMK e o Zephyr integram um “input driver”** para enviar dados de sensores (como um touchpad ou mouse) de um **peripheral** para um **central** BLE (via HID).
+
+Vamos dividir a explicação em **arquitetura** e **fluxo de dados** 👇
+
+---
+
+## 🧩 1. Arquitetura
+
+### 🔹 Camadas principais:
+
+| Camada                       | Função                                                                                                                              |
+| ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| **Hardware (sensor)**        | O dispositivo físico (ex: Cirque Pinnacle touch sensor) que gera dados — movimentos, cliques, etc.                                  |
+| **Input Driver (Zephyr)**    | Código C que lê os dados do sensor via I²C/SPI e os transforma em eventos de input (`input_report_*`). Exemplo: `input_pinnacle.c`. |
+| **Input Subsystem (Zephyr)** | Núcleo genérico (`zephyr/subsys/input/input.c`) que gerencia eventos de entrada e despacha para os *listeners* registrados.         |
+| **ZMK HID layer**            | Camada do ZMK que transforma eventos de input em eventos HID e envia via BLE para o *central* (teu computador ou celular).          |
+| **BLE GATT HID Service**     | Serviço BLE usado pelo ZMK para enviar os relatórios HID ao central.                                                                |
+
+---
+
+## ⚙️ 2. Fluxo de Dados — Do sensor ao central BLE
+
+### Passo a passo do fluxo:
+
+#### 🧠 (1) Inicialização do driver
+
+* No `pinnacle_init()` o Zephyr cria e inicializa o dispositivo `DEVICE_DT_INST_DEFINE(...)`.
+* O driver configura o barramento SPI/I²C, interrupções GPIO e funções de leitura.
+* A função `pinnacle_gpio_cb()` é registrada para reagir quando o sensor tem novos dados.
+
+#### 🧲 (2) Interrupção de novo dado
+
+* Quando o sensor tem novos dados (ex: movimento detectado), ele puxa a linha `dr_gpios` (data ready).
+* Isso chama o callback `pinnacle_gpio_cb()`, que marca `data->in_int = true` e agenda o *work item* `pinnacle_work_cb`.
+
+#### 📦 (3) Leitura e interpretação
+
+* `pinnacle_work_cb()` chama `pinnacle_report_data()`.
+* Essa função lê via SPI/I²C os bytes do sensor (`pinnacle_seq_read()`).
+* Interpreta os pacotes em:
+
+  * Botões (`btn`)
+  * Movimento relativo (`dx`, `dy`)
+
+#### 🎯 (4) Criação de eventos de input
+
+* Com os dados, o driver chama as funções do **Zephyr Input Subsystem**:
+
+  ```c
+  input_report_key(dev, INPUT_BTN_0 + i, btn_val ? 1 : 0, false, K_FOREVER);
+  input_report_rel(dev, INPUT_REL_X, dx, false, K_FOREVER);
+  input_report_rel(dev, INPUT_REL_Y, dy, true, K_FOREVER);
+  ```
+* Esses eventos são entregues ao sistema de input (veja `zephyr/subsys/input/input.c`).
+
+#### 📨 (5) Encaminhamento para listeners (ZMK)
+
+* O Zephyr percorre todos os listeners registrados via `INPUT_CALLBACK_DEFINE()` e chama suas *callbacks*.
+* O ZMK registra um listener que recebe eventos de input e converte-os em eventos ZMK
+(`zmk_mouse_state_changed`, `zmk_keycode_state_changed`, etc.).
+
+#### 🧮 (6) Processamento pelo ZMK
+
+* O evento chega ao **ZMK Event Manager**, que o propaga internamente (por exemplo, para o módulo HID).
+
+#### 📡 (7) Envio BLE ao central
+
+* O módulo **ZMK HID** empacota os dados (botões, movimento, scroll, etc.) em um relatório HID.
+* O relatório é enviado via **GATT HID Service** do BLE ao central.
+* O computador ou celular conectado recebe os dados como se fossem de um **mouse físico**.
+
+---
+
+## 📊 Diagrama Resumido do Fluxo
+
+```
+[SENSOR TOUCH] 
+   │
+   ▼
+[input_pinnacle.c]
+   │  lê dados SPI/I2C
+   ▼
+[input_report_rel/input_report_key()]
+   │
+   ▼
+[Zephyr Input Subsystem]
+   │  distribui eventos
+   ▼
+[ZMK Listener -> zmk_mouse_state_changed]
+   │
+   ▼
+[ZMK HID Layer]
+   │
+   ▼
+[BLE GATT HID Service]
+   │
+   ▼
+[CENTRAL (PC / CELULAR)]
+```
+
+---
+
+## 💡 Em resumo
+
+* O **input driver** encapsula toda a lógica de comunicação com o sensor físico.
+* Ele **não envia dados BLE diretamente** — apenas gera eventos “genéricos de input”.
+* O **ZMK** intercepta esses eventos e é quem decide como transformar e enviar via BLE HID.
+
+---
+
+Se quiser, posso te mostrar **onde exatamente o ZMK faz o “bridge”** entre `input_report_*()` e o `zmk_mouse_state_changed` que gera o HID report — isso é o ponto-chave da integração entre o *input driver* e o *HID BLE stack* do ZMK. Quer que eu te mostre essa parte?
+
+
+---
+
 python print_allfiles_path.py /home/segodimo/zmkpromicro
 
 
@@ -29639,6 +29765,10 @@ el consegue enviar dados de um sensor desde um peripheral para o central,
 
 agora que vc tem todo o contexto, usando a referencia do inputdriver.md,
 quero que me ajude a descobrir como posso enviar os dados do mouse gerados no test_mouse.c do peripheral para o central.
+
+
+aqui no arquivo inputdriver.md tem um exemplo de referencia para um input driver que usa o zmk,
+me axplica a arquitetura e o fluxo sobre como el faz para enviar dados de um sensor desde um peripheral para o central.
 
 
 #include <zmk/events/mouse_state_changed.h>
@@ -29661,6 +29791,197 @@ uart_move_mouse_right.c
 
 eu quero usar o test_mouse.c para simular uma entrada e não usar o uart_move_mouse_right.c nem uart_receiver_right.c como entrada
 
+
+
+se eu fizer isso o evento chegaria no central e testaria no central?
+
 meu test_mouse.c está assim:
 
+que quero criar um test no zmk assim:
 
+1 - gerar um dado do lado peripheral (um press e release de um botão)
+2 - chama as funções do **Zephyr Input Subsystem** para enviar esse dado usando input_report
+3 - quero que aconteça o Encaminhamento para listeners (ZMK)
+    * O Zephyr percorre todos os listeners registrados via `INPUT_CALLBACK_DEFINE()` e chama suas *callbacks*.
+    * O ZMK registra um listener que recebe eventos de input e converte-os em eventos ZMK
+    (`zmk_mouse_state_changed`, `zmk_keycode_state_changed`, etc.).
+4 - eu quero testar que o evento chega ao **ZMK Event Manager**
+
+
+
+
+
+
+
+
+Perfeito ✅ — você entendeu exatamente o fluxo correto!
+O que você quer fazer é **simular um input físico** no *peripheral* e verificar que ele realmente **chega no ZMK Event Manager**, passando pelo pipeline `input_report → listener → zmk_event`.
+
+Vamos detalhar o que vai acontecer e como montar o **teste prático** dentro do ZMK.
+
+---
+
+## 🧠 Objetivo do seu `test_mouse.c`
+
+Você quer validar o caminho completo **sem precisar de um hardware real**:
+
+```
+[input_report_*()]  →  [INPUT_CALLBACK_DEFINE listener do ZMK]  →  [zmk_event_manager.c]
+```
+
+ou seja:
+
+1. **Gerar evento manualmente** (como se fosse o sensor)
+2. **Enviar com input_report_key / input_report_rel**
+3. **Ver se o listener do ZMK capturou**
+4. **Confirmar que o Event Manager recebeu o evento ZMK correspondente**
+
+---
+
+## 🧩 1. O que você precisa no `test_mouse.c`
+
+Você pode fazer isso direto dentro do app (`app/src/test_mouse.c`) criando um **device fake** e usando as APIs do Zephyr input subsystem.
+Exemplo mínimo para gerar um *click de mouse*:
+
+```c
+#include <zephyr/input/input.h>
+#include <zephyr/device.h>
+#include <zephyr/kernel.h>
+#include <zephyr/logging/log.h>
+
+LOG_MODULE_REGISTER(test_mouse, CONFIG_ZMK_LOG_LEVEL);
+
+void test_mouse_send_click(void)
+{
+    const struct device *dev = DEVICE_DT_GET_ONE(zmk_input_device); // qualquer device válido, ou NULL
+
+    if (!device_is_ready(dev)) {
+        LOG_ERR("Device not ready!");
+        return;
+    }
+
+    LOG_INF("Simulating mouse click event...");
+
+    // 1️⃣ Press
+    input_report_key(dev, INPUT_BTN_0, 1, false, K_NO_WAIT);
+
+    // 2️⃣ Release
+    input_report_key(dev, INPUT_BTN_0, 0, true, K_NO_WAIT);
+
+    LOG_INF("Mouse click event sent.");
+}
+
+void main(void)
+{
+    k_msleep(2000); // aguarda inicialização
+    test_mouse_send_click();
+}
+```
+
+👉 Isso vai gerar dois eventos de input:
+
+* `INPUT_BTN_0 = press`
+* `INPUT_BTN_0 = release`
+
+Eles serão **capturados pelos listeners** registrados no sistema (`STRUCT_SECTION_FOREACH(input_listener, listener)`).
+
+---
+
+## 🧩 2. Listener do ZMK
+
+O ZMK registra listeners como:
+
+```c
+INPUT_CALLBACK_DEFINE(NULL, zmk_input_listener_callback);
+```
+
+Essa callback interna converte os eventos Zephyr em eventos ZMK (`zmk_mouse_state_changed`, `zmk_keycode_state_changed`, etc.).
+
+Então, quando você chama `input_report_key()`, o fluxo real é:
+
+```
+test_mouse.c
+ └─▶ input_report_key()
+      └─▶ input_report()
+           └─▶ input_process()
+                └─▶ zmk_input_listener_callback()
+                     └─▶ zmk_event_manager_emit_event()
+                          └─▶ listener modules (HID, layers, etc.)
+```
+
+Portanto — sim ✅, se você fizer isso, **o evento vai chegar ao ZMK Event Manager**.
+
+---
+
+## 🧪 3. Como testar que o evento chegou ao ZMK Event Manager
+
+O ZMK tem o **Event Manager** central (`zmk/event_manager.c`) com macros:
+
+```c
+ZMK_EVENT_DECLARE(zmk_mouse_state_changed);
+ZMK_EVENT_RAISE(new zmk_mouse_state_changed(...));
+```
+
+Você pode verificar de duas formas:
+
+### 🔸 A. Log
+
+Ative logs para o `event_manager`:
+
+```bash
+CONFIG_ZMK_EVENT_LOG_LEVEL_DBG=y
+```
+
+E veja no console algo como:
+
+```
+[00:00:02.123,000] <dbg> event_manager: event raised: zmk_mouse_state_changed
+```
+
+### 🔸 B. Código (hook de teste)
+
+Você pode registrar um *listener ZMK* com:
+
+```c
+ZMK_LISTENER(test_mouse_listener, test_mouse_callback);
+ZMK_SUBSCRIPTION(test_mouse_listener, zmk_mouse_state_changed);
+
+static int test_mouse_callback(const zmk_event_t *eh)
+{
+    LOG_INF("✅ Test mouse event reached Event Manager!");
+    return 0;
+}
+```
+
+Assim, quando o evento chegar no Event Manager, **sua callback será chamada** — validando o fluxo inteiro.
+
+---
+
+## 🚀 Resultado esperado
+
+Se tudo estiver integrado corretamente:
+
+1. `input_report_key()` → gera evento Zephyr
+2. Listener ZMK intercepta e converte → `zmk_mouse_state_changed`
+3. Event Manager propaga → seu listener `test_mouse_callback` é chamado
+4. Log confirma o recebimento ✅
+
+---
+
+## ⚡ Dica final
+
+Se você quiser isolar o teste sem BLE real:
+
+* Compile com `CONFIG_ZMK_SPLIT_ROLE_PERIPHERAL=y`
+* Desative BLE temporariamente (`CONFIG_BT=n`)
+* O fluxo interno de eventos ZMK ainda funciona normalmente (você só não transmite o HID).
+
+---
+
+Se quiser, eu posso te gerar um exemplo completo de `test_mouse.c` com:
+
+* geração do evento `input_report_key()`,
+* listener ZMK registrado,
+* logs automáticos para confirmar o recebimento no Event Manager.
+
+Quer que eu monte esse arquivo completo pra você (já pronto pra compilar dentro do ZMK)?

@@ -2153,3 +2153,255 @@ DT_INST_FOREACH_STATUS_OKAY(ZMK_INPUT_MOUSE_INST)
 4. **Sistema** → Eventos de input são enviados para o computador host
 
 Esta é a arquitetura correta que o ZMK usa para comunicação split, similar ao que o driver Cirque faz!
+
+
+
+
+### 🔄 Fluxo de Dados - Peripheral (Lado Direito)
+
+```
+UART (Dados Externos)
+        ↓
+uart_receiver_right.c (Recebe e decodifica)
+        ↓
+uart_move_mouse_right.c (Processa movimento)
+        ↓
+zmk_input_mouse.c (Envia via BLE)
+        ↓
+BLE → Transmissão Wireless → Central
+```
+
+### 🔄 Fluxo de Dados - Central (Lado Esquerdo)
+
+```
+BLE (Recebe dados do Peripheral)
+        ↓
+zmk_input_mouse.c (Callback de recebimento)
+        ↓
+input_report_rel/input_report_key (Sistema Zephyr)
+        ↓
+Sistema HID do ZMK
+        ↓
+Computador Host (via USB/BLE)
+```
+
+### 1. ✅ NOVO: `config/include/zmk/input_mouse.h`
+
+
+---
+
+A relação entre a criação de um **input driver** no **Zephyr** (e, por extensão, no **ZMK**) e a adição de um **Device Tree Overlay (DTO)** é de **configuração e ativação de hardware**.
+
+O Device Tree (DT) é o mecanismo central que o Zephyr usa para descrever o hardware do seu sistema, e o Overlay é a forma como você o modifica para a sua aplicação específica.
+
+Aqui está a explicação da relação em termos de Zephyr e ZMK:
+
+### 1\. O Papel do Input Driver (Zephyr)
+
+No Zephyr, um **Input Driver** (como o `kscan` ou o driver para dispositivos apontadores) é o **software** que sabe como interagir com um periférico de entrada (por exemplo, uma matriz de teclas, um encoder, um trackpad) para ler eventos de entrada (como "tecla pressionada" ou "movimento do mouse").
+
+Para que o driver funcione, ele precisa saber:
+
+1.  **Qual periférico ele deve controlar.**
+2.  **Quais pinos GPIO (ou barramentos I2C/SPI) estão conectados a esse periférico.**
+3.  **Quais configurações específicas usar (ex: tempos de debounce, tamanho da matriz).**
+
+### 2\. O Papel do Device Tree (DT) e do Overlay (DTO)
+
+O **Device Tree (DT)** é o formato de dados que descreve o hardware da sua placa e do SoC (System-on-Chip). Ele é o lugar onde você declara a **presença física** de um dispositivo.
+
+Um **Device Tree Overlay (DTO)** é um arquivo (`.overlay`) que você cria para **modificar** a descrição do DT da placa base, sem alterar os arquivos originais do Zephyr.
+
+### A Relação: Usando o DTO para Configurar o Driver
+
+Você usa o **Device Tree Overlay** para:
+
+| Ação | Detalhe | Exemplo em ZMK |
+| :--- | :--- | :--- |
+| **1. Instanciar o Driver** | Você cria um novo nó no DT que é **compatível** com o driver de entrada que você está usando. Isso informa ao Zephyr que esse tipo de dispositivo está presente. | `&kscan0 { ... };` |
+| **2. Ativar o Hardware** | Você define as propriedades do nó para especificar exatamente a que o driver está conectado. Isso geralmente inclui referências aos pinos GPIO, barramentos I2C/SPI e quaisquer configurações específicas do hardware. | `compatible = "zmk,kscan-gpio-matrix";` <br> `input-gpios = <&gpio0 1 2 3 ...>;` |
+| **3. Configuração Específica** | Você define as propriedades que o driver usa para sua lógica de negócio. | `row-gpios = <&pro_micro 21 GPIO_PULL_UP ...>;` <br> `col-gpios = <&pro_micro 15 GPIO_PULL_DOWN ...>;` |
+
+Em resumo, o **Input Driver** é o **código** (a lógica) que lê as entradas, e o **Device Tree Overlay** é o **mapa** que diz ao Zephyr onde esse código deve ser conectado no hardware da sua placa (quais pinos, qual barramento, e com quais configurações).
+
+-----
+
+### Aplicação no ZMK
+
+No contexto do **ZMK** (que é baseado no Zephyr):
+
+1.  **Criação do Driver (ZMK):** O ZMK já fornece drivers de entrada comuns, como o `zmk,kscan-gpio-matrix` (para matrizes de teclado) e drivers para dispositivos apontadores (ex: `zmk,input-listener`).
+2.  **Adição do DTO (Você):** Para integrar um novo teclado ou shield (escudo de hardware), você cria um arquivo **`.overlay`**. É neste arquivo que você ativa, configura e "liga" o driver ZMK/Zephyr aos pinos físicos da sua placa, definindo a estrutura da sua matriz de teclas (colunas e linhas GPIOs).
+
+Sem o DTO, o driver existe no código, mas o sistema operacional (Zephyr) não sabe **onde** ele está no hardware para ativá-lo e inicializá-lo corretamente.
+
+
+
+
+
+
+
+---
+
+Excelente pergunta 🔥 — e é **fundamental** entender essa relação se você quer fazer um
+*input driver* funcionar no ZMK (ou no Zephyr em geral).
+
+Vamos destrinchar a ligação entre o **driver de input** e o **Device Tree Overlay**
+dentro do contexto **Zephyr + ZMK** 👇
+
+---
+
+## 🧩 1. O que é um *Input Driver* no Zephyr?
+
+Um **input driver** no Zephyr é um **módulo de software** que implementa a interface
+`input.h` e envia eventos de entrada (como movimento de mouse, teclas, sensores etc.)
+para o **Input Subsystem** do Zephyr.
+👉 Ele é o “código que fala com o hardware” ou com outro módulo que gera eventos.
+
+Exemplo simplificado (C):
+
+```c
+#include <zephyr/input/input.h>
+
+static void my_input_send_event(int dx, int dy) {
+    struct input_event event = {
+        .type = INPUT_EV_REL,
+        .code = INPUT_REL_X,
+        .value = dx
+    };
+    input_report(NULL, &event);
+}
+```
+
+Esse driver pode ser associado a um *device node* no devicetree, e aí entra o próximo ponto.
+
+---
+
+## 🌳 2. O que é o *Device Tree* no Zephyr?
+
+O **Device Tree** descreve **o hardware e os dispositivos lógicos** que o sistema tem.
+Cada nó (`node`) representa um *device*, e cada driver do Zephyr (como o de input,
+sensor, UART, etc.) é **ligado a um nó** que declara:
+
+* `compatible` → o tipo de driver que deve ser usado;
+* `label` → nome simbólico (ex.: `"test_input"`);
+* outras propriedades específicas do driver.
+
+No build, o Zephyr vai:
+
+1. Ler o `.dts` (Device Tree Source);
+2. Encontrar o `compatible`;
+3. Vincular o driver C correspondente via o macro `DEVICE_DT_INST_DEFINE()`.
+
+---
+
+## 🧩 3. Então, o *overlay* serve pra quê?
+
+O **overlay** (`.overlay`) serve para **adicionar ou modificar nós** do *Device Tree*
+original da placa sem precisar editar o arquivo base.
+
+Quando você adiciona algo assim no `.overlay`:
+
+```dts
+/ {
+    test_input: test_input {
+        compatible = "zmk,input-device";
+        label = "test_input";
+        status = "okay";
+    };
+};
+```
+
+Você está dizendo ao Zephyr:
+
+> “Ei, adicione um novo dispositivo chamado `test_input` e use o driver compatível com
+`zmk,input-device`.”
+
+E o Zephyr, no build, procura um driver C que tenha:
+
+```c
+DEVICE_DT_INST_DEFINE(0, init_fn, NULL, NULL, NULL, POST_KERNEL, CONFIG_KERNEL_INIT_PRIORITY_DEVICE, NULL);
+```
+
+e que **declare o mesmo `compatible`** no seu `DEVICE_DT_INST_DEFINE()`.
+
+---
+
+## 🔗 4. Relação direta entre o input driver e o overlay
+
+| Elemento                | Papel                                                                    | Onde aparece                                            |
+| ----------------------- | ------------------------------------------------------------------------ | ------------------------------------------------------- |
+| **Input Driver (C)**    | Implementa o comportamento — envia eventos de input.                     | Código C (`input_driver.c`)                             |
+| **`compatible`**        | Conecta o Device Tree ao driver.                                         | Tanto no `.overlay` quanto no `DEVICE_DT_INST_DEFINE()` |
+| **Device Tree Overlay** | Declara o dispositivo que usa o driver.                                  | Arquivo `.overlay`                                      |
+| **ZMK**                 | Usa o device declarado no overlay para receber e enviar eventos BLE/HID. | Camadas superiores (ex: `split.c`, `input_listener.c`)  |
+
+---
+
+## 🧠 5. Em resumo
+
+O **overlay** não é o driver — é apenas a **descrição** de que um dispositivo existe e **qual driver** o Zephyr deve usar.
+
+🔹 **O driver (C)** é o código que realmente envia ou processa eventos.
+🔹 **O overlay (DTS)** é a “ponte” que faz o Zephyr reconhecer que esse driver deve ser instanciado no sistema.
+
+Sem o overlay → o Zephyr **não cria o device**.
+Sem o driver → o overlay **não tem código para associar**.
+
+---
+
+## 🧱 Exemplo concreto (no ZMK)
+
+### Overlay:
+
+```dts
+/ {
+    test_input: test_input {
+        compatible = "zmk,input-device";
+        label = "test_input";
+        status = "okay";
+    };
+};
+```
+
+### Driver:
+
+```c
+#include <zephyr/device.h>
+#include <zephyr/input/input.h>
+
+static int test_input_init(const struct device *dev) {
+    printk("Test input initialized\n");
+    return 0;
+}
+
+DEVICE_DT_INST_DEFINE(0, test_input_init, NULL, NULL, NULL,
+                      POST_KERNEL, CONFIG_KERNEL_INIT_PRIORITY_DEVICE, NULL);
+```
+
+Agora o ZMK pode usar `device_get_binding("test_input")` para interagir com esse dispositivo.
+
+---
+
+Se quiser, posso te mostrar um exemplo **completo e mínimo** de como criar um *input
+driver customizado no ZMK* que envia movimento de mouse ou cliques via BLE (ou entre
+split halves).
+Quer que eu te monte esse exemplo?
+
+
+
+aqui esta uma documentação sobre o input driver:
+
+https://docs.zephyrproject.org/3.5.0/services/input/index.html
+
+usando zephyr e ZMK, que relação tem o fato de criar um input driver a adicionar um Device Tree Overlay?
+
+
+
+
+
+
+
+
+
+

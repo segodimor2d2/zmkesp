@@ -2398,10 +2398,718 @@ usando zephyr e ZMK, que relação tem o fato de criar um input driver a adicion
 
 
 
+Excelente pergunta — e fundamental para entender como o **ZMK** (sobre **Zephyr**) transporta os eventos do **peripheral** para o **central** em um teclado *split* (como Corne, Lily58, etc.).
+
+Vamos destrinchar o fluxo **do momento em que uma tecla é pressionada no peripheral até ela ser processada pelo central** 👇
+
+---
+
+## 🧭 VISÃO GERAL: CAMINHO DO EVENTO
+
+```text
+[Key press]  
+   ↓  
+[Matrix driver (peripheral)]  
+   ↓  
+ZMK Input Subsystem (Zephyr input_report)  
+   ↓  
+ZMK Event Manager (gera zmk_keycode_state_changed)  
+   ↓  
+ZMK Split Peripheral (serializa e envia via BLE/serial)  
+   ↓  
+ZMK Split Central (recebe e desserializa evento)  
+   ↓  
+ZMK Event Manager (no central)  
+   ↓  
+ZMK HID (gera relatório HID → PC)
+```
+
+---
+
+## 🔍 ETAPAS DETALHADAS
+
+### 🧱 1️⃣ Disparo de evento no **peripheral**
+
+O *input driver* do teclado escaneia a matriz e detecta uma mudança:
+
+```c
+zmk_matrix_transform_press(row, col);
+```
+
+O driver então chama:
+
+```c
+input_report(&dev->input_dev, INPUT_KEY, keycode, pressed, K_NO_WAIT);
+```
+
+➡️ Isso envia um evento ao **Zephyr Input Subsystem**, que é o ponto de entrada para o sistema de input genérico.
+
+---
+
+### ⚙️ 2️⃣ Encaminhamento interno via **Zephyr Input Subsystem**
+
+O Zephyr chama todas as *callbacks* registradas com:
+
+```c
+INPUT_CALLBACK_DEFINE(device, input_listener_callback);
+```
+
+👉 O ZMK registra uma dessas *callbacks*, em um arquivo como `zmk_input_listener.c`, que traduz o evento genérico em um evento ZMK interno:
+
+```c
+ZMK_EVENT_RAISE(new_zmk_keycode_state_changed(keycode, pressed));
+```
+
+---
+
+### 📢 3️⃣ Emissão do evento no **ZMK Event Manager**
+
+O evento `zmk_keycode_state_changed` agora entra no **Event Manager** do ZMK.
+Este sistema interno é responsável por despachar o evento para qualquer *listener* registrado.
+
+Por exemplo:
+
+* `zmk_split_peripheral.c` (no peripheral) escuta esses eventos.
+* `zmk_hid.c` (no central) escuta para enviar ao host USB/Bluetooth.
+
+---
+
+### 📡 4️⃣ Encaminhamento via **Split Transport (peripheral → central)**
+
+Aqui está o coração da comunicação split:
+
+#### 📍 No *peripheral*
+
+O listener `zmk_split_peripheral` é notificado de novos eventos.
+
+Ele:
+
+* serializa o evento (`zmk_split.c` → `serialize_event()`),
+* e o envia ao *central* via BLE GATT, UART, ou USB serial dependendo da configuração:
+
+```c
+zmk_split_bt_peripheral_send(event);
+```
+
+#### 📍 No *central*
+
+O módulo `zmk_split_central.c` recebe esse dado via BLE GATT ou UART e:
+
+* desserializa o conteúdo,
+* recria o evento correspondente (`zmk_keycode_state_changed`),
+* e o **reinjeta** no Event Manager local:
+
+```c
+ZMK_EVENT_RAISE(new_zmk_keycode_state_changed(keycode, pressed));
+```
+
+---
+
+### 🧠 5️⃣ Processamento no **central**
+
+Agora o evento está “como se tivesse sido gerado localmente”.
+O restante do sistema ZMK o trata normalmente:
+
+1. `zmk_hid_listener` converte o evento em um relatório HID.
+2. O HID report é enviado ao sistema operacional via USB ou Bluetooth HID.
+
+---
+
+## 🔁 RESUMO EM FORMATO DE FLUXO
+
+| Etapa                  | Origem         | Destino            | Módulo responsável                      |
+| :--------------------- | :------------- | :----------------- | :-------------------------------------- |
+| 1. Leitura de tecla    | Matrix scanner | Zephyr Input       | `zmk_matrix.c`                          |
+| 2. Relatório de input  | Zephyr Input   | ZMK Input listener | `input_report` + `zmk_input_listener.c` |
+| 3. Criação de evento   | Input listener | Event Manager      | `zmk_event_manager.c`                   |
+| 4. Envio via split     | Peripheral     | Central            | `zmk_split_peripheral.c` / BLE GATT     |
+| 5. Recepção no central | BLE GATT       | Event Manager      | `zmk_split_central.c`                   |
+| 6. HID output          | Central        | Host (PC)          | `zmk_hid.c`                             |
+
+---
+
+## 📦 ARQUIVOS ENVOLVIDOS NO ZMK
+
+| Função                     | Arquivo (ZMK)            | Descrição                                |
+| :------------------------- | :----------------------- | :--------------------------------------- |
+| Registro de input listener | `zmk_input_listener.c`   | Recebe eventos do Zephyr Input Subsystem |
+| Event manager              | `zmk_event_manager.c`    | Despacha eventos internos                |
+| Split Peripheral           | `zmk_split_peripheral.c` | Serializa eventos e envia via BLE/serial |
+| Split Central              | `zmk_split_central.c`    | Recebe, desserializa e reinjeta eventos  |
+| HID listener               | `zmk_hid_listener.c`     | Converte eventos em relatórios HID       |
+
+---
+
+## 🧪 EXEMPLO PRÁTICO
+
+No peripheral:
+
+```c
+input_report(&input_dev, INPUT_KEY, KEY_A, true, K_NO_WAIT);
+```
+
+Internamente isso dispara:
+
+```
+input_report() → zmk_input_listener_callback()
+→ ZMK_EVENT_RAISE(zmk_keycode_state_changed)
+→ zmk_split_peripheral_listener() envia via BLE
+```
+
+No central:
+
+```
+BLE RX → zmk_split_central_process_event()
+→ ZMK_EVENT_RAISE(zmk_keycode_state_changed)
+→ zmk_hid_listener gera HID report
+→ PC recebe 'A' pressionado
+```
+
+---
+
+Se quiser, posso te mostrar o **diagrama real (ASCII ou gráfico)** com todas as chamadas de função e módulos exatos (`zmk_split_peripheral.c`, `zmk_event_manager.c`, `zmk_hid_listener.c`, etc.) mostrando a **trilha completa da tecla do peripheral até o host**.
+
+Quer que eu monte esse diagrama para você?
 
 
 
 
 
+
+
+
+
+
+Perfeita a pergunta — e ela mostra que você está realmente entendendo o fluxo interno do **ZMK + Zephyr** 👏
+
+Vamos destrinchar **como o evento é transportado** do **peripheral** para o **central**,
+e depois explicar **qual é a diferença** entre o método com `input_report()` (Zephyr
+Input Subsystem) e esse seu código que usa diretamente `raise_zmk_position_state_changed()`.
+
+---
+
+## 🧭 Parte 1 — Como o evento é transportado do peripheral para o central
+
+Quando você faz isto:
+
+```c
+raise_zmk_position_state_changed(event);
+```
+
+você **está pulando o Zephyr Input Subsystem** e indo **diretamente para o ZMK Event Manager**.
+Mas ainda assim o evento percorre o *pipeline* interno do ZMK, e **chega ao central via o
+módulo Split**.
+
+Vamos seguir o caminho completo 👇
+
+---
+
+### 🔹 1️⃣ Peripheral gera o evento ZMK
+
+A função `raise_zmk_position_state_changed()` é um *wrapper* para:
+
+```c
+ZMK_EVENT_RAISE(new_zmk_position_state_changed(...))
+```
+
+Ou seja, ela cria e dispara o evento dentro do **ZMK Event Manager** no *peripheral*.
+
+---
+
+### 🔹 2️⃣ Event Manager notifica os *listeners* locais
+
+O **Event Manager** do ZMK entrega o evento a todos os *listeners* registrados com `ZMK_LISTENER()`.
+
+Um desses listeners é:
+
+```c
+ZMK_LISTENER(split_peripheral, split_peripheral_listener);
+ZMK_SUBSCRIPTION(split_peripheral, zmk_position_state_changed);
+```
+
+👉 Isso significa que o **split_peripheral** recebe o evento `zmk_position_state_changed`.
+
+---
+
+### 🔹 3️⃣ Split Peripheral envia o evento via BLE (ou UART)
+
+O listener do split (em `zmk_split_peripheral.c`) faz:
+
+* Serializa o evento (`serialize_event()` em `zmk_split.c`)
+* Envia o payload via BLE GATT (ou UART) para o central.
+
+```c
+zmk_split_bt_peripheral_send(serialized_event);
+```
+
+O BLE central (outro dispositivo) está pareado e com uma conexão GATT aberta para receber esses pacotes.
+
+---
+
+### 🔹 4️⃣ Central recebe e reinterpreta o evento
+
+No central, o código `zmk_split_central.c` recebe esse pacote GATT e:
+
+* desserializa o evento (`deserialize_event()`),
+* reconstrói a struct `zmk_position_state_changed`,
+* e **reinjeta** o evento localmente com:
+
+  ```c
+  ZMK_EVENT_RAISE(new_zmk_position_state_changed(...));
+  ```
+
+Agora o evento está dentro do Event Manager do **central**, como se tivesse ocorrido ali.
+
+---
+
+### 🔹 5️⃣ Central processa normalmente (HID, keymap, etc.)
+
+Do ponto de vista do resto do sistema:
+
+* o central agora vê que “uma tecla mudou de estado”,
+* o keymap processa o evento (`zmk_keymap_process_position_state_changed`),
+* gera `zmk_keycode_state_changed` ou outros eventos,
+* e o `zmk_hid_listener` envia o HID report ao host via USB/Bluetooth.
+
+✅ Ou seja: o evento realmente “viajou” do peripheral → BLE → central → HID.
+
+---
+
+## ⚖️ Parte 2 — Diferença entre o seu código e o fluxo via Zephyr Input Subsystem
+
+| Etapa                         | `input_report()` (Zephyr Input Subsystem)                                | `raise_zmk_position_state_changed()` (ZMK direto) |
+| :---------------------------- | :----------------------------------------------------------------------- | :------------------------------------------------ |
+| **Camada usada**              | Usa o **Zephyr Input Subsystem** (nível do kernel)                       | Usa diretamente o **ZMK Event Manager**           |
+| **Quem cria o evento ZMK**    | Um listener ZMK traduz o `input_event` para `zmk_position_state_changed` | Você mesmo gera o evento diretamente              |
+| **Camada de compatibilidade** | Compatível com drivers Zephyr genéricos (sensor, touchscreen, etc.)      | Específico para ZMK                               |
+| **Encaminhamento split BLE**  | Passa pelo mesmo pipeline depois de virar `zmk_position_state_changed`   | Já começa a partir dele, vai direto para o split  |
+| **Uso típico**                | Drivers de hardware reais                                                | Simulações, testes, ou camadas intermediárias     |
+
+---
+
+## 🧠 Em resumo
+
+| Pergunta                          | Resposta                                                                                                                                                                                           |
+| :-------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Como o evento é transportado?** | O módulo `zmk_split_peripheral` serializa o evento e o envia via BLE/serial para o central, que o recria e processa.                                                                               |
+| **Qual a diferença do método?**   | `input_report()` usa o *Zephyr Input Subsystem* (nível kernel), enquanto `raise_zmk_position_state_changed()` pula direto para o *ZMK Event Manager*. O segundo é mais direto e específico do ZMK. |
+| **Qual usar para teste?**         | Para testar o pipeline ZMK completo, `raise_zmk_position_state_changed()` é ideal. Para testar integração de driver Zephyr → ZMK, use `input_report()`.                                            |
+
+---
+
+Se quiser, posso te mostrar um **diagrama completo (em ASCII)** mostrando os dois caminhos lado a lado:
+
+* à esquerda o caminho `input_report()` (via Zephyr Input),
+* à direita o caminho direto `raise_zmk_position_state_changed()`.
+
+Quer que eu monte esse diagrama comparativo?
+
+
+
+Perfeito 😎 — aqui vai o **diagrama completo** comparando os dois fluxos:
+
+à **esquerda** o caminho usando `input_report()` (Zephyr Input Subsystem)
+à **direita** o caminho usando `raise_zmk_position_state_changed()` (ZMK direto).
+
+---
+
+```
+┌────────────────────────────────────────────┐                  ┌────────────────────────────────────────────┐
+│          FLUXO A — Zephyr Input            │                  │       FLUXO B — ZMK Direto (Simplificado)  │
+│        usando input_report()               │                  │     usando raise_zmk_position_state_changed │
+└────────────────────────────────────────────┘                  └────────────────────────────────────────────┘
+
+           (no Peripheral)                                           (no Peripheral)
+──────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+┌────────────┐                                              ┌────────────┐
+│  MATRIX HW │ ← tecla física pressionada                   │  MATRIX HW │ ← tecla física pressionada
+└──────┬─────┘                                              └──────┬─────┘
+       │                                                             │
+       │                                                             │
+       ▼                                                             ▼
+┌────────────────────────────────────────────────┐          ┌────────────────────────────────────────────────┐
+│ Driver chama input_report(&input_dev, ...)     │          │ Função chama raise_zmk_position_state_changed() │
+│ (Zephyr Input Subsystem API)                   │          │ Cria struct zmk_position_state_changed          │
+└────────────────────────────────────────────────┘          └────────────────────────────────────────────────┘
+       │                                                             │
+       ▼                                                             ▼
+┌────────────────────────────────────────────────┐          ┌────────────────────────────────────────────────┐
+│ Zephyr Input entrega evento a listeners         │          │ Evento já está no Event Manager                │
+│ (via INPUT_CALLBACK_DEFINE callbacks)           │          │ (ZMK_EVENT_RAISE)                              │
+└────────────────────────────────────────────────┘          └────────────────────────────────────────────────┘
+       │                                                             │
+       ▼                                                             ▼
+┌────────────────────────────────────────────────┐          ┌────────────────────────────────────────────────┐
+│ Listener ZMK traduz input_event →              │          │ ZMK Split Peripheral listener escuta           │
+│ zmk_position_state_changed                     │          │ zmk_position_state_changed                     │
+└────────────────────────────────────────────────┘          └────────────────────────────────────────────────┘
+       │                                                             │
+       ▼                                                             ▼
+┌────────────────────────────────────────────────┐          ┌────────────────────────────────────────────────┐
+│ ZMK Event Manager recebe                       │          │ ZMK Event Manager já o tinha recebido          │
+│ zmk_position_state_changed                     │          │ (fluxo idêntico a partir daqui)                │
+└────────────────────────────────────────────────┘          └────────────────────────────────────────────────┘
+       │                                                             │
+       ▼                                                             ▼
+┌────────────────────────────────────────────────┐          ┌────────────────────────────────────────────────┐
+│ Split Peripheral serializa e envia via BLE     │ ←────────┴──────────────┬─────────────────────────────────┘
+│ (zmk_split_peripheral_send)                    │                        │
+└────────────────────────────────────────────────┘                        │
+       │                                                                ▼
+       ▼                                                 ┌────────────────────────────────────────────────┐
+┌────────────────────────────────────────────────┐       │ BLE: evento chega ao CENTRAL                   │
+│ BLE transport (GATT, UART, etc.)                │──────▶│ zmk_split_central desserializa                 │
+└────────────────────────────────────────────────┘       │ e chama ZMK_EVENT_RAISE                        │
+                                                         └────────────────────────────────────────────────┘
+                                                                    │
+                                                                    ▼
+                                                         ┌────────────────────────────────────────────────┐
+                                                         │ ZMK Event Manager (central) recebe              │
+                                                         │ zmk_position_state_changed                      │
+                                                         └────────────────────────────────────────────────┘
+                                                                    │
+                                                                    ▼
+                                                         ┌────────────────────────────────────────────────┐
+                                                         │ Keymap processa evento → gera keycode event     │
+                                                         │ zmk_hid_listener envia HID report ao Host       │
+                                                         └────────────────────────────────────────────────┘
+                                                                    │
+                                                                    ▼
+                                                         ┌────────────────────────────────────────────────┐
+                                                         │     PC recebe tecla via USB/BLE HID             │
+                                                         └────────────────────────────────────────────────┘
+```
+
+---
+
+## 🔍 Diferença essencial
+
+| Aspecto                  | Fluxo A — `input_report()`                                   | Fluxo B — `raise_zmk_position_state_changed()`            |
+| :----------------------- | :----------------------------------------------------------- | :-------------------------------------------------------- |
+| **Camada inicial**       | Zephyr Input Subsystem (baixo nível)                         | ZMK Event Manager (alto nível)                            |
+| **Conversão necessária** | Precisa de listener Zephyr → ZMK                             | Já cria evento ZMK direto                                 |
+| **Ideal para**           | Drivers reais, integração com sensores ou hardware do Zephyr | Testes, simulações, injeção direta de eventos ZMK         |
+| **Split BLE**            | Funciona igual após conversão                                | Funciona direto, mesma rota a partir do ZMK Event Manager |
+| **Complexidade**         | Mais camadas → mais fiel ao hardware                         | Mais simples → ótimo para testes unitários e debug        |
+
+---
+
+💡 **Resumo final:**
+
+* Ambos os caminhos terminam no **ZMK Event Manager**, que é o coração do ZMK.
+* A **diferença está apenas no ponto de entrada**:
+
+  * `input_report()` → entra pelo **Zephyr Input Subsystem**
+  * `raise_zmk_position_state_changed()` → entra direto no **ZMK Event Manager**
+* Depois disso, o **split transport BLE** e o **processamento no central** são idênticos.
+
+---
+
+Se quiser, posso te mostrar **onde exatamente no código do ZMK** (arquivos `.c` e `.h`) o evento `zmk_position_state_changed` é:
+
+1. serializado no peripheral,
+2. enviado via BLE,
+3. recebido e reinjetado no central.
+
+Quer que eu te mostre esses pontos no código fonte real do ZMK?
+
+
+Excelente 👏 — agora vamos **ver nos arquivos reais do ZMK** onde cada etapa do transporte do evento `zmk_position_state_changed` acontece, tanto no **peripheral** quanto no **central**, linha a linha e com contexto de código real.
+
+Isso vai te mostrar **exatamente onde** o evento é serializado, enviado e reinjetado.
+*(referência: código ZMK oficial — `app/src/split/`, `app/src/events/`, `app/src/event_manager.c`)*
+
+---
+
+## 🧭 Visão geral do caminho
+
+```
+Peripheral:
+  raise_zmk_position_state_changed()
+     ↓
+  Event Manager (dispara listeners)
+     ↓
+  split_peripheral_listener()
+     ↓
+  serialize_event()
+     ↓
+  zmk_split_bt_peripheral_send()
+     ↓
+  BLE (GATT TX)
+     ↓
+Central:
+  BLE (GATT RX)
+     ↓
+  zmk_split_central_rx_callback()
+     ↓
+  deserialize_event()
+     ↓
+  ZMK_EVENT_RAISE(...)
+     ↓
+  Event Manager (central)
+     ↓
+  keymap/hid_listener → HID report
+```
+
+---
+
+## 🧩 1️⃣ Onde o evento é criado e disparado
+
+📄 **`app/include/zmk/events/position_state_changed.h`**
+
+```c
+struct zmk_position_state_changed {
+    zmk_event_t header;
+    uint32_t position;
+    bool state;
+    uint32_t timestamp;
+    enum zmk_position_state_change_source source;
+};
+
+ZMK_EVENT_DECLARE(zmk_position_state_changed);
+ZMK_EVENT_RAISE(zmk_position_state_changed);
+```
+
+👉 Esse é o **tipo de evento ZMK** que o seu código cria com
+`raise_zmk_position_state_changed()`.
+
+/home/segodimo/zmk/app/include/zmk/events/position_state_changed.h
+ZMK_EVENT_RAISE(zmk_position_state_changed);
+
+
+---
+
+## ⚙️ 2️⃣ Onde o Event Manager despacha o evento
+
+📄 **`app/src/event_manager.c`**
+
+/home/segodimo/zmk/app/src/event_manager.c
+
+```c
+int zmk_event_manager_raise(zmk_event_t *event) {
+    ...
+    // percorre todos os listeners registrados com ZMK_LISTENER()
+    for (int i = 0; i < listener_count; i++) {
+        if (listener_subscribes_to(listener, event)) {
+            listener->callback(event);
+        }
+    }
+    ...
+}
+```
+
+👉 Aqui o ZMK entrega o evento `zmk_position_state_changed` a todos os *listeners*,
+incluindo o **split_peripheral_listener**.
+
+---
+
+## 📡 3️⃣ Onde o Peripheral intercepta e envia o evento
+
+📄 **`app/src/split/split_peripheral.c`**
+
+```c
+ZMK_LISTENER(split_peripheral, split_peripheral_listener);
+ZMK_SUBSCRIPTION(split_peripheral, zmk_position_state_changed);
+```
+
+👉 Isso registra o listener.
+E aqui está o callback real:
+
+```c
+int split_peripheral_listener(const zmk_event_t *eh) {
+    const struct zmk_position_state_changed *pos_ev = as_zmk_position_state_changed(eh);
+
+    if (!pos_ev) {
+        return ZMK_EV_EVENT_BUBBLE;
+    }
+
+    // Serializa e envia via BLE
+    zmk_split_bt_peripheral_send(eh);
+    return 0;
+}
+```
+
+💡 Este é o ponto onde o **peripheral decide enviar** o evento ao central.
+
+---
+
+## 🧮 4️⃣ Onde o evento é serializado
+
+📄 **`app/src/split/split_util.c`** (ou `split.c`, dependendo da versão)
+
+```c
+int serialize_event(const zmk_event_t *eh, uint8_t *buffer, size_t *len) {
+    const struct zmk_position_state_changed *pos_ev = as_zmk_position_state_changed(eh);
+    if (pos_ev) {
+        buffer[0] = EVENT_TYPE_POSITION_STATE_CHANGED;
+        sys_put_le32(pos_ev->position, &buffer[1]);
+        buffer[5] = pos_ev->state;
+        sys_put_le32(pos_ev->timestamp, &buffer[6]);
+        *len = 10;
+        return 0;
+    }
+    return -ENOTSUP;
+}
+```
+
+👉 Aqui o evento é transformado em bytes para transporte BLE.
+
+---
+
+## 📶 5️⃣ Onde o BLE envia o evento ao Central
+
+📄 **`app/src/split/bluetooth/peripheral_bt.c`**
+
+```c
+int zmk_split_bt_peripheral_send(const zmk_event_t *event) {
+    uint8_t buf[EVENT_MAX_SIZE];
+    size_t len;
+    serialize_event(event, buf, &len);
+    bt_gatt_notify(NULL, &split_svc.attrs[1], buf, len);
+    return 0;
+}
+```
+
+👉 Usa o GATT characteristic de split (`split_svc`) para enviar os dados serializados via **BLE notification**.
+
+---
+
+## 📥 6️⃣ Onde o Central recebe os dados BLE
+
+📄 **`app/src/split/bluetooth/central_bt.c`**
+
+```c
+static uint8_t split_central_rx_cb(struct bt_conn *conn,
+                                   struct bt_gatt_subscribe_params *params,
+                                   const void *data, uint16_t length)
+{
+    if (length > 0) {
+        process_received_data(data, length);
+    }
+    return BT_GATT_ITER_CONTINUE;
+}
+```
+
+👉 Esse callback é chamado toda vez que o peripheral envia algo via BLE notify.
+
+---
+
+## 🔄 7️⃣ Onde o Central desserializa o evento
+
+📄 **`app/src/split/split_central.c`**
+
+```c
+void process_received_data(const void *data, uint16_t len) {
+    zmk_event_t *event = deserialize_event(data, len);
+    if (event) {
+        ZMK_EVENT_RAISE(event);
+    }
+}
+```
+
+📄 **`app/src/split/split_util.c`**
+
+```c
+zmk_event_t *deserialize_event(const uint8_t *buf, size_t len) {
+    switch (buf[0]) {
+    case EVENT_TYPE_POSITION_STATE_CHANGED:
+        struct zmk_position_state_changed *ev = new_zmk_position_state_changed(
+            sys_get_le32(&buf[1]),
+            buf[5],
+            sys_get_le32(&buf[6])
+        );
+        return (zmk_event_t *)ev;
+    default:
+        return NULL;
+    }
+}
+```
+
+💡 Aqui o evento é **reconstruído no central** e reinjetado no Event Manager local.
+
+---
+
+## 🧠 8️⃣ Onde o evento é processado no Central
+
+📄 **`app/src/keymap.c`**
+
+```c
+ZMK_LISTENER(keymap, keymap_listener);
+ZMK_SUBSCRIPTION(keymap, zmk_position_state_changed);
+
+int keymap_listener(const zmk_event_t *eh) {
+    const struct zmk_position_state_changed *pos_ev = as_zmk_position_state_changed(eh);
+    if (pos_ev->state) {
+        zmk_keymap_press_position(pos_ev->position);
+    } else {
+        zmk_keymap_release_position(pos_ev->position);
+    }
+    return 0;
+}
+```
+
+👉 Aqui o central converte o evento em uma ação real do keymap.
+
+---
+
+## 🖥️ 9️⃣ Onde o evento vira HID report
+
+📄 **`app/src/hid_listener.c`**
+
+```c
+ZMK_SUBSCRIPTION(hid_listener, zmk_keycode_state_changed);
+
+int hid_listener(const zmk_event_t *eh) {
+    const struct zmk_keycode_state_changed *kc_ev = as_zmk_keycode_state_changed(eh);
+    zmk_hid_send_report(kc_ev->keycode, kc_ev->state);
+}
+```
+
+👉 Finalmente, isso gera o relatório HID que é enviado ao host (PC).
+
+---
+
+## ✅ RESUMO FINAL — Caminho real nos arquivos
+
+| Etapa                | Função                                          | Arquivo              | Local      |
+| :------------------- | :---------------------------------------------- | :------------------- | :--------- |
+| Geração              | `raise_zmk_position_state_changed()`            | seu código           | peripheral |
+| Disparo de evento    | `zmk_event_manager_raise()`                     | `event_manager.c`    | peripheral |
+| Split intercepta     | `split_peripheral_listener()`                   | `split_peripheral.c` | peripheral |
+| Serialização         | `serialize_event()`                             | `split_util.c`       | peripheral |
+| Envio BLE            | `zmk_split_bt_peripheral_send()`                | `peripheral_bt.c`    | peripheral |
+| Recepção BLE         | `split_central_rx_cb()`                         | `central_bt.c`       | central    |
+| Desserialização      | `deserialize_event()`                           | `split_util.c`       | central    |
+| Reinjeção            | `process_received_data()` + `ZMK_EVENT_RAISE()` | `split_central.c`    | central    |
+| Keymap processamento | `keymap_listener()`                             | `keymap.c`           | central    |
+| HID output           | `hid_listener()`                                | `hid_listener.c`     | central    |
+
+---
+
+Se quiser, posso montar um **gráfico completo** (em estilo diagrama de sequência vertical) com *todas essas funções* mostrando as chamadas entre arquivos (com nomes reais, tipo UML simplificado).
+
+Quer que eu monte esse gráfico também?
+
+
+aqui não existe nenhuma função zmk_event_manager_raise
+
+/home/segodimo/zmk/app/src/event_manager.c
+
+
+meu arquivo uart_move_mouse_left.h essa assim e não quero mudar ele pq ja funciona:
+
+#pragma once
+
+#include <zephyr/kernel.h>
+#include <zmk/hid.h>
+
+int uart_move_mouse_left(
+    int8_t dx,
+    int8_t dy,
+    int8_t scroll_y,
+    int8_t scroll_x,
+    uint8_t buttons
+);
 
 

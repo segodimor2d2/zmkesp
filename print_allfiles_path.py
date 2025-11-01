@@ -14,6 +14,7 @@ def consolidar_codigos(pasta_origem, arquivo_saida='out_print_allfiles.md'):
     extensoes_linguagem = {
         '.py': 'python', '.js': 'javascript', '.java': 'java', '.c': 'c', '.cpp': 'cpp',
         '.h': 'c', '.html': 'html', '.css': 'css', '.php': 'php', '.rb': 'ruby',
+        '.lua': 'lua',
         '.go': 'go', '.rs': 'rust', '.swift': 'swift', '.kt': 'kotlin', '.ts': 'typescript',
         '.sh': 'bash', '.sql': 'sql', '.md': 'markdown', '.txt': 'text', '.json': 'json', '.xml': 'xml'
     }
@@ -32,32 +33,35 @@ def consolidar_codigos(pasta_origem, arquivo_saida='out_print_allfiles.md'):
                     # Verifica se é um arquivo de código pela extensão
                     if extensao.lower() in extensoes_linguagem:
                         linguagem = extensoes_linguagem[extensao.lower()]
+                    else:
+                        linguagem = 'text'  # Formato texto para extensões não mapeadas
+                    
+                    try:
+                        with open(caminho_completo, 'r', encoding='utf-8') as entrada:
+                            # Escreve cabeçalho do arquivo
+                            saida.write(f"## arquivo: {caminho_completo}\n\n")
+                            # Abre bloco de código com a linguagem específica
+                            saida.write(f"```{linguagem}\n")
+                            # Escreve o conteúdo do arquivo
+                            saida.write(entrada.read())
+                            # Fecha bloco de código
+                            saida.write("\n```\n\n\n")
+                            print(f"Processado: {caminho_completo}")
+                    except UnicodeDecodeError:
+                        # Tenta ler com outro encoding se utf-8 falhar
                         try:
-                            with open(caminho_completo, 'r', encoding='utf-8') as entrada:
-                                # Escreve cabeçalho do arquivo
-                                saida.write(f"## arquivo: {caminho_completo}\n\n")
-                                # Abre bloco de código com a linguagem específica
+                            with open(caminho_completo, 'r', encoding='latin-1') as entrada:
+                                saida.write(f"## arquivo: {caminho_completo} (latin-1)\n\n")
                                 saida.write(f"```{linguagem}\n")
-                                # Escreve o conteúdo do arquivo
                                 saida.write(entrada.read())
-                                # Fecha bloco de código
                                 saida.write("\n```\n\n\n")
-                                print(f"Processado: {caminho_completo}")
-                        except UnicodeDecodeError:
-                            # Tenta ler com outro encoding se utf-8 falhar
-                            try:
-                                with open(caminho_completo, 'r', encoding='latin-1') as entrada:
-                                    saida.write(f"## arquivo: {caminho_completo} (latin-1)\n\n")
-                                    saida.write(f"```{linguagem}\n")
-                                    saida.write(entrada.read())
-                                    saida.write("\n```\n\n\n")
-                                    print(f"Processado (latin-1): {caminho_completo}")
-                            except Exception as e:
-                                saida.write(f"*Erro ao ler arquivo: {e}*\n\n")
-                                print(f"Erro ao ler {caminho_completo}: {e}")
+                                print(f"Processado (latin-1): {caminho_completo}")
                         except Exception as e:
-                            saida.write(f"*Erro ao processar arquivo: {e}*\n\n")
-                            print(f"Erro ao processar {caminho_completo}: {e}")
+                            saida.write(f"*Erro ao ler arquivo: {e}*\n\n")
+                            print(f"Erro ao ler {caminho_completo}: {e}")
+                    except Exception as e:
+                        saida.write(f"*Erro ao processar arquivo: {e}*\n\n")
+                        print(f"Erro ao processar {caminho_completo}: {e}")
             
             print(f"\nConsolidação concluída! Arquivo gerado: {arquivo_saida}")
     

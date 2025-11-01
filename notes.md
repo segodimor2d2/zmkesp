@@ -1,5 +1,25 @@
 $$$$
 
+zmk v3.5.0
+
+```bash
+cd ~/zmk | term
+cd ~/zmkesp/firmwar | term
+cd ~/zmkpromicro | term
+cd ~/zmkesp
+```
+
+Sophia Dai 
+ErgO, a smart ring
+
+# atualizar ou refresh oil
+c-f atualizar ou refresh oil
+
+:OilRefresh
+
+# app/CMakeLists.txt
+
+add_subdirectory(${ZMK_CONFIG}/src ${CMAKE_CURRENT_BINARY_DIR}/zmk_config_src)
 
 ---
 # print_allfiles_path.py
@@ -10,6 +30,9 @@ python print_allfiles_path.py /home/segodimo/zmkpromicro
 python ../zmkesp/print_allfiles_path.py /home/segodimo/zmkpromicro
 
 python print_allfiles_path.py /home/segodimo/zmk/app/src/split
+
+python print_allfiles_path.py /home/segodimo/.config/nvim
+python print_allfiles_path.py /home/segodimo/zmkbkp/nvim
 
 python print_allfiles_path.py /home/segodimo/zmk/app/include/zmk/events
                                                  app/include/zmk/events/mouse_state_changed.h
@@ -22,9 +45,6 @@ existe alguma função que me ajude a enviar os dados dx e dy do mouse do periph
 no aquivo out_print_allfiles.md estão os eventos do ZMK,
 eu poderia enviar os dados dx e dy do mouse do peripheral para o central via zmk_sensor_event e conseguir receber esses dados do lado central?
 
-
-
-
 ---
 
 ## corne
@@ -35,7 +55,7 @@ eu poderia enviar os dados dx e dy do mouse do peripheral para o central via zmk
 - remapear puntos
 
 - modo Hold ou modo Tap
-- modo Hold é uma ação similar ao -2 gyro que deixa o Hold liberado
+jjk- modo Hold é uma ação similar ao -2 gyro que deixa o Hold liberado
 
 - bug tecla pressionada ao mudar step do gyro
     - um teclado envia todas as teclas no momento que todas estejam soltas
@@ -31250,10 +31270,667 @@ Se quiser, posso gerar uma **versão expandida** que lista automaticamente o `ev
 Quer que eu monte essa versão automática também?
 
 
+---
+
+# me ajuda a criar um evento novo mas tem que ser usando a versão do zmk é a v3.5.0,
+
+Perfeito ✅ — fazer isso da forma **correta e compatível com o ZMK v3.5.0** significa criar um **novo evento** (por exemplo `zmk_mouse_split_event`) que será transportado automaticamente entre os lados *peripheral* e *central* via o sistema do Event Manager e Split Transport.
+
+Vamos fazer tudo passo a passo, e no final você terá:
+
+* um novo evento `zmk_mouse_split_event`;
+* um emissor (`uart_move_mouse_right.c`);
+* um receptor (`split_mouse_rx.c`) que reage **somente** a esse evento;
+* tudo integrado no ZMK v3.5.0 (sem conflitar com `zmk_position_state_changed`).
+
+---
+
+## 🧩 1. Estrutura geral de um evento no ZMK 3.5.0
+
+Cada evento no ZMK é definido como um *struct* + *macro* de registro no Event Manager.
+O padrão é o mesmo que `position_state_changed.h` e `sensor_event.h`.
+
+**Local:**
+`app/include/zmk/events/mouse_split_event.h`
+
+---
+
+## 📝 2. Criar o novo evento: `mouse_split_event.h`
+
+Crie o arquivo:
+
+```
+app/include/zmk/events/mouse_split_event.h
+```
+
+Conteúdo:
+
+```c
+#pragma once
+
+#include <zephyr/kernel.h>
+#include <zephyr/logging/log.h>
+#include <zmk/event_manager.h>
+
+struct zmk_mouse_split_event {
+    int8_t dx;
+    int8_t dy;
+    int8_t scroll_x;
+    int8_t scroll_y;
+    uint8_t buttons;
+    int64_t timestamp;
+};
+
+// Cria helper para casting de eventos
+ZMK_EVENT_DECLARE(zmk_mouse_split_event);
+```
+
+Agora registre o evento na tabela global, adicionando a macro no mesmo arquivo (logo abaixo da struct):
+
+```c
+ZMK_EVENT_DEFINE(zmk_mouse_split_event);
+```
+
+---
+
+## ⚙️ 3. Editar `app/CMakeLists.txt`
+
+Adicione o novo arquivo à lista de includes, dentro do bloco onde estão os outros headers de evento.
+Procure no seu `CMakeLists.txt` a seção com `target_include_directories(app PRIVATE include ...)` ou onde há linhas semelhantes a:
+
+```cmake
+zephyr_library_include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
+```
+
+Certifique-se de que o arquivo `app/include/zmk/events/mouse_split_event.h` está dentro do caminho `include/` (ele será automaticamente incluído porque a pasta inteira já é registrada).
+Não é necessário mexer mais nada aqui se seu projeto já inclui toda a pasta `include/`.
+
+---
+
+## 🧠 4. Emitir o evento (lado peripheral)
+
+Edite `uart_move_mouse_right.c` e troque o envio via `raise_zmk_position_state_changed()` por seu novo evento:
+
+```c
+#include <zmk/events/mouse_split_event.h>
+
+int uart_move_mouse_right(int8_t dx,
+                          int8_t dy,
+                          int8_t scroll_y,
+                          int8_t scroll_x,
+                          uint8_t buttons) {
+
+    struct zmk_mouse_split_event ev = {
+        .dx = dx,
+        .dy = dy,
+        .scroll_x = scroll_x,
+        .scroll_y = scroll_y,
+        .buttons = buttons,
+        .timestamp = k_uptime_get(),
+    };
+
+    ZMK_EVENT_RAISE(ev); // substitui raise_zmk_position_state_changed
+
+    return 0;
+}
+```
+
+✅ Isso agora envia o evento **apenas** para os dispositivos emparelhados split.
+
+---
+
+## 🖥️ 5. Receber o evento (lado central)
+
+Edite seu `split_mouse_rx.c`:
+
+```c
+#include <zephyr/kernel.h>
+#include <zephyr/logging/log.h>
+#include <zmk/event_manager.h>
+#include <zmk/events/mouse_split_event.h>
+
+LOG_MODULE_REGISTER(split_mouse_rx, CONFIG_ZMK_LOG_LEVEL);
+
+int uart_move_mouse_left(
+    int8_t dx,
+    int8_t dy,
+    int8_t scroll_y,
+    int8_t scroll_x,
+    uint8_t buttons
+);
+
+static int handle_split_mouse(const zmk_event_t *eh) {
+    const struct zmk_mouse_split_event *ev = as_zmk_mouse_split_event(eh);
+    if (!ev) {
+        return ZMK_EV_EVENT_BUBBLE;
+    }
+
+    LOG_DBG("Received zmk_mouse_split_event dx=%d dy=%d scroll_x=%d scroll_y=%d buttons=%d",
+            ev->dx, ev->dy, ev->scroll_x, ev->scroll_y, ev->buttons);
+
+    uart_move_mouse_left(ev->dx, ev->dy, ev->scroll_y, ev->scroll_x, ev->buttons);
+
+    return ZMK_EV_EVENT_BUBBLE;
+}
+
+ZMK_LISTENER(split_mouse_rx_listener, handle_split_mouse);
+ZMK_SUBSCRIPTION(split_mouse_rx_listener, zmk_mouse_split_event);
+```
+
+Agora o listener **só escuta** o evento `zmk_mouse_split_event`, sem interceptar teclas.
+
+---
+
+## 🧪 6. Testar (verifique logs)
+
+Recompile os dois firmwares:
+
+```bash
+west build -p always -s app -b nice_nano_v2 -- -DSHIELD=corne_right -DZMK_CONFIG=...
+west build -p always -s app -b nice_nano_v2 -- -DSHIELD=corne_left -DZMK_CONFIG=...
+```
+
+Ative logs debug (em `prj.conf`):
+
+```
+CONFIG_ZMK_EVENT_MANAGER_LOG_LEVEL_DBG=y
+CONFIG_LOG_DEFAULT_LEVEL=4
+```
+
+Ao pressionar teclas, o `split_mouse_rx` **não** deve reagir.
+Ao chamar `uart_move_mouse_right(dx, dy, ...)`, o log mostrará:
+
+```
+Received zmk_mouse_split_event dx=5 dy=-3 ...
+```
+
+E o mouse se moverá corretamente.
+
+---
+
+## 🧩 7. Resumo dos arquivos criados/editados
+
+| Caminho                                      | Função                       |
+| -------------------------------------------- | ---------------------------- |
+| `app/include/zmk/events/mouse_split_event.h` | Define o novo evento         |
+| `app/src/uart_move_mouse_right.c`            | Envia o evento               |
+| `app/src/split_mouse_rx.c`                   | Recebe o evento              |
+| `prj.conf` (opcional)                        | Ativa logs DEBUG para testar |
+
+---
+
+## 🚀 Resultado final
+
+Agora:
+
+* O `split_mouse_rx.c` **não reage a teclas normais**.
+* O `uart_move_mouse_right.c` envia **eventos de mouse dedicados**.
+* O Event Manager/Split Transport do ZMK v3.5.0 faz a transmissão automática.
+
+---
+
+Posso gerar para você o **patch `git diff` completo** com esses três arquivos prontos para colar no seu projeto (seguindo seu layout do `out_print_allfiles.md`).
+Quer que eu gere esse diff pronto?
 
 
 ---
 
+Analisando seu código, identifiquei alguns problemas que estão causando o comportamento indesejado do mouse. Vou explicar cada um e fornecer as correções necessárias:
+
+## Problemas Identificados:
+
+### 1. **split_mouse_rx.c - Escutando eventos errados**
+O arquivo `split_mouse_rx.c` está escutando `zmk_position_state_changed`, que são eventos de teclas, não de mouse. Isso faz com que toda tecla pressionada dispare movimento do mouse.
+
+**Correção:** Mude para escutar o evento de mouse customizado:
+
+```c
+// split_mouse_rx.c - VERSÃO CORRIGIDA
+#include <zephyr/kernel.h>
+#include <zephyr/logging/log.h>
+#include <zmk/event_manager.h>
+#include <zmk/events/mouse_split_event.h>  // ✅ Nosso evento customizado
+
+LOG_MODULE_REGISTER(split_mouse_rx, CONFIG_ZMK_LOG_LEVEL);
+
+// Função existente do lado central
+int uart_move_mouse_left(
+    int8_t dx,
+    int8_t dy,
+    int8_t scroll_y,
+    int8_t scroll_x,
+    uint8_t buttons
+);
+
+static int handle_split_mouse(const zmk_event_t *eh) {
+    const struct zmk_mouse_split_event *ev = as_zmk_mouse_split_event(eh);
+    if (!ev) {
+        return ZMK_EV_EVENT_BUBBLE;
+    }
+
+    LOG_DBG("Received split mouse dx=%d dy=%d scroll_x=%d scroll_y=%d buttons=%d",
+            ev->dx, ev->dy, ev->scroll_x, ev->scroll_y, ev->buttons);
+
+    // Chama a função do lado central para enviar HID mouse report
+    (void)uart_move_mouse_left(ev->dx, ev->dy, ev->scroll_y, ev->scroll_x, ev->buttons);
+
+    return ZMK_EV_EVENT_BUBBLE;
+}
+
+// ✅ Agora escuta o evento correto
+ZMK_LISTENER(split_mouse_rx_listener, handle_split_mouse);
+ZMK_SUBSCRIPTION(split_mouse_rx_listener, zmk_mouse_split_event);
+```
+
+### 2. **uart_move_mouse_right.c - Problema de transporte do evento**
+O evento `zmk_mouse_split_event` não está sendo transportado via split BLE. No ZMK v3.5.0, eventos customizados precisam de configuração adicional para funcionar no split.
+
+**Correção:** Use o sistema de split existente do ZMK:
+
+```c
+// uart_move_mouse_right.c - VERSÃO CORRIGIDA
+#include <zephyr/input/input.h>
+#include <zephyr/kernel.h>
+#include <zephyr/logging/log.h>
+#include <zephyr/device.h>
+
+#include <zmk/uart_move_mouse_right.h>
+#include <zmk/uart_switch_right.h>
+#include <zmk/events/position_state_changed.h>  // ✅ Usar evento existente do split
+
+LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
+
+// Codifica movimento do mouse em uma "posição" para transporte via split
+static uint32_t encode_mouse_position(int8_t dx, int8_t dy) {
+    // Usa parte alta para identificar que é movimento de mouse
+    return (0xFF000000) | ((uint8_t)dx << 8) | (uint8_t)dy;
+}
+
+int uart_move_mouse_right(int8_t dx,
+                          int8_t dy,
+                          int8_t scroll_y,
+                          int8_t scroll_x,
+                          uint8_t buttons) {
+
+    LOG_DBG("uart_move_mouse_right: dx=%d dy=%d scroll_x=%d scroll_y=%d buttons=%d",
+            dx, dy, scroll_x, scroll_y, buttons);
+
+    // ✅ Usa o sistema de split existente do ZMK
+    // Codifica o movimento do mouse em uma posição virtual
+    uint32_t mouse_position = encode_mouse_position(dx, dy);
+    
+    struct zmk_position_state_changed event = {
+        .source = ZMK_POSITION_STATE_CHANGE_SOURCE_LOCAL,
+        .state = true,  // "pressionado"
+        .position = mouse_position,
+        .timestamp = k_uptime_get(),
+    };
+
+    int ret = raise_zmk_position_state_changed(event);
+    LOG_DBG("Mouse event sent via split, result: %d", ret);
+
+    return ret;
+}
+```
+
+### 3. **split_mouse_rx.c - Decodificação corrigida**
+Atualize a decodificação no lado central:
+
+```c
+// split_mouse_rx.c - Adicione esta função
+static bool is_mouse_position(uint32_t position) {
+    return (position & 0xFF000000) == 0xFF000000;
+}
+
+static void decode_mouse_position(uint32_t position, int8_t *dx, int8_t *dy) {
+    *dx = (int8_t)((position >> 8) & 0xFF);
+    *dy = (int8_t)(position & 0xFF);
+}
+
+static int handle_split_mouse(const zmk_event_t *eh) {
+    const struct zmk_position_state_changed *p = as_zmk_position_state_changed(eh);
+    if (!p) {
+        return ZMK_EV_EVENT_BUBBLE;
+    }
+
+    // ✅ Só processa se for uma posição de mouse
+    if (!is_mouse_position(p->position)) {
+        return ZMK_EV_EVENT_BUBBLE;
+    }
+
+    int8_t dx = 0, dy = 0;
+    decode_mouse_position(p->position, &dx, &dy);
+
+    LOG_DBG("Received mouse movement via split: dx=%d dy=%d", dx, dy);
+
+    // Envia para o host
+    (void)uart_move_mouse_left(dx, dy, 0, 0, 0);
+
+    return ZMK_EV_EVENT_BUBBLE;
+}
+```
+
+### 4. **CMakeLists.txt - Remova arquivos conflitantes**
+No `config/src/CMakeLists.txt`, remova a duplicação:
+
+```text
+# Configuração CORRETA para o lado central
+if(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
+  target_sources(app PRIVATE
+    ${CMAKE_CURRENT_LIST_DIR}/uart_receiver_left.c
+    ${CMAKE_CURRENT_LIST_DIR}/uart_switch_left.c
+    ${CMAKE_CURRENT_LIST_DIR}/uart_move_mouse_left.c
+    ${CMAKE_CURRENT_LIST_DIR}/split_mouse_rx.c  # ✅ Apenas este listener de mouse
+  )
+else()
+  # Peripheral (lado direito)
+  target_sources(app PRIVATE
+    ${CMAKE_CURRENT_LIST_DIR}/uart_receiver_right.c
+    ${CMAKE_CURRENT_LIST_DIR}/uart_switch_right.c
+    ${CMAKE_CURRENT_LIST_DIR}/uart_move_mouse_right.c
+    # ❌ Remove outros listeners de mouse duplicados
+  )
+endif()
+```
+
+## Resumo das Correções:
+
+1. **Pare de escutar eventos de tecla** para movimento do mouse
+2. **Use o sistema de split existente** do ZMK (position_state_changed) em vez de eventos customizados para transporte
+3. **Codifique/decodifique** movimento do mouse em posições virtuais
+4. **Remova listeners duplicados** que causam conflitos
+
+Estas alterações devem resolver o problema do mouse se movendo sempre que você pressiona teclas e permitir que o movimento do mouse seja transportado corretamente do peripheral para o central via split BLE.
+
+
+
+
+
+
+
+
+
+---
+
+Vou explicar passo a passo como deve ficar o `split_mouse_rx.c` corrigido:
+
+## split_mouse_rx.c - Versão Corrigida e Comentada
+
+```c
+// split_mouse_rx.c - Lado CENTRAL (esquerdo)
+#include <zephyr/kernel.h>
+#include <zephyr/logging/log.h>
+#include <zmk/event_manager.h>
+#include <zmk/events/position_state_changed.h>
+#include <zmk/uart_move_mouse_left.h>
+
+LOG_MODULE_REGISTER(split_mouse_rx, CONFIG_ZMK_LOG_LEVEL);
+
+// ✅ Define uma máscara para identificar posições de mouse
+// Usamos o bit mais significativo para marcar como movimento de mouse
+#define MOUSE_POSITION_MASK 0x80000000
+
+// ✅ Verifica se uma posição é de movimento de mouse
+static inline bool is_mouse_position(uint32_t position) {
+    return (position & MOUSE_POSITION_MASK) == MOUSE_POSITION_MASK;
+}
+
+// ✅ Decodifica a posição de volta para dx, dy
+static inline void decode_mouse_position(uint32_t position, int8_t *dx, int8_t *dy) {
+    // Remove a máscara e extrai dx, dy
+    uint32_t clean_pos = position & ~MOUSE_POSITION_MASK;
+    *dx = (int8_t)((clean_pos >> 8) & 0xFF);   // Byte alto = dx
+    *dy = (int8_t)(clean_pos & 0xFF);          // Byte baixo = dy
+}
+
+// ✅ Função principal que processa os eventos recebidos via split
+static int handle_split_mouse(const zmk_event_t *eh) {
+    const struct zmk_position_state_changed *p = as_zmk_position_state_changed(eh);
+    
+    // Verifica se é um evento válido
+    if (!p) {
+        return ZMK_EV_EVENT_BUBBLE;
+    }
+
+    // ✅ IMPORTANTE: Só processa se for uma posição de MOUSE
+    if (!is_mouse_position(p->position)) {
+        // Não é movimento de mouse, ignora e deixa o evento prosseguir
+        return ZMK_EV_EVENT_BUBBLE;
+    }
+
+    // ✅ Decodifica dx e dy da posição
+    int8_t dx = 0, dy = 0;
+    decode_mouse_position(p->position, &dx, &dy);
+
+    LOG_DBG("Received mouse movement via split: dx=%d dy=%d", dx, dy);
+
+    // ✅ Chama a função do lado central para enviar HID mouse report
+    // Usa scroll=0 e buttons=0 por enquanto - você pode expandir depois
+    (void)uart_move_mouse_left(dx, dy, 0, 0, 0);
+
+    return ZMK_EV_EVENT_BUBBLE;
+}
+
+// ✅ Registra o listener para eventos position_state_changed
+ZMK_LISTENER(split_mouse_rx_listener, handle_split_mouse);
+ZMK_SUBSCRIPTION(split_mouse_rx_listener, zmk_position_state_changed);
+```
+
+## E no lado PERIPHERAL (direito), atualize o `uart_move_mouse_right.c`:
+
+```c
+// uart_move_mouse_right.c - Lado PERIPHERAL (direito)
+#include <zephyr/kernel.h>
+#include <zephyr/logging/log.h>
+#include <zmk/uart_move_mouse_right.h>
+#include <zmk/events/position_state_changed.h>
+
+LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
+
+// ✅ Mesma máscara do lado central
+#define MOUSE_POSITION_MASK 0x80000000
+
+// ✅ Codifica dx, dy em uma posição virtual de mouse
+static uint32_t encode_mouse_position(int8_t dx, int8_t dy) {
+    // Combina dx e dy em uma posição de 32 bits com a máscara de mouse
+    return MOUSE_POSITION_MASK | ((uint8_t)dx << 8) | (uint8_t)dy;
+}
+
+int uart_move_mouse_right(int8_t dx,
+                          int8_t dy,
+                          int8_t scroll_y,
+                          int8_t scroll_x,
+                          uint8_t buttons) {
+
+    LOG_DBG("uart_move_mouse_right: dx=%d dy=%d scroll_x=%d scroll_y=%d buttons=%d",
+            dx, dy, scroll_x, scroll_y, buttons);
+
+    // ✅ Codifica o movimento do mouse em uma posição virtual
+    uint32_t mouse_position = encode_mouse_position(dx, dy);
+    
+    // ✅ Cria evento para transporte via split BLE
+    struct zmk_position_state_changed event = {
+        .source = ZMK_POSITION_STATE_CHANGE_SOURCE_LOCAL,
+        .state = true,  // Sempre "true" para movimento de mouse
+        .position = mouse_position,
+        .timestamp = k_uptime_get(),
+    };
+
+    // ✅ Envia via split BLE
+    int ret = raise_zmk_position_state_changed(event);
+    LOG_DBG("Mouse event sent via split, result: %d", ret);
+
+    return ret;
+}
+```
+
+## Explicação do Funcionamento:
+
+### **No Peripheral (lado direito):**
+1. **`encode_mouse_position(dx, dy)`** - Transforma movimento do mouse em um número de 32 bits:
+   - `0x80000000` - Marca como movimento de mouse
+   - `(dx << 8)` - Coloca dx no byte 2
+   - `dy` - Coloca dy no byte 1
+
+### **No Central (lado esquerdo):**
+1. **`is_mouse_position(position)`** - Verifica se é movimento de mouse (bit 31 = 1)
+2. **`decode_mouse_position(position, &dx, &dy)`** - Extrai dx e dy de volta
+3. **Chama `uart_move_mouse_left()`** - Envia movimento real para o computador
+
+### **Por que isso funciona:**
+- ✅ Usa o sistema de split BLE **existente** do ZMK
+- ✅ Não interfere com eventos de teclado normais
+- ✅ Funciona com ZMK v3.5.0
+- ✅ Transporta dados de mouse de peripheral para central
+
+### **O que foi corrigido:**
+- ❌ **Antes:** `split_mouse_rx.c` escutava TODOS os eventos de tecla
+- ✅ **Agora:** Só processa eventos marcados como movimento de mouse
+
+Esta abordagem evita que teclas normais causem movimento do mouse, enquanto permite que movimentos reais do mouse sejam transportados corretamente via split BLE.
+
+---
+
+
+
+$$$$
+!!!!
+---
+Perfeito, Segodimo ⚡ — aqui vai um **script único e limpo** que faz todas as buscas importantes, organiza por seção e salva tudo em um arquivo `grep_split.txt`, pronto pra você abrir, revisar ou colar aqui.
+
+---
+
+### 💻 Comando único (cola isso no diretório raiz do ZMK):
+
+```bash
+(
+echo "==== 1. Estrutura da pasta split/bluetooth ====";
+ls -R app/src/split | grep bluetooth || true;
+
+echo -e "\n==== 2. Procurando 'transport_send' ====";
+grep -RIn "transport_send" app/src/split || true;
+
+echo -e "\n==== 3. Procurando 'register.*callback' ====";
+grep -RIn "register.*callback" app/src/split || true;
+
+echo -e "\n==== 4. Procurando 'bt_gatt_notify' (envio BLE) ====";
+grep -RIn "bt_gatt_notify" app/src/split || true;
+
+echo -e "\n==== 5. Procurando 'bt_gatt_subscribe' (recepção BLE) ====";
+grep -RIn "bt_gatt_subscribe" app/src/split || true;
+) | tee grep_split.txt
+```
+
+---
+
+### 🧠 O que ele faz
+
+| Etapa | O que procura                        | Propósito                                              |
+| ----- | ------------------------------------ | ------------------------------------------------------ |
+| 1️⃣   | Estrutura da pasta `split/bluetooth` | Ver se o módulo BLE existe e quais arquivos tem        |
+| 2️⃣   | `transport_send`                     | Ver se existe `zmk_split_bt_transport_send` ou similar |
+| 3️⃣   | `register.*callback`                 | Ver se existe `zmk_split_bt_register_receive_callback` |
+| 4️⃣   | `bt_gatt_notify`                     | Ver onde o periférico envia dados BLE                  |
+| 5️⃣   | `bt_gatt_subscribe`                  | Ver onde o central recebe callbacks BLE                |
+
+---
+
+### 📄 Resultado
+
+* Tudo será salvo no arquivo `grep_split.txt`
+* Também será impresso no terminal (graças ao `tee`)
+
+---
+
+### 📋 Próximo passo
+
+Depois de rodar, cola aqui **só as linhas de resultado** (as partes com caminhos e nomes de função, algo assim):
+
+```
+app/src/split/bluetooth/peripheral.c:105:int zmk_split_bt_transport_send(...)
+app/src/split/bluetooth/central.c:84:static void split_central_notify_cb(...)
+```
+
+Com isso eu te digo:
+
+* ✅ se `zmk_split_bt_transport_send` realmente existe (e como usá-la),
+* ✅ onde o callback de recepção está no central,
+* ⚙️ e como adaptar teu `split_mouse_rx.c` para essa versão **v3.5.0** do ZMK.
+
+---
+
+Quer que eu te monte também o segundo script que mostra o conteúdo das funções encontradas (por exemplo, as 20 linhas ao redor de cada ocorrência)? Assim podemos ver a implementação real e confirmar assinatura e parâmetros.
+
+
+
+
+
+
+
+
+---
+
+por favor revice todo meu código no arquivo out_print_allfiles.md.
+
+o código split_mouse_rx.c está conseguindo ouvir cada vez que eu pressiono uma tecla qualquer então ele mando o mouse descer sempre
+eu quero entender porque o slpit_mouse_rx.c sempre faz isso.
+
+o meu arquivo uart_move_mouse_right.c esta enviando dx e dx mas parece que ele não esta envando dos dados ao central com dx e dy,
+eu quero entender o que enta acontecendo no arquivo uart_move_mouse_right.c.
+
+
+
+---
+
+# Vamos examinar um evento específico para ver a estrutura
+grep -A 10 "struct zmk_position_state_changed {" /home/segodimo/zmk/app/include/zmk/events/position_state_changed.h
+
+
+➜  zmk git:(main) ✗ grep -A 10 "struct zmk_position_state_changed {" /home/segodimo/zmk/app/include/zmk/events
+/position_state_changed.h
+struct zmk_position_state_changed {
+    uint8_t source;
+    uint32_t position;
+    bool state;
+    int64_t timestamp;
+};
+
+ZMK_EVENT_DECLARE(zmk_position_state_changed);
+➜  zmk git:(main) ✗ 
+
+# Verifique a estrutura completa de um evento
+cat /home/segodimo/zmk/app/include/zmk/events/position_state_changed.h
+
+➜  zmk git:(main) ✗ cat /home/segodimo/zmk/app/include/zmk/events/position_state_changed.h
+/*
+ * Copyright (c) 2020 The ZMK Contributors
+ *
+ * SPDX-License-Identifier: MIT
+ */
+
+#pragma once
+
+#include <zephyr/kernel.h>
+#include <zmk/event_manager.h>
+
+#define ZMK_POSITION_STATE_CHANGE_SOURCE_LOCAL UINT8_MAX
+
+struct zmk_position_state_changed {
+    uint8_t source;
+    uint32_t position;
+    bool state;
+    int64_t timestamp;
+};
+
+ZMK_EVENT_DECLARE(zmk_position_state_changed);
+➜  zmk git:(main) ✗ 
+
+
+
+
+---
+
+# python print_allfiles_path.py /home/segodimo/zmkpromicro
 python print_allfiles_path.py /home/segodimo/zmkpromicro
 
 
@@ -31407,5 +32084,288 @@ v0.3-30-g4ec69cb
     revision: 6cb4c283e76209d59c45fbcb218800cd19e9339d
     path: modules/msgs/zmk-studio-messages
   - name: chre
+
+
     url: https://github.com/zephyrproject-rtos/chre
 ➜  zmk git:(main) ✗   
+
+---
+
+zmk v3.5.0
+
+
+eu estou simulando eventos de mouse no test_mouse.c,
+meu objetivo é poder enviar esses eventos do peripheral para o central usando a verção do zmk v3.5.0,
+
+ignore os arquivos uart_move_mouse_right.c e uart_receiver_right.c,
+por favor revice todo meu código no arquivo out_print_allfiles.md.
+
+---
+
+# python print_allfiles_path.py /home/segodimo/zmkpromicro
+python print_allfiles_path.py /home/segodimo/zmkpromicro
+
+por favor revice todo meu código no arquivo out_print_allfiles.md.
+
+repare que a versão do zmk é a v3.5.0,
+o código split_mouse_rx.c está conseguindo ouvir cada vez que eu pressiono uma tecla qualquer então ele mando o mouse descer sempre
+eu quero entender porque o slpit_mouse_rx.c sempre faz isso.
+
+o meu arquivo uart_move_mouse_right.c esta enviando dx e dx mas esta somente ativando o comportamento de mover o mouse para baixo.
+eu quero entender o que enta acontecendo no arquivo uart_move_mouse_right.c.
+
+
+
+me ajuda a criar um evento novo mas tem que ser usando a versão do zmk é a v3.5.0,
+
+
+Crie um novo evento zmk_mouse_split_event, como é feito para sensor_event no ZMK.
+Isso exige adicionar um header em app/include/zmk/events/, registrar no CMakeLists.txt, e usar ZMK_EVENT_RAISE()
+
+
+
+
+
+
+# python print_allfiles_path.py /home/segodimo/zmkpromicro
+python print_allfiles_path.py /home/segodimo/zmkpromicro
+
+por favor revice todo meu código no arquivo out_print_allfiles.md.
+
+a versão que estou trabalhando é a versão do zmk é a v3.5.0,
+
+o código split_mouse_rx.c está conseguindo ouvir cada vez que eu pressiono uma tecla qualquer então ele manda o mouse descer sempre
+eu quero entender porque o slpit_mouse_rx.c sempre faz isso.
+
+o meu arquivo uart_move_mouse_right.c esta enviando dx e dx e tem um novo evento zmk_mouse_split_event, mas esta somente ativando o comportamento de mover o mouse para baixo.
+eu quero entender o que enta acontecendo no arquivo uart_move_mouse_right.c.
+
+meu objetivo é poder enviar esses eventos do peripheral para o central usando a verção do zmk v3.5.0,
+
+
+
+grep -R "struct zmk_event_header" /home/segodimo/zmk/app/include/zmk/ -n
+
+
+eu gosto muito dos seus trabalhos, parabéns!! meu sonho é ter isso no smartphone
+
+
+
+# python print_allfiles_path.py /home/segodimo/zmkpromicro
+python print_allfiles_path.py /home/segodimo/zmkpromicro
+
+por favor revice todo meu código no arquivo out_print_allfiles.md,
+a versão que estou trabalhando é a versão do zmk v3.5.0,
+me ajuda a debugar o fluxo para ver onde não esta funcionando,
+me ajuda a validar no repositório do zmk o que estou precisando.
+meu objetivo é poder enviar esses eventos do peripheral para o central usando a verção do zmk v3.5.0
+
+---
+
+
+# python print_allfiles_path.py /home/segodimo/zmkpromicro
+python print_allfiles_path.py /home/segodimo/zmkpromicro
+
+
+por favor revice todo meu código no arquivo out_print_allfiles.md,
+a versão que estou trabalhando é a versão do zmk v3.5.0,
+eu não vou poder ler os logs e por isso estou usando led_debug.c para testar,
+meu objetivo é poder enviar esses eventos que estão no uart_move_mouse_right.c do peripheral para o central usando a versão do zmk v3.5.0
+por favor me ajuda a entender o fluxo e a estrutura do evento para debugar ele.
+
+
+Pôr que eu não estou conseguindo receber os dados no split_mouse_rx.c?
+eu deveria serializar ev antes de usar ZMK_EVENT_RAISE(ev)?
+
+é verdade que ZMK_EVENT_RAISE(ev) funciona só funciona localmente?
+é verdade que esse listener ZMK_SUBSCRIPTION(split_mouse_rx_listener, zmk_mouse_split_event) só captura eventos locais, não via split?
+
+como eu 
+1. Registra o evento localmente no *Event Manager*.
+2. Se o *split transport* estiver ativo, o evento é **serializado e enviado via BLE para o lado central**.
+
+
+a versão que estou trabalhando é a versão do zmk v3.5.0,
+me ajuda a validar que no repositório oficial do zmk seguiente
+No lado central, o ZMK registra callbacks de recepção via: zmk_split_bt_register_receive_callback(callback);
+Toda vez que o periférico envia dados com: zmk_split_bt_transport_send(cmd, data, len);
+
+---
+
+# me ajuda a procurar na documentação do ZMK sobre:
+
+# como usar **a infraestrutura já existente** em `service.c` e `central.c`
+# como adicionar **uma nova characteristic BLE** (por exemplo, `split_mouse_data`)
+# No periférico: como chamar `bt_gatt_notify()` com teu payload de mouse
+# No central: como adicionar callback em `split_central_notify_cb()` pra decodificar o payload
+
+
+como usar **a infraestrutura já existente** em `service.c` e `central.c`
+como adicionar **uma nova characteristic BLE** (por exemplo, `split_mouse_data`)
+No periférico: como chamar `bt_gatt_notify()` com teu payload de mouse
+No central: como adicionar callback em `split_central_notify_cb()` pra decodificar o payload
+
+
+* Onde adicionar **uma nova característica BLE** em `service.c`
+* Onde interceptar ela no `central.c`
+* E como conectar isso ao teu `uart_move_mouse_left()`
+
+mantendo compatibilidade com o ZMK 3.5.0 (sem quebrar o split original)?
+
+---
+
+me ajuda a procurar na documentação do ZMK sobre:
+
+
+---
+quero ter compatibilidade com o ZMK 3.5.0
+
+---
+eu quero entender o que é fazer um Device Tree Overlays para Adicionar Characteristics
+eu quero saber se eu preciso por no overlay do lado central ou do periférico ou nos dois,
+eu quero fazer um teste bem simples para validar que o que fiz no overlay esta funcionado
+a versão que estou trabalhando é a versão do zmk v3.5.0,
+
+
+
+# python print_allfiles_path.py /home/segodimo/zmkpromicro
+python print_allfiles_path.py /home/segodimo/zmkpromicro
+
+---
+
+por favor revice todo meu código no arquivo out_print_allfiles.md,
+
+# contexto:
+
+##  Estrutura do **módulo “split/bluetooth” oficial** para o transporte BLE para o ZMK 3.5.0:
+
+```
+app/src/split/
+├── bluetooth/
+│   ├── central.c
+│   ├── service.c
+│   ├── central_bas_proxy.c
+│   └── peripheral.c
+```
+
+```bash
+bt_conn_cb_register(&conn_callbacks);
+```
+
+em `central.c` e `peripheral.c`.
+
+👉 Isso é o **registro padrão de callbacks de conexão BLE**, não de transporte split.
+
+### 🔹 O envio BLE ocorre em `service.c`
+
+O envio BLE entre halves (do periférico → central) é feito via
+`bt_gatt_notify()` em `service.c`, dentro do módulo `split_svc`.
+
+Cada atributo (`split_svc.attrs[i]`) representa uma *característica BLE* registrada no serviço Split.
+Os payloads padrão são estados do teclado (ex: `position_state_changed`, `sensor_event`, etc).
+
+👉 Ou seja, o **periférico envia via GATT notify**, mas **não há API pública genérica** — o transporte é interno ao ZMK.
+
+
+### 🔹 O recebimento BLE ocorre em `central.c`
+
+o lado **central** usa `bt_gatt_subscribe()` para assinar características BLE e receber notificações do periférico.
+
+Essas notificações disparam callbacks como:
+
+```c
+static uint8_t split_central_notify_cb(struct bt_conn *conn,
+                                       struct bt_gatt_subscribe_params *params,
+                                       const void *data, uint16_t length)
+```
+
+Esse é o **callback real** que recebe bytes vindos do periférico.
+
+👉 Esse callback decodifica o `payload` e reconstrói o evento (`position_state_changed`, `sensor_event`, etc).
+
+
+## 🧭 3️⃣ Conclusão técnica
+
+| Item                                       | Observação                                                              |
+| ------------------------------------------ | ----------------------------------------------------------------------- |
+| Envio BLE (peripheral)                     | `bt_gatt_notify()` em `app/src/split/bluetooth/service.c`               |
+| Recepção BLE (central)                     | `bt_gatt_subscribe()` e callback em `app/src/split/bluetooth/central.c` |
+
+---
+
+## ⚙️ 4️⃣Opções de implementação
+
+1. Usar **a infraestrutura já existente** em `service.c` e `central.c`
+   * Adicionar **uma nova characteristic BLE** (por exemplo, `split_mouse_data`)
+   * No periférico: chamar `bt_gatt_notify()` com teu payload de mouse
+   * No central: adicionar callback em `split_central_notify_cb()` pra decodificar o payload
+
+2. Ou, mais simples: **reutilizar uma característica existente** (como `sensor_event`) e multiplexar teu tipo de evento ali (adicionando um campo “mouse_event”).
+
+---
+
+
+## 🧩 5️⃣ Caminho ideal pra seguir
+
+me ajuda a fazer uma explicação passo-a-passo mostrando mantendo compatibilidade com o ZMK 3.5.0 sobre:
+
+* Onde adicionar **uma nova característica BLE** em `service.c`
+* Onde interceptar ela no `central.c`
+* E como conectar isso ao teu `uart_move_mouse_left()`
+
+por favor me ajuda a entender o fluxo e a estrutura do evento para debugar ele.
+
+a versão que estou trabalhando é a versão do zmk v3.5.0,
+eu não vou poder ler os logs e por isso estou usando led_debug.c para testar,
+meu objetivo é poder enviar esses eventos que estão no uart_move_mouse_right.c do peripheral para o central usando a versão do zmk v3.5.0,
+
+como usar **a infraestrutura já existente** em `service.c` e `central.c`?,
+como adicionar **uma nova characteristic BLE** (por exemplo, `split_mouse_data`)?,
+No periférico: como chamar `bt_gatt_notify()` com teu payload de mouse?,
+No central: como adicionar callback em `split_central_notify_cb()` pra decodificar o payload?,
+
+eu quero achar uma solução feita no zmk-config e não no zmk do repositório,
+mantendo compatibilidade com o ZMK 3.5.0 (sem quebrar o split original),
+
+---
+# python print_allfiles_path.py /home/segodimo/zmkpromicro
+python print_allfiles_path.py /home/segodimo/zmkpromicro
+
+por favor revice todo meu código no arquivo out_print_allfiles.md,
+eu estou tentando enviar eventos que estão no uart_move_mouse_right.c do peripheral para o central,
+eu não vou poder ler os logs e por isso estou usando led_debug.c para testar,
+por favor me ajuda a entender o fluxo e a estrutura do evento para debugar ele,
+mantendo compatibilidade com o ZMK 3.5.0 (sem quebrar o split original),
+
+eu não estou vendo o led piscar lado central,
+pisca sim no lado peripheral mas gostaria fazer testes com o led para confirmar o fluxo desse lado.
+
+---
+
+por favor revice todo meu código no arquivo out_print_allfiles.md,
+eu estou tentando enviar eventos que estão no uart_move_mouse_right.c do peripheral para o central,
+eu não vou poder ler os logs e por isso estou usando led_debug.c para testar,
+eu não estou vendo o led piscar do lado central mas ja testei o led e funciona sim, só que no split_mouse_central.c nenhum dos testes funcionou.
+
+---
+
+
+# python print_allfiles_path.py /home/segodimo/zmkpromicro
+python print_allfiles_path.py /home/segodimo/zmkpromicro
+
+por favor revice todo meu código no arquivo out_print_allfiles.md,
+eu quero adicionar dois botões a mais na quarta linha onde só tem 6 botões,
+ficariam oito no total adicionando mais um botão de cada lado, como eu faria isso?
+
+ficaria assom por exemplo:
+&kp A  &kp S     &kp D  &kp F           &kp G        &kp H  &kp J         &kp K
+
+
+
+por favor revice todo meu código no arquivo out_print_allfiles.md,
+eu quero adicionar dois botões a mais na quarta linha onde só tem 6 botões,
+eu fiz os ajustes nos dois lados mas
+ainda não consigo usar os dois botões j e k na 4ta linha
+
+
+

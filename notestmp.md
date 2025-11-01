@@ -3112,4 +3112,913 @@ int uart_move_mouse_left(
     uint8_t buttons
 );
 
+---
+
+
+
+
+
+
+
+
+---
+# python print_allfiles_path.py /home/segodimo/zmkpromicro
+python print_allfiles_path.py /home/segodimo/zmkpromicro
+
+por favor revice todo meu código no arquivo out_print_allfiles.md,
+a versão que estou trabalhando é a versão do zmk é a v3.5.0,
+me ajuda a debugar o fluxo para ver onde não esta funcionando,
+me ajuda a validar no repositório do zmk o que estou precisando.
+meu objetivo é poder enviar esses eventos do peripheral para o central usando a verção do zmk v3.5.0
+
+Analisando seu código e a estrutura do projeto ZMK v3.5.0, identifiquei vários pontos que precisam de ajustes para o funcionamento adequado do split BLE com eventos customizados:
+
+## 🔍 **Problemas Identificados:**
+
+### 1. **Configuração do Split BLE Inconsistente**
+- **No lado direito (peripheral)**: `CONFIG_ZMK_SPLIT_ROLE_CENTRAL=n` mas falta `CONFIG_ZMK_SPLIT_ROLE_PERIPHERAL=y`
+- **Falta configuração essencial**: Adicione em `corne_right.conf`:
+```text
+CONFIG_ZMK_SPLIT_ROLE_PERIPHERAL=y
+CONFIG_ZMK_SPLIT_BLE_CENTRAL_SPC=y
+```
+
+### 2. **Event Manager - Problema de Versão**
+Na ZMK v3.5.0, a API do Event Manager mudou. Seu código usa:
+```c
+ZMK_EVENT_RAISE(ev);  // Pode não funcionar na v3.5.0
+```
+
+**Correção necessária** em `uart_move_mouse_right.c`:
+```c
+// Use a nova API do Event Manager
+zmk_event_manager_raise(ev);
+```
+
+### 3. **Serialização de Eventos Customizados**
+Seus eventos `zmk_mouse_split_event` precisam de serialização para trafegar via BLE. Adicione em `mouse_split_event.h`:
+
+```c
+#pragma once
+
+#include <zephyr/kernel.h>
+#include <zmk/event_manager.h>
+#include <zmk/split/split_events.h>  // ✅ Importante para split
+
+struct zmk_mouse_split_event {
+    struct zmk_event_t header;
+    int8_t dx;
+    int8_t dy;
+    int8_t scroll_x;
+    int8_t scroll_y;
+    uint8_t buttons;
+};
+
+ZMK_EVENT_DECLARE(zmk_mouse_split_event);
+
+// ✅ Adicione estas funções para serialização
+int zmk_mouse_split_event_serialize(struct zmk_mouse_split_event *ev, uint8_t *buf, size_t buf_size);
+int zmk_mouse_split_event_deserialize(struct zmk_mouse_split_event *ev, const uint8_t *buf, size_t buf_size);
+```
+
+### 4. **Registro do Evento no Sistema Split**
+Crie um novo arquivo `config/src/split_mouse_event.c`:
+
+```c
+#include <zephyr/kernel.h>
+#include <zmk/split/split.h>
+#include <zmk/events/mouse_split_event.h>
+
+static int split_mouse_event_serialize(const struct zmk_event_t *eh, uint8_t *buf, size_t buf_size) {
+    const struct zmk_mouse_split_event *ev = as_zmk_mouse_split_event(eh);
+    
+    if (buf_size < 6) return -ENOMEM;
+    
+    buf[0] = ev->dx;
+    buf[1] = ev->dy;
+    buf[2] = ev->scroll_x;
+    buf[3] = ev->scroll_y;
+    buf[4] = ev->buttons;
+    
+    return 5; // bytes escritos
+}
+
+static int split_mouse_event_deserialize(struct zmk_event_t *eh, const uint8_t *buf, size_t buf_size) {
+    struct zmk_mouse_split_event *ev = cast_zmk_mouse_split_event(eh);
+    
+    if (buf_size < 5) return -EINVAL;
+    
+    ev->dx = (int8_t)buf[0];
+    ev->dy = (int8_t)buf[1];
+    ev->scroll_x = (int8_t)buf[2];
+    ev->scroll_y = (int8_t)buf[3];
+    ev->buttons = buf[4];
+    
+    return 0;
+}
+
+ZMK_SPLIT_EVENT_DEFINE(MOUSE_SPLIT_EVENT, zmk_mouse_split_event, 
+                       split_mouse_event_serialize, split_mouse_event_deserialize);
+```
+
+### 5. **Atualização do CMakeLists.txt**
+Modifique `config/src/CMakeLists.txt`:
+
+```text
+# Fonte comum
+target_sources(app PRIVATE
+  ${CMAKE_CURRENT_LIST_DIR}/mouse_split_event.c
+  ${CMAKE_CURRENT_LIST_DIR}/split_mouse_event.c  # ✅ Novo arquivo
+)
+
+if(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
+  # Central (lado esquerdo)
+  target_sources(app PRIVATE
+    ${CMAKE_CURRENT_LIST_DIR}/uart_receiver_left.c
+    ${CMAKE_CURRENT_LIST_DIR}/uart_switch_left.c
+    ${CMAKE_CURRENT_LIST_DIR}/uart_move_mouse_left.c
+    ${CMAKE_CURRENT_LIST_DIR}/split_mouse_rx.c
+  )
+else()
+  # Peripheral (lado direito)
+  target_sources(app PRIVATE
+    ${CMAKE_CURRENT_LIST_DIR}/uart_receiver_right.c
+    ${CMAKE_CURRENT_LIST_DIR}/uart_switch_right.c
+    ${CMAKE_CURRENT_LIST_DIR}/uart_move_mouse_right.c
+  )
+endif()
+```
+
+### 6. **Debug e Logs**
+Adicione logs estratégicos para debug:
+
+Em `uart_move_mouse_right.c`:
+```c
+int uart_move_mouse_right(int8_t dx, int8_t dy, int8_t scroll_y, int8_t scroll_x, uint8_t buttons) {
+    LOG_INF("🖱️ Peripheral: Creating mouse event dx=%d dy=%d", dx, dy);
+    
+    struct zmk_mouse_split_event *ev = new_zmk_mouse_split_event();
+    ev->dx = dx;
+    ev->dy = dy;
+    ev->scroll_x = scroll_x;
+    ev->scroll_y = scroll_y;
+    ev->buttons = buttons;
+    
+    // ✅ Use a nova API do Event Manager
+    return zmk_event_manager_raise(ev);
+}
+```
+
+Em `split_mouse_rx.c`:
+```c
+static int handle_split_mouse(const zmk_event_t *eh) {
+    const struct zmk_mouse_split_event *ev = as_zmk_mouse_split_event(eh);
+    
+    if (!ev) {
+        LOG_ERR("❌ Received null mouse event");
+        return ZMK_EV_EVENT_BUBBLE;
+    }
+    
+    LOG_INF("🖱️ Central: Received mouse event dx=%d dy=%d", ev->dx, ev->dy);
+    
+    return uart_move_mouse_left(ev->dx, ev->dy, ev->scroll_y, ev->scroll_x, ev->buttons);
+}
+```
+
+### 7. **Verificação da Configuração BLE**
+Adicione em ambos os arquivos de configuração:
+
+**`corne_left.conf`** (central):
+```text
+CONFIG_ZMK_SPLIT_ROLE_CENTRAL=y
+CONFIG_ZMK_SPLIT_BLE_CENTRAL_SPC=y
+CONFIG_ZMK_SPLIT_BLE=y
+CONFIG_BT_MAX_CONN=3
+CONFIG_BT_MAX_PAIRED=3
+```
+
+**`corne_right.conf`** (peripheral):
+```text
+CONFIG_ZMK_SPLIT_ROLE_CENTRAL=n
+CONFIG_ZMK_SPLIT_ROLE_PERIPHERAL=y
+CONFIG_ZMK_SPLIT_BLE=y
+```
+
+## 🛠️ **Próximos Passos para Debug:**
+
+1. **Compile e verifique os logs**:
+```bash
+cd /home/segodimo/zmkpromicro
+west build -b nice_nano_v2 -- -DSHIELD=corne_left -DZMK_CONFIG="/home/segodimo/zmkpromicro/config"
+```
+
+2. **Verifique se os eventos estão sendo registrados** nos logs de inicialização
+
+3. **Teste a comunicação básica do split** com teclas normais primeiro
+
+4. **Use o comando** `zmk-connect` para verificar se os dois lados estão se conectando via BLE
+
+A principal questão é que na ZMK v3.5.0, eventos customizados precisam de serialização explícita para funcionar via split BLE, e a API do Event Manager foi atualizada. Essas correções devem resolver o problema de comunicação entre peripheral e central.
+
+
+
+
+
+
+
+
+
+
+
+
+---
+# python print_allfiles_path.py /home/segodimo/zmkpromicro
+python print_allfiles_path.py /home/segodimo/zmkpromicro
+
+por favor revice todo meu código no arquivo out_print_allfiles.md,
+a versão que estou trabalhando é a versão do zmk é a v3.5.0,
+me ajuda a debugar o fluxo para ver onde não esta funcionando,
+me ajuda a validar no repositório do zmk o que estou precisando.
+meu objetivo é poder enviar esses eventos do peripheral para o central usando a verção do zmk v3.5.0
+
+
+Ótimo — eu revisei todo o conteúdo que você mandou em **out_print_allfiles.md** e comparei com a documentação do ZMK v3.5.0. Vou resumir o que está correto, o que provavelmente está faltando/errado, e dar um passo-a-passo de debug prático (com mudanças pequenas que você pode aplicar já) para fazer os eventos do *peripheral* chegarem ao *central*.
+
+### O que eu confirmei no seu repositório (e onde está)
+
+* Você declarou e implementou o evento custom `zmk_mouse_split_event` (header + `ZMK_EVENT_IMPL`) corretamente. 
+* No *peripheral* você constroi o evento e faz `ZMK_EVENT_RAISE(ev)` em `uart_move_mouse_right.c`. 
+* No *central* você tem um listener (`split_mouse_rx.c`) que usa `as_zmk_mouse_split_event(...)`, e faz `uart_move_mouse_left(...)` ao receber. 
+* O envio de eventos de tecla (posição) já usa `raise_zmk_position_state_changed(...)` (nas funções `uart_switch_*`) — essa API é a correta para simular posição/tecla. 
+* Seus arquivos `.conf` e overlays têm várias opções relacionadas a split, UART e logs (ex.: `CONFIG_ZMK_SPLIT`, `CONFIG_ZMK_SPLIT_ROLE_CENTRAL`, `CONFIG_UART_INTERRUPT_DRIVEN`, `CONFIG_LOG_DEFAULT_LEVEL`, etc.). Veja seus `corne_left.conf` / `corne_right.conf`. 
+
+Evidências e docs oficiais que valem como referência (úteis para entender o fluxo split / event manager no ZMK v3.5.0):
+
+* Documentação do Event Manager (API de eventos do ZMK). ([zmk.dev][1])
+* Documentação de *split keyboards* (papel central/peripheral e encaminhamento de eventos). ([zmk.dev][2])
+* Página de configuração de split (Kconfig / flags que ativam o split). ([zmk.dev][3])
+
+---
+
+### Por que **a compilação gera mas “não funciona”** — hipóteses mais prováveis
+
+1. **Evento não está sendo transportado pelo transporte do split**
+
+   * `ZMK_EVENT_RAISE(ev)` só coloca o evento no Event Manager local. Para que chegue ao *central*, o mecanismo de transporte split (wired/UART ou BLE split transport) precisa serializar esse evento e enviar ao central. Se o split-transport não estiver ativo/registrado para o seu evento custom, o evento nunca atravessa. (Docs: split keyboard / split transport). ([zmk.dev][2])
+2. **Nível de log muito baixo → você não vê o evento chegando**
+
+   * Seu listener usa `LOG_DBG(...)`. Se `CONFIG_LOG_DEFAULT_LEVEL` estiver em 3 (ou menor que DEBUG) ou se o backend do log estiver configurado para outro canal, você pode não ver a linha. 
+3. **Cabeçalho / impl do evento não ligado aos mesmos símbolos em ambos os lados**
+
+   * Se, por exemplo, central e peripheral estiverem compilando código do evento com namespace/paths diferentes (ou se somente um lado compila `mouse_split_event.c`), o Event Manager pode não reconhecer o tipo quando desserializado. Você está incluindo `mouse_split_event.c` em `target_sources` (bom) — mas garanta que **ambos** os firmwares tenham o mesmo evento declarado/implementado ou que o transporte esteja preparado para encaminhar esse tipo.
+
+---
+
+### Checklist prático de debug (aplique na ordem — cada item tem o porquê e um comando/alteração sugerida)
+
+1. **Forçar logs informativos / debug no central e peripheral**
+
+   * No *both* .conf, habilite:
+
+     ```
+     CONFIG_LOG=y
+     CONFIG_LOG_DEFAULT_LEVEL=4    # 4 = DEBUG/INFO dependendo da versão
+     CONFIG_ZMK_EVENT_MANAGER_LOG_LEVEL_DBG=y
+     ```
+   * Substitua `LOG_DBG(...)` por `LOG_INF(...)` temporariamente em `split_mouse_rx.c` e em `uart_move_mouse_right.c` para garantir que a mensagem apareça com menor configuração de log. (Depois você pode voltar para DBG).
+   * Por que: imediatamente mostra se o evento está sendo recebido no central. 
+
+2. **Verificar se o transporte split está efetivamente habilitado e qual tipo (UART vs BLE)**
+
+   * No *peripheral* você precisa de `CONFIG_ZMK_SPLIT=y` e, dependendo do link físico, `CONFIG_ZMK_SPLIT_BLE=y` ou habilitar o driver / overlay de UART. Em `corne_right.conf`/`corne_left.conf` você tem flags relacionadas — confirme que **ambos** compilam com as flags corretas (central deve ter `CONFIG_ZMK_SPLIT_ROLE_CENTRAL=y`, peripheral `CONFIG_ZMK_SPLIT_ROLE_CENTRAL=n` ou `CONFIG_ZMK_SPLIT_ROLE_PERIPHERAL=y`).  ([zmk.dev][3])
+   * Por que: se o split não estiver configurado, o Event Manager não fará a troca entre os dois nós. ([zmk.dev][2])
+
+3. **Confirmar que seu evento custom está incluído/compilado em ambos os lados ou é conhecido pelo transporte**
+
+   * Você adicionou `mouse_split_event.c` a `target_sources(app PRIVATE ...)` — ótimo — **verifique** que quando você compila a imagem do *central* ela também inclui `mouse_split_event.c` (às vezes `if(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)` pode estar excluindo o arquivo se as flags estiverem invertidas). Veja `config/src/CMakeLists.txt`. 
+   * Por que: os tipos de evento precisam existir no receptor para desserializar corretamente.
+
+4. **Adicionar logs/indicações no transporte (ponto de serialização/deserialização)**
+
+   * Encontre (ou adicione temporariamente) prints/logs onde o split transport serializa eventos no peripheral e onde o central desserializa/recebe. Se você não encontrar um ponto para o seu evento custom (algumas implementações precisam registrar serializers), adicione logs antes e depois de `ZMK_EVENT_RAISE` no peripheral e antes de `as_zmk_mouse_split_event` no central para confirmar passagem. (Você já tem logs, apenas aumente categoria pra INFO/INF).
+   * Por que: confirma se o evento sai do peripheral e se chega ao central. 
+
+5. **Teste mínimo: raise evento local no central (sanity)**
+
+   * No central, adicione um `SYS_INIT` que faz `ZMK_EVENT_RAISE` do mesmo evento (com valores fixos) logo na inicialização. Se o listener `split_mouse_rx.c` reagir a esse evento local, sabemos que o listener está correto; o problema é transporte.
+   * Por que: separa problema de *listener* vs *transporte*.
+
+6. **Verificar implementação HID / envio ao host**
+
+   * Sua função `uart_move_mouse_left(...)` obtém o relatório global (`zmk_hid_get_mouse_report()`) e chama `zmk_endpoints_send_mouse_report()` — essa é a forma esperada de enviar mouse HID no ZMK. Confirme retorno e logs desse `zmk_endpoints_send_mouse_report()` para garantir que há conectividade host. 
+
+---
+
+### Pequenas correções/inspeções de código que eu sugiro **imediatamente**
+
+* Em `split_mouse_rx.c` troque `LOG_DBG(...)` por `LOG_INF(...)` enquanto debuga. 
+* Confirme que `mouse_split_event.c` (com `ZMK_EVENT_IMPL`) está sendo compilado tanto no central quanto no peripheral (ou pelo menos no receptor que precisa desserializar). Está listado em `config/src/CMakeLists.txt` — verifique que o if/else inclui esse arquivo para ambos os builds. 
+* No *peripheral* garanta que `ZMK_EVENT_RAISE(ev);` esteja de fato alcançado (coloque `LOG_INF` logo antes). 
+
+---
+
+### Se quiser, eu faço agora (o que posso executar já nesta conversa)
+
+* Posso apontar exatamente quais linhas alterar (diffs completos) para:
+
+  1. Trocar LOG_DBG → LOG_INF temporariamente;
+  2. Inserir `LOG_INF("raising mouse_split_event dx=%d ...");` antes do `ZMK_EVENT_RAISE(ev)`;
+  3. Inserir um teste `SYS_INIT` local no central (snippet) que faz `ZMK_EVENT_RAISE` para validar o listener.
+     (faço agora mesmo os trechos para você colar — diga se quer que eu gere os *diffs*/patches).
+
+---
+
+### Resumo rápido e prioridade
+
+1. A arquitetura do seu código está correta: evento declarado, raised no peripheral, listener no central. 
+2. **Suspeita principal:** eventos não estão sendo transportados — revise configuração do split (Kconfig/.conf) e o código de transporte. ([zmk.dev][2])
+3. Coloque logs INFO/DEBUG maiores nas bordas (antes de `ZMK_EVENT_RAISE`, na desserialização e antes de `zmk_endpoints_send_mouse_report`) para identificar onde perde o evento.
+
+---
+
+Quer que eu **gere os snippets/patches** (em C) para:
+
+* trocar os logs em `split_mouse_rx.c` e `uart_move_mouse_right.c` para INFO;
+* adicionar um `SYS_INIT` de teste no central que gera um `zmk_mouse_split_event` fixo, e também uma mensagem log antes de `ZMK_EVENT_RAISE` no peripheral?
+
+Se sim, eu já os escrevo aqui para você colar — sem esperar nada.
+
+[1]: https://zmk.dev/docs/development/events?utm_source=chatgpt.com "ZMK Events"
+[2]: https://zmk.dev/docs/features/split-keyboards?utm_source=chatgpt.com "Split Keyboards"
+[3]: https://zmk.dev/docs/config/split?utm_source=chatgpt.com "Split Configuration"
+
+
+
+
+
+
+
+
+
+
+
+---
+Excelente ideia! Piscar LEDs é a forma mais prática de debug em sistemas embarcados. Vou te mostrar várias formas de fazer isso:
+
+## 💡 **Método 1: Usando o LED Interno (Mais Simples)**
+
+### **Adicione esta função utilitária:**
+
+**`config/src/led_debug.c`:**
+```c
+#include <zephyr/kernel.h>
+#include <zephyr/drivers/gpio.h>
+#include <zephyr/logging/log.h>
+
+LOG_MODULE_REGISTER(led_debug, CONFIG_ZMK_LOG_LEVEL);
+
+// LED interno do nice!nano (pino P0.15)
+#define LED0_NODE DT_ALIAS(led0)
+static const struct gpio_dt_spec led = GPIO_DT_SPEC_GET(LED0_NODE, gpios);
+
+void led_debug_init(void) {
+    if (!device_is_ready(led.port)) {
+        LOG_ERR("LED device not ready");
+        return;
+    }
+    
+    gpio_pin_configure_dt(&led, GPIO_OUTPUT_INACTIVE);
+    LOG_INF("LED debug initialized");
+}
+
+void led_blink_pattern(uint8_t count, uint32_t delay_ms) {
+    if (!device_is_ready(led.port)) return;
+    
+    for (int i = 0; i < count; i++) {
+        gpio_pin_set_dt(&led, 1);  // LED ON
+        k_msleep(delay_ms);
+        gpio_pin_set_dt(&led, 0);  // LED OFF
+        k_msleep(delay_ms);
+    }
+}
+
+void led_set(bool state) {
+    if (device_is_ready(led.port)) {
+        gpio_pin_set_dt(&led, state);
+    }
+}
+```
+
+**`config/include/zmk/led_debug.h`:**
+```c
+#pragma once
+#include <stdbool.h>
+
+void led_debug_init(void);
+void led_blink_pattern(uint8_t count, uint32_t delay_ms);
+void led_set(bool state);
+```
+
+## 🔧 **Método 2: Debug no Peripheral (Lado Direito)**
+
+### **Modifique `uart_move_mouse_right.c`:**
+```c
+#include <zephyr/kernel.h>
+#include <zephyr/logging/log.h>
+#include <zmk/uart_move_mouse_right.h>
+#include <zmk/events/mouse_split_event.h>
+#include <zmk/led_debug.h>  // ✅ Adicione este include
+
+LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
+
+int uart_move_mouse_right(int8_t dx, int8_t dy, int8_t scroll_y, int8_t scroll_x, uint8_t buttons) {
+    
+    // ✅ Pisca o LED 3 vezes rápido quando recebe comando do UART
+    led_blink_pattern(3, 100);
+    
+    LOG_DBG("uart_move_mouse_right: dx=%d dy=%d", dx, dy);
+
+    // Seu código existente para criar e enviar o evento...
+    struct zmk_mouse_split_event *ev = zmk_mouse_split_event_new(dx, dy, scroll_x, scroll_y, buttons);
+    if (!ev) {
+        // ✅ Pisca 5 vezes lento em caso de erro
+        led_blink_pattern(5, 300);
+        return -ENOMEM;
+    }
+
+    int ret = zmk_event_manager_raise((zmk_event_t *)ev);
+    
+    if (ret == 0) {
+        // ✅ Pisca 1 vez se sucesso
+        led_blink_pattern(1, 200);
+    } else {
+        // ✅ Pisca 2 vezes se erro
+        led_blink_pattern(2, 200);
+    }
+
+    return ret;
+}
+```
+
+## 🔧 **Método 3: Debug no Central (Lado Esquerdo)**
+
+### **Modifique `split_mouse_rx.c`:**
+```c
+#include <zephyr/kernel.h>
+#include <zephyr/logging/log.h>
+#include <zmk/event_manager.h>
+#include <zmk/events/mouse_split_event.h>
+#include <zmk/uart_move_mouse_left.h>
+#include <zmk/led_debug.h>  // ✅ Adicione este include
+
+LOG_MODULE_REGISTER(split_mouse_rx, CONFIG_ZMK_LOG_LEVEL);
+
+static int handle_split_mouse(const zmk_event_t *eh) {
+    const struct zmk_mouse_split_event *ev = as_zmk_mouse_split_event(eh);
+    
+    if (!ev) {
+        return ZMK_EV_EVENT_BUBBLE;
+    }
+
+    // ✅ Pisca o LED quando recebe evento do peripheral
+    led_blink_pattern(2, 150);
+    
+    LOG_DBG("Received split mouse dx=%d dy=%d", ev->dx, ev->dy);
+
+    return uart_move_mouse_left(ev->dx, ev->dy, ev->scroll_y, ev->scroll_x, ev->buttons);
+}
+
+ZMK_LISTENER(split_mouse_rx_listener, handle_split_mouse);
+ZMK_SUBSCRIPTION(split_mouse_rx_listener, zmk_mouse_split_event);
+```
+
+## 🔧 **Método 4: Debug no UART Receiver**
+
+### **Modifique `uart_receiver_right.c`:**
+```c
+// No callback UART, quando receber dados:
+static void uart_cb_right(const struct device *dev, void *user_data) {
+    uint8_t c;
+    ARG_UNUSED(user_data);
+
+    while (uart_fifo_read(dev, &c, 1) > 0) {
+        
+        // ✅ Pisca LED quando recebe byte via UART
+        led_set(1);  // LED ON
+        k_msleep(50);
+        led_set(0);  // LED OFF
+        
+        // Seu código existente...
+    }
+}
+```
+
+## 🔧 **Método 5: Teste de Inicialização**
+
+### **Adicione em `uart_receiver_right.c`:**
+```c
+void uart_receiver_right_init(void) {
+    // ✅ Inicializa LED debug
+    led_debug_init();
+    
+    // ✅ Pisca 4 vezes na inicialização
+    led_blink_pattern(4, 200);
+    
+    if (!device_is_ready(uart_right)) {
+        LOG_ERR("UART device not ready");
+        // ✅ Pisca 10 vezes rápido em caso de erro
+        led_blink_pattern(10, 50);
+        return;
+    }
+
+    // Resto do código de inicialização...
+    
+    // ✅ Pisca 2 vezes se inicializou com sucesso
+    led_blink_pattern(2, 200);
+}
+```
+
+## 📋 **Atualize o CMakeLists.txt:**
+
+```text
+# Adicione o novo arquivo
+target_sources(app PRIVATE
+  ${CMAKE_CURRENT_LIST_DIR}/mouse_split_event.c
+  ${CMAKE_CURRENT_LIST_DIR}/test_mouse_events.c
+  ${CMAKE_CURRENT_LIST_DIR}/simple_mouse_split.c
+  ${CMAKE_CURRENT_LIST_DIR}/led_debug.c  # ✅ Novo arquivo
+)
+
+# ... resto do código
+```
+
+## 🎯 **Padrões de Piscada Úteis:**
+
+| **Padrão** | **Significado** |
+|------------|-----------------|
+| 🔦 1 piscada | Evento enviado com sucesso |
+| 🔦🔦 2 piscadas | Evento recebido do split |
+| 🔦🔦🔦 3 piscadas | Dados recebidos via UART |
+| 🔦🔦🔦🔦 4 piscadas | Sistema inicializado |
+| 🔦(rápido) 5+ piscadas | Erro |
+
+## 🚀 **Como Usar:**
+
+1. **Compile e flashe o firmware**
+2. **Observe o LED interno do nice!nano** (perto do conector USB)
+3. **Cada ação terá um padrão visual único**
+4. **Você saberá exatamente em qual estágio o código está**
+
+### **Teste o Fluxo Completo:**
+1. **Inicialização** → 4 piscadas
+2. **Receber dados UART** → 3 piscadas  
+3. **Enviar evento split** → 1 piscada
+4. **Receber evento split** → 2 piscadas
+
+Quer que eu adapte algum padrão específico ou adicione mais funcionalidades de debug?
+
+
+
+
+eu estou usando o promicro nRF52840 e quero fazer piscar qualquer led interno da placa mas não estou conseguindo ainda
+
+eu fiz o seguinte:
+
+eu criei um arquivo **`config/src/led_debug.c`:**
+```c
+#include <zephyr/kernel.h>
+#include <zephyr/drivers/gpio.h>
+#include <zephyr/logging/log.h>
+
+LOG_MODULE_REGISTER(led_debug, CONFIG_ZMK_LOG_LEVEL);
+
+// LED interno do nice!nano (pino P0.15)
+#define LED0_NODE DT_ALIAS(led0)
+static const struct gpio_dt_spec led = GPIO_DT_SPEC_GET(LED0_NODE, gpios);
+
+void led_debug_init(void) {
+    if (!device_is_ready(led.port)) {
+        LOG_ERR("LED device not ready");
+        return;
+    }
+    
+    gpio_pin_configure_dt(&led, GPIO_OUTPUT_INACTIVE);
+    LOG_INF("LED debug initialized");
+}
+
+void led_blink_pattern(uint8_t count, uint32_t delay_ms) {
+    if (!device_is_ready(led.port)) return;
+    
+    for (int i = 0; i < count; i++) {
+        gpio_pin_set_dt(&led, 1);  // LED ON
+        k_msleep(delay_ms);
+        gpio_pin_set_dt(&led, 0);  // LED OFF
+        k_msleep(delay_ms);
+    }
+}
+
+void led_set(bool state) {
+    if (device_is_ready(led.port)) {
+        gpio_pin_set_dt(&led, state);
+    }
+}
+```
+
+eu criei um arquivo **`config/include/zmk/led_debug.h`:**
+
+```c
+#pragma once
+#include <stdbool.h>
+
+void led_debug_init(void);
+void led_blink_pattern(uint8_t count, uint32_t delay_ms);
+void led_set(bool state);
+```
+
+e estou testando com o arquivo test_mouse_r.c:
+
+```c
+#include <zephyr/input/input.h>
+#include <zephyr/device.h>
+#include <zephyr/devicetree.h>
+#include <zephyr/kernel.h>
+#include <zmk/event_manager.h>
+#include <zmk/uart_switch_right.h>
+#include <zmk/events/sensor_event.h>
+#include <zmk/sensors.h>
+#include <zmk/led_debug.h>  // ✅ Adicione este include
+
+#include <zmk/uart_switch_right.h>
+#define MATRIX_COLS 12
+#define ZMK_KEYMAP_POSITION(row, col) ((row) * MATRIX_COLS + (col))
+
+// Função auxiliar para enviar uma tecla
+static void send_key(uint8_t row, uint8_t col) {
+    uart_switch_simulate_right(row, col, true);   // Pressionar
+    k_msleep(20);
+    uart_switch_simulate_right(row, col, false);  // Soltar
+    k_msleep(20);
+}
+
+// Função para enviar o evento com dx e dy
+static void send_mouse_motion(int8_t dx, int8_t dy) {
+    struct zmk_sensor_channel_data data = {
+        .value = {
+            .val1 = dx,
+            .val2 = dy,
+        },
+    };
+
+    struct zmk_sensor_event event = {
+        .channel_data_size = 1,
+        .channel_data = {data},
+        .timestamp = k_uptime_get(),
+        .sensor_index = 0,
+    };
+
+    // raise_zmk_sensor_event(event);
+    int ret = raise_zmk_sensor_event(event);
+  
+    switch (ret) {
+        case 0:
+            send_key(1, 1);//a
+            led_blink_pattern(2, 150);
+            break;
+        case 1:
+            send_key(1, 2);//s
+            led_blink_pattern(2, 150);
+            break;
+        case -EINVAL:
+            send_key(1, 3);//d
+            led_blink_pattern(2, 150);
+            break;
+        case -ENOMEM:
+            send_key(1, 4);//f
+            led_blink_pattern(2, 150);
+            break;
+        case -ENOTSUP:
+            send_key(1, 5);//g
+            led_blink_pattern(2, 150);
+            break;
+        case -EAGAIN:
+            send_key(1, 6);//h
+            led_blink_pattern(2, 150);
+            break;
+        case -EFAULT:
+            send_key(1, 7);//j
+            led_blink_pattern(2, 150);
+            break;
+        default:
+            send_key(1, 8);//k
+            led_blink_pattern(2, 150);
+            break;
+    }
+}
+
+// Simulação periódica (exemplo)
+static void test_mouse_thread(void) {
+    while (true) {
+        send_mouse_motion(5, -3); // exemplo de movimento
+        k_msleep(1000);
+    }
+}
+
+K_THREAD_DEFINE(test_mouse_thread_id, 1024, test_mouse_thread, NULL, NULL, NULL, 5, 0, 0);
+
+```
+
+
+--- 
+```c 
+#include <zephyr/kernel.h>
+#include <zephyr/device.h>
+#include <zephyr/drivers/gpio.h>
+#include <zmk/uart_switch_right.h>
+
+#define MATRIX_COLS 12
+#define ZMK_KEYMAP_POSITION(row, col) ((row) * MATRIX_COLS + (col))
+
+// Função auxiliar para enviar uma tecla
+static void send_key(uint8_t row, uint8_t col) {
+    uart_switch_simulate_right(row, col, true);   // Pressiona
+    k_msleep(50);
+    uart_switch_simulate_right(row, col, false);  // Solta
+    k_msleep(50);
+}
+
+// Pisca o LED de um pino específico
+static void blink_pin(uint8_t port_num, uint8_t pin_num, uint32_t delay_ms) {
+    const struct device *port = (port_num == 0)
+        ? DEVICE_DT_GET(DT_NODELABEL(gpio0))
+        : DEVICE_DT_GET(DT_NODELABEL(gpio1));
+
+    if (!device_is_ready(port)) return;
+
+    gpio_pin_configure(port, pin_num, GPIO_OUTPUT);
+    gpio_pin_set(port, pin_num, 1);
+    k_msleep(delay_ms);
+    gpio_pin_set(port, pin_num, 0);
+    k_msleep(delay_ms);
+}
+
+// Thread de teste
+static void test_led_thread(void) {
+    // Lista de pinos candidatos (port, pin)
+    struct {
+        uint8_t port;
+        uint8_t pin;
+    } test_pins[] = {
+        {0, 13}, // A ok
+        {0, 15}, // S ok
+        {0, 17}, // D
+        {0, 25}, // F
+        {1, 6},  // G
+        {1, 9},  // H
+        {0, 24}, // J
+        {0, 31}, // K
+    };
+
+    while (true) {
+        for (int i = 0; i < 2; i++) {
+            // Mostra visualmente qual pino está sendo testado
+            send_key(1, i + 1);   // A..K (1,1) até (1,8)
+            blink_pin(test_pins[i].port, test_pins[i].pin, 300);
+            k_msleep(700); // pausa entre testes
+        }
+    }
+}
+
+K_THREAD_DEFINE(test_led_thread_id, 1024, test_led_thread, NULL, NULL, NULL, 5, 0, 0);
+
+ 
+``` 
+
+
+me ajuda a descobrir qual é o led interno da placa com o arquivo test_mouse_r.c
+eu não consigo ver logs então para testar pode ser usando os cases de test_mouse_r.c
+o lend que que quero piscar tem que ser o led interno da placa
+
+
+com o código find_led.c eu consigo piscar os leds internos da placa 13 e 15,
+eu queiro fazer uma função no codigo led_debug.c e led_debug.h, para poder fazer testes com os leds internos,
+mas não consigo fazer que funcione, a
+a versão que estou trabalhando é a versão do zmk v3.5.0,
+
+aqui esta o código find_led.c:
+
+#include <zephyr/kernel.h>
+#include <zephyr/device.h>
+#include <zephyr/drivers/gpio.h>
+#include <zmk/uart_switch_right.h>
+
+#define MATRIX_COLS 12
+#define ZMK_KEYMAP_POSITION(row, col) ((row) * MATRIX_COLS + (col))
+
+// Função auxiliar para enviar uma tecla
+static void send_key(uint8_t row, uint8_t col) {
+    uart_switch_simulate_right(row, col, true);   // Pressiona
+    k_msleep(50);
+    uart_switch_simulate_right(row, col, false);  // Solta
+    k_msleep(50);
+}
+
+// Pisca o LED de um pino específico
+static void blink_pin(uint8_t port_num, uint8_t pin_num, uint32_t delay_ms) {
+    const struct device *port = (port_num == 0)
+        ? DEVICE_DT_GET(DT_NODELABEL(gpio0))
+        : DEVICE_DT_GET(DT_NODELABEL(gpio1));
+
+    if (!device_is_ready(port)) return;
+
+    gpio_pin_configure(port, pin_num, GPIO_OUTPUT);
+    gpio_pin_set(port, pin_num, 1);
+    k_msleep(delay_ms);
+    gpio_pin_set(port, pin_num, 0);
+    k_msleep(delay_ms);
+}
+
+// Thread de teste
+static void test_led_thread(void) {
+    // Lista de pinos candidatos (port, pin)
+    struct {
+        uint8_t port;
+        uint8_t pin;
+    } test_pins[] = {
+        {0, 13}, // A ok
+        {0, 15}, // S ok
+        {0, 17}, // D
+        {0, 25}, // F
+        {1, 6},  // G
+        {1, 9},  // H
+        {0, 24}, // J
+        {0, 31}, // K
+    };
+
+    while (true) {
+        for (int i = 0; i < 2; i++) {
+            // Mostra visualmente qual pino está sendo testado
+            send_key(1, i + 1);   // A..K (1,1) até (1,8)
+            blink_pin(test_pins[i].port, test_pins[i].pin, 300);
+            k_msleep(700); // pausa entre testes
+        }
+    }
+}
+
+K_THREAD_DEFINE(test_led_thread_id, 1024, test_led_thread, NULL, NULL, NULL, 5, 0, 0);
+
+aqui esta o código led_debug.h:
+
+#include <zephyr/kernel.h>
+#include <zephyr/device.h>
+#include <zephyr/drivers/gpio.h>
+#include <zephyr/logging/log.h>
+
+LOG_MODULE_REGISTER(led_debug, CONFIG_ZMK_LOG_LEVEL);
+
+// LED direto no P0.15 (port 0, pin 15)
+#define LED_PORT   DT_NODELABEL(gpio0)
+#define LED_PIN    13  // altere para 13 se quiser usar o outro
+
+static const struct device *port;
+
+void led_debug_init(void) {
+    port = DEVICE_DT_GET(LED_PORT);
+
+    if (!device_is_ready(port)) {
+        LOG_ERR("GPIO port not ready");
+        return;
+    }
+
+    gpio_pin_configure(port, LED_PIN, GPIO_OUTPUT);
+    gpio_pin_set(port, LED_PIN, 0); // começa desligado
+
+    LOG_INF("LED P0.%d initialized", LED_PIN);
+}
+
+void led_blink_pattern(uint8_t count, uint32_t delay_ms) {
+    if (!device_is_ready(port)) return;
+
+    for (int i = 0; i < count; i++) {
+        gpio_pin_set(port, LED_PIN, 1);
+        k_msleep(delay_ms);
+        gpio_pin_set(port, LED_PIN, 0);
+        k_msleep(delay_ms);
+    }
+}
+
+void led_set(bool state) {
+    if (device_is_ready(port)) {
+        gpio_pin_set(port, LED_PIN, state ? 1 : 0);
+    }
+}
+
+#pragma once
+#include <stdbool.h>
+
+void led_debug_init(void);
+void led_blink_pattern(uint8_t count, uint32_t delay_ms);
+void led_set(bool state);
+
+aqui esta o código led_debug.c:
+
 

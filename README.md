@@ -122,3 +122,120 @@ DEBUG = 0
    ```
 
 Recomendo começar com os valores padrão e ajustar gradualmente conforme a necessidade do usuário, testando a sensibilidade e resposta do sistema.
+
+---
+
+
+# contexto:
+
+##  Estrutura do **módulo “split/bluetooth” oficial** para o transporte BLE para o ZMK 3.5.0:
+
+```
+app/src/split/
+├── bluetooth/
+│   ├── central.c
+│   ├── service.c
+│   ├── central_bas_proxy.c
+│   └── peripheral.c
+```
+
+```bash
+bt_conn_cb_register(&conn_callbacks);
+```
+
+em `central.c` e `peripheral.c`.
+
+👉 Isso é o **registro padrão de callbacks de conexão BLE**, não de transporte split.
+
+### 🔹 O envio BLE ocorre em `service.c`
+
+O envio BLE entre halves (do periférico → central) é feito via
+`bt_gatt_notify()` em `service.c`, dentro do módulo `split_svc`.
+
+Cada atributo (`split_svc.attrs[i]`) representa uma *característica BLE* registrada no serviço Split.
+Os payloads padrão são estados do teclado (ex: `position_state_changed`, `sensor_event`, etc).
+
+👉 Ou seja, o **periférico envia via GATT notify**, mas **não há API pública genérica** — o transporte é interno ao ZMK.
+
+
+### 🔹 O recebimento BLE ocorre em `central.c`
+
+o lado **central** usa `bt_gatt_subscribe()` para assinar características BLE e receber notificações do periférico.
+
+Essas notificações disparam callbacks como:
+
+```c
+static uint8_t split_central_notify_cb(struct bt_conn *conn,
+                                       struct bt_gatt_subscribe_params *params,
+                                       const void *data, uint16_t length)
+```
+
+Esse é o **callback real** que recebe bytes vindos do periférico.
+
+👉 Esse callback decodifica o `payload` e reconstrói o evento (`position_state_changed`, `sensor_event`, etc).
+
+
+## 🧭 3️⃣ Conclusão técnica
+
+| Item                                       | Observação                                                              |
+| ------------------------------------------ | ----------------------------------------------------------------------- |
+| Envio BLE (peripheral)                     | `bt_gatt_notify()` em `app/src/split/bluetooth/service.c`               |
+| Recepção BLE (central)                     | `bt_gatt_subscribe()` e callback em `app/src/split/bluetooth/central.c` |
+
+---
+
+## ⚙️ 4️⃣Opções de implementação
+
+1. Usar **a infraestrutura já existente** em `service.c` e `central.c`
+   * Adicionar **uma nova characteristic BLE** (por exemplo, `split_mouse_data`)
+   * No periférico: chamar `bt_gatt_notify()` com teu payload de mouse
+   * No central: adicionar callback em `split_central_notify_cb()` pra decodificar o payload
+
+2. Ou, mais simples: **reutilizar uma característica existente** (como `sensor_event`) e multiplexar teu tipo de evento ali (adicionando um campo “mouse_event”).
+
+---
+
+
+## 🧩 5️⃣ Caminho ideal pra seguir
+
+me ajuda a fazer uma explicação passo-a-passo mostrando mantendo compatibilidade com o ZMK 3.5.0 sobre:
+
+* Onde adicionar **uma nova característica BLE** em `service.c`
+* Onde interceptar ela no `central.c`
+* E como conectar isso ao teu `uart_move_mouse_left()`
+
+por favor me ajuda a entender o fluxo e a estrutura do evento para debugar ele.
+
+a versão que estou trabalhando é a versão do zmk v3.5.0,
+eu não vou poder ler os logs e por isso estou usando led_debug.c para testar,
+meu objetivo é poder enviar esses eventos que estão no uart_move_mouse_right.c do peripheral para o central usando a versão do zmk v3.5.0,
+
+como usar **a infraestrutura já existente** em `service.c` e `central.c`?,
+como adicionar **uma nova characteristic BLE** (por exemplo, `split_mouse_data`)?,
+No periférico: como chamar `bt_gatt_notify()` com teu payload de mouse?,
+No central: como adicionar callback em `split_central_notify_cb()` pra decodificar o payload?,
+
+eu quero achar uma solução feita no zmk-config e não no zmk do repositório,
+mantendo compatibilidade com o ZMK 3.5.0 (sem quebrar o split original),
+
+---
+# python print_allfiles_path.py /home/segodimo/zmkpromicro
+python print_allfiles_path.py /home/segodimo/zmkpromicro
+
+por favor revice todo meu código no arquivo out_print_allfiles.md,
+eu estou tentando enviar eventos que estão no uart_move_mouse_right.c do peripheral para o central,
+eu não vou poder ler os logs e por isso estou usando led_debug.c para testar,
+por favor me ajuda a entender o fluxo e a estrutura do evento para debugar ele,
+mantendo compatibilidade com o ZMK 3.5.0 (sem quebrar o split original),
+
+eu não estou vendo o led piscar lado central,
+pisca sim no lado peripheral mas gostaria fazer testes com o led para confirmar o fluxo desse lado.
+
+---
+
+por favor revice todo meu código no arquivo out_print_allfiles.md,
+eu estou tentando enviar eventos que estão no uart_move_mouse_right.c do peripheral para o central,
+eu não vou poder ler os logs e por isso estou usando led_debug.c para testar,
+eu não estou vendo o led piscar do lado central mas ja testei o led e funciona sim, só que no split_mouse_central.c nenhum dos testes funcionou.
+
+

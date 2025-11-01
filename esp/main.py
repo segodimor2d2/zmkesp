@@ -314,6 +314,6 @@ def start(i2c=None, mpu=None, mpr=None, pots=None, vib=None, led=None, force_cal
 
 if __name__ == "__main__":
     vibrar(init_vibrator(), 4, ready=True)
-    liberar_repl(init_vibrator(), init_led(2), 3)  # <-- webrepl ativado
+    # liberar_repl(init_vibrator(), init_led(2), 3)  # <-- webrepl ativado
     start(force_calib=False)
 

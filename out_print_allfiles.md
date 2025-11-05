@@ -165,7 +165,6 @@ CONFIG_INPUT=y
     pinctrl-names = "default", "sleep";
 };
 
-
 ```
 
 
@@ -328,13 +327,12 @@ CONFIG_ZMK_SPLIT_BLE=y
 
       default_layer {
               bindings = <
-&kp ESC    &kp Q  &kp W  &kp E     &kp R  &kp T           &kp Y        &kp U  &kp I         &kp O    &kp P     &kp BSPC
-&kp LSHFT  &kp A  &kp S  &kp D     &kp F  &kp G           &kp H        &kp J  &kp K         &kp L    &kp SEMI  &kp ENTER
-&kp LCTRL  &kp Z  &kp X  &kp C     &kp V  &kp B           &kp N        &kp M  &kp COMMA     &kp DOT  &kp FSLH  &kp RSHIFT
-                  /* &kp Q  &kp LALT  &mo 2  &kp SPACE       &kp ENTER    &mo 1  &kp RSHIFT    &kp W */
-                  /* &kp A  &kp S     &kp D  &kp F           &kp G        &kp H  &kp J         &kp K */
-                  &kp A  &kp S  &kp D  &kp F  &kp G  &kp H  &kp J  &kp K  &none  &none  &none  &none
-
+&kp ESC    &kp Q  &kp W  &kp E     &kp R  &kp T           &kp Y        &kp U  &kp I            &kp O    &kp P     &kp BSPC
+&kp LSHFT  &kp A  &kp S  &kp D     &kp F  &kp G           &kp H        &kp J  &kp K            &kp L    &kp SEMI  &kp ENTER
+&kp LCTRL  &kp Z  &kp X  &kp C     &kp V  &kp B           &kp N        &kp M  &kp COMMA        &kp DOT  &kp FSLH  &kp RSHIFT
+&kp LCTRL  &kp Z  &kp X  &kp C     &kp V  &kp B           &kp N        &kp M  &kp COMMA        &kp DOT  &kp FSLH  &kp RSHIFT
+                         /* &kp LALT  &mo 2  &lt 4 SPACE     &lt 3 ENTER  &mo 1  &kp RIGHT_SHIFT */
+/* &kp A  &kp S  &kp D  &kp F  &kp G  &kp H  &kp J  &kp K  &kp L  &kp Q  &kp W  &kp E */
                         >;
       };
 
@@ -343,8 +341,8 @@ CONFIG_ZMK_SPLIT_BLE=y
 &kp TAB  &none  &kp NUMBER_9  &kp NUMBER_8    &kp NUMBER_7  &none           &kp HOME        &kp PG_DN       &kp PG_UP     &kp END          &parenthesis  &kp LBKT
 &trans   &none  &kp NUMBER_6  &kp NUMBER_5    &kp NUMBER_4  &none           &mmv MOVE_LEFT  &mmv MOVE_DOWN  &mmv MOVE_UP  &mmv MOVE_RIGHT  &bracket      &kp SQT
 &trans   &none  &kp NUMBER_3  &kp NUMBER_2    &kp NUMBER_1  &kp NUMBER_0    &kp LEFT        &kp DOWN        &kp UP        &kp RIGHT        &brace        &kp MINUS
-                /* &none         &none           &none         &none           &kp RSHIFT      &none           &kp LALT      &none */
-                &kp A  &kp S  &kp D  &kp F  &kp G  &kp H  &kp J  &kp K  &none  &none  &none  &none
+/* &kp A  &kp S  &kp D  &kp F  &kp G  &kp H  &kp J  &kp K  &kp L  &kp Q  &kp W  &kp E */
+                              /* &none           &none         &none           &kp RSHIFT      &none           &kp LALT */
                         >;
       };
 
@@ -353,36 +351,10 @@ CONFIG_ZMK_SPLIT_BLE=y
 &kp LA(TAB)  &trans  &trans  &trans  &trans  &trans          &kp BSLH   &kp MINUS  &kp PLUS  &kp PRCNT  &kp EXCL       &kp LA(DELETE)
 &trans       &trans  &trans  &trans  &trans  &trans          &kp N0     &kp STAR   &kp HASH  &kp DLLR   &kp KP_DIVIDE  &kp GRAVE
 &trans       &trans  &trans  &trans  &trans  &trans          &kp EQUAL  &kp AT     &kp EXCL  &kp RA(W)  &kp RA(W)      &kp AMPS
-                     /* &trans  &trans  &none   &trans          &kp RET    &trans     &trans    &trans */
-                &kp A  &kp S  &kp D  &kp F  &kp G  &kp H  &kp J  &kp K  &none  &none  &none  &none
+/* &kp A  &kp S  &kp D  &kp F  &kp G  &kp H  &kp J  &kp K  &kp L  &kp Q  &kp W  &kp E */
+                             /* &trans  &none   &trans          &kp RET    &trans     &trans */
                         >;
       };
-
-        fn_layer {
-            display-name = "FN";
-            bindings = <
-&none  &none  &none  &none  &none  &none    &kp F7  &kp F8  &kp F9    &kp F10  &none  &none
-&none  &none  &none  &none  &none  &none    &kp F4  &kp F5  &kp F6    &kp F11  &none  &none
-&none  &none  &none  &none  &none  &none    &kp F1  &kp F2  &kp F3    &kp F12  &none  &none
-              /* &none  &none  &none  &none    &none   &none   &kp RALT  &none */
-              &kp A  &kp S  &kp D  &kp F  &kp G  &kp H  &kp J  &kp K  &none  &none  &none  &none
-            >;
-        };
-
-        rec_layer {
-            bindings = <
-&trans  &trans  &trans  &trans        &trans        &trans        &msc SCRL_LEFT  &msc SCRL_DOWN  &msc SCRL_UP  &msc SCRL_RIGHT  &trans  &trans
-&trans  &trans  &trans  &mkp MCLK     &mkp RCLK     &mkp LCLK     &mmv MOVE_LEFT  &mmv MOVE_DOWN  &mmv MOVE_UP  &mmv MOVE_RIGHT  &trans  &kp PG_UP
-&none   &trans  &trans  &kp C_VOL_DN  &kp C_VOL_UP  &kp C_MUTE    &kp LEFT_ARROW  &kp DOWN        &kp UP        &kp RIGHT        &trans  &kp PG_DN
-                /* &trans  &trans        &trans        &none         &trans          &trans          &trans        &trans */
-                &kp A  &kp S  &kp D  &kp F  &kp G  &kp H  &kp J  &kp K  &none  &none  &none  &none
-            >;
-
-            label = "REC";
-        };
-
-
-
     };
 };
 
@@ -392,8 +364,6 @@ CONFIG_ZMK_SPLIT_BLE=y
 ## arquivo: /home/segodimo/zmkpromicro/config/corne_right.overlay
 
 ```text
-
-
 /* 3️⃣ Configura UART e pinos normalmente */
 &pinctrl {
     uart0_default: uart0_default {
@@ -419,7 +389,6 @@ CONFIG_ZMK_SPLIT_BLE=y
     pinctrl-1 = <&uart0_sleep>;
     pinctrl-names = "default", "sleep";
 };
-
 
 ```
 
@@ -562,28 +531,6 @@ int uart_switch_simulate_right(uint8_t row, uint8_t col, bool pressed);
 ```
 
 
-## arquivo: /home/segodimo/zmkpromicro/config/include/zmk/events/mouse_split_event.h
-
-```c
-#pragma once
-
-#include <zephyr/kernel.h>
-#include <zmk/event_manager.h>
-
-struct zmk_mouse_split_event {
-    zmk_event_t header;
-    int8_t dx;
-    int8_t dy;
-    int8_t scroll_x;
-    int8_t scroll_y;
-    uint8_t buttons;
-};
-
-ZMK_EVENT_DECLARE(zmk_mouse_split_event);
-
-```
-
-
 ## arquivo: /home/segodimo/zmkpromicro/config/src/CMakeLists.txt
 
 ```text
@@ -592,10 +539,10 @@ zephyr_include_directories(${ZMK_CONFIG}/include)
 zephyr_include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../include)
 
 # # Fonte comum (sempre incluída)
-target_sources(app PRIVATE
-  ${CMAKE_CURRENT_LIST_DIR}/mouse_split_event.c
-  ${CMAKE_CURRENT_LIST_DIR}/led_debug.c
-)
+# target_sources(app PRIVATE
+#   ${CMAKE_CURRENT_LIST_DIR}/mouse_split_event.c
+#   ${CMAKE_CURRENT_LIST_DIR}/led_debug.c
+# )
 
 if(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
   # Central (lado esquerdo)
@@ -640,14 +587,17 @@ endif()
 
 LOG_MODULE_REGISTER(split_mouse_central, CONFIG_ZMK_LOG_LEVEL);
 
-/* UUIDs (iguais ao peripheral, versão 128-bit em uint64_t) */
-static struct bt_uuid_128 split_mouse_service_uuid =
-    BT_UUID_INIT_128(0xf0debc9a78563412ULL,
-                     0x12efcdab90785634ULL);
+// static struct bt_uuid_128 split_mouse_service_uuid =
+//     BT_UUID_INIT_128(0xf0, 0xde, 0xbc, 0x9a,
+//                      0x78, 0x56, 0x34, 0x12,
+//                      0x12, 0xef, 0xcd, 0xab,
+//                      0x90, 0x78, 0x56, 0x34);
 
 static struct bt_uuid_128 split_mouse_data_uuid =
-    BT_UUID_INIT_128(0x0fedcba987654321ULL,
-                     0x21fedcba98765432ULL);
+    BT_UUID_INIT_128(0x0f, 0xed, 0xcb, 0xa9,
+                     0x87, 0x65, 0x43, 0x21,
+                     0x21, 0xfe, 0xdc, 0xba,
+                     0x98, 0x76, 0x54, 0x32);
 
 /* Discovery + Subscribe params */
 static struct bt_gatt_discover_params discover_params;
@@ -775,10 +725,10 @@ SYS_INIT(split_mouse_central_init, APPLICATION, CONFIG_APPLICATION_INIT_PRIORITY
 #include <zmk/uart_move_mouse_right.h>
 
 #include <zmk/event_manager.h>
-#include <zmk/events/mouse_split_event.h>
+// #include <zmk/events/mouse_split_event.h>
 
 #include <zmk/split_mouse_service.h>
-#include <zmk/led_debug.h>
+// #include <zmk/led_debug.h>
 
 LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 
@@ -1229,18 +1179,6 @@ SYS_INIT(uart_left_receiver_sys_init, APPLICATION, CONFIG_APPLICATION_INIT_PRIOR
 ```
 
 
-## arquivo: /home/segodimo/zmkpromicro/config/src/mouse_split_event.c
-
-```c
-#include <zephyr/kernel.h>
-#include <zmk/event_manager.h>
-#include <zmk/events/mouse_split_event.h>
-
-ZMK_EVENT_IMPL(zmk_mouse_split_event);
-
-```
-
-
 ## arquivo: /home/segodimo/zmkpromicro/config/src/split_mouse_service.c
 
 ```c
@@ -1269,12 +1207,16 @@ LOG_MODULE_REGISTER(split_mouse_svc, CONFIG_ZMK_LOG_LEVEL);
                        0xfe,0x21,0x43,0x65,0x87,0xa9,0xcb,0xed,0x0f)
 
 static struct bt_uuid_128 split_mouse_service_uuid =
-    BT_UUID_INIT_128(0xf0debc9a78563412ULL,
-                     0x12efcdab90785634ULL);
+    BT_UUID_INIT_128(0xf0, 0xde, 0xbc, 0x9a,
+                     0x78, 0x56, 0x34, 0x12,
+                     0x12, 0xef, 0xcd, 0xab,
+                     0x90, 0x78, 0x56, 0x34);
 
 static struct bt_uuid_128 split_mouse_data_uuid =
-    BT_UUID_INIT_128(0x0fedcba987654321ULL,
-                     0x21fedcba98765432ULL);
+    BT_UUID_INIT_128(0x0f, 0xed, 0xcb, 0xa9,
+                     0x87, 0x65, 0x43, 0x21,
+                     0x21, 0xfe, 0xdc, 0xba,
+                     0x98, 0x76, 0x54, 0x32);
 
 /* O valor que vamos enviar (máximo 20 bytes para MTU de BLE) */
 static uint8_t split_mouse_value[20];
@@ -1460,36 +1402,93 @@ int uart_move_mouse_left(int8_t dx,
 ```
 
 
+## arquivo: /home/segodimo/zmkpromicro/boards/shields/corne_right/keymap_transform.dtsi
+
+```text
+/ {
+    keymap_transform {
+        compatible = "zmk,keymap-transform";
+
+        rows = <4>;
+        cols = <12>;
+
+        map = <
+            0   1   2   3   4   5   6   7   8   9  10  11
+            12  13  14  15  16  17  18  19  20  21  22  23
+            24  25  26  27  28  29  30  31  32  33  34  35
+            36  37  38  39  40  41  42  43  44  45  46  47
+        >;
+    };
+};
+
+```
+
+
+## arquivo: /home/segodimo/zmkpromicro/boards/shields/corne_right/corne_right.overlay
+
+```text
+#include "keymap_transform.dtsi"
+
+```
+
+
+## arquivo: /home/segodimo/zmkpromicro/boards/shields/corne_left/keymap_transform.dtsi
+
+```text
+/ {
+    keymap_transform {
+        compatible = "zmk,keymap-transform";
+
+        rows = <4>;
+        cols = <12>;
+
+        map = <
+            0   1   2   3   4   5   6   7   8   9  10  11
+            12  13  14  15  16  17  18  19  20  21  22  23
+            24  25  26  27  28  29  30  31  32  33  34  35
+            36  37  38  39  40  41  42  43  44  45  46  47
+        >;
+    };
+};
+
+```
+
+
+## arquivo: /home/segodimo/zmkpromicro/boards/shields/corne_left/corne_left.overlay
+
+```text
+#include "keymap_transform.dtsi"
+
+```
+
+
 ## arquivo: /home/segodimo/zmkpromicro/.git/index
 
 ```text
 ## arquivo: /home/segodimo/zmkpromicro/.git/index (latin-1)
 
 ```text
-DIRC      h$P*÷³h$P*÷³ :Û  ¤  è  è   uazYTó.«S;~8V` .github/workflows/build.yml       hÛ#¶íùèhÛ#¶íùè 6>  ¤  è  è  }D
-z2Ðùd@fÿñ÷ 	README.md h$P*÷³h$P*÷³ :Þ  ¤  è  è    æâ²ÑÖCK)®wZØÂäS boards/shields/.gitkeep   hí=¹ÓÛhí=¹ þ+ 6÷  ¤  è  è  ÀåºvÿÎÙ wÄV=è¸« 
-build.yaml        hÔOúç9hÔOúç9 :  ¤  è  è  Cc¯Ò&¬>£Áu­åËþOÐ?] config/corne.keymap       i ¸¾ìi ¸bá : d  ¤  è  è  6fÏJ6èMÛÕM*; ;)vð5 config/corne_left.conf    iÔÊøGiÔÊøG :}*  ¤  è  è  r ]èæLÄàõ«xG>m
-!y¼ config/corne_left.overlay i úª,¥Wi úª,¥W :|  ¤  è  è  îà¡ÌÁÉßîd"	 config/corne_right.conf   icÕÃúûicÕÃúû :}2  ¤  è  è  
-4G¨LÈËIjðÿ¨GØð config/corne_right.overlay        i ù¿i ù¿ ¯¡ F\  ¤  è  è  
-dV
-ÕK<Jû¯
-» -config/include/zmk/events/mouse_split_event.h     ißùì~ißùì~ @Å  ¤  è  è  #*p(ù
+DIRC      h$P*÷³h$P*÷³ :Û  ¤  è  è   uazYTó.«S;~8V` .github/workflows/build.yml       hÛ#¶íùèhÛ#¶íùè 6>  ¤  è  è  }D
+z2Ðùd@fÿñ÷ 	README.md h$P*÷³h$P*÷³ :Þ  ¤  è  è    æâ²ÑÖCK)®wZØÂäS boards/shields/.gitkeep   iü¤ú7^iü¤ú7^ F  ¤  è  è  X)['æTÏXOO¢)¤<Ô¹ *boards/shields/corne/keymap_transform.dtsi        hí=¹ÓÛhí=¹ þ+ 6÷  ¤  è  è  ÀåºvÿÎÙ wÄV=è¸« 
+build.yaml        i	nª	i	nw¸¢ :Ó  ¤  è  è  åçê8d"KÊÎKzä[ ÞÌ config/corne.keymap       i ¸¾ìi ¸bá : d  ¤  è  è  6fÏJ6èMÛÕM*; ;)vð5 config/corne_left.conf    iýL*M)iýL'¸MV : e  ¤  è  è  UsÀU²{:Y¼ã¿§çÙú© config/corne_left.overlay i úª,¥Wi úª,¥W :|  ¤  è  è  îà¡ÌÁÉßîd"	 config/corne_right.conf   iýH#»¿ØiýH#»¿Ø :ª  ¤  è  è  åÉÕgv<ÓY
+$çP3 config/corne_right.overlay        ißùì~ißùì~ @Å  ¤  è  è  #*p(ù
 è[ôd³ÓV config/include/zmk/led_debug.h    iyiy @Ñ  ¤  è  è  7jx=|F$(t¯¿ÏæO (config/include/zmk/split_mouse_service.h  höä+ÎNÙhöä+ÎNÙ @ò  ¤  è  è   ºû+?mÆD-èÇÏë>äbý¡_% )config/include/zmk/uart_move_mouse_left.h hæ¦ó
 hæ¦ÀA§ @Ò  ¤  è  è   ¹Ò¹Ò}æù3àù8öðAüLR *config/include/zmk/uart_move_mouse_right.h        hÖ ÌêùhÖ Ì¸' @lÐ  ¤  è  è   ®	KFæä;Û¦Å¬5%T %config/include/zmk/uart_switch_left.h     hÜP3ËýhÜP3Ëý @m  ¤  è  è   ¯zL²öÙËZ¹Þõ
-Æ`qØ!Ç &config/include/zmk/uart_switch_right.h    iÔ5«@;iÔ5xbÙ @Ì  ¤  è  è  ¢ûÉlXg-\2M¡ùù© config/src/CMakeLists.txt i×¹"îêi×¹ &Îª @Í  ¤  è  è  ÕÔð=:¨öÒY)²<Á;µ[Î config/src/led_debug.c    i ù¢ô	i ù¢ ^Ëp @¿  ¤  è  è   SýfçïÕpyfÛ¼X config/src/mouse_split_event.c    iü9]âÿiü6È¤Ø @ä  ¤  è  è  (noKéÓí@Ùèê3$½[HÎ  config/src/split_mouse_central.c  i,õÄfi,õ_æý @î  ¤  è  è  wÃ	¼=§À[ýtÅ¡¥hf P  config/src/split_mouse_service.c  i ®ôØ~i ®ô	Z @o  ¤  è  è  '|ñ4ÚªÊ&ýQÂÕ'¼¬O !config/src/uart_move_mouse_left.c i,ø (i,ø ( @é  ¤  è  è  þõ$â8À«Â<ðÀ*¼FJÀè "config/src/uart_move_mouse_right.c        hæE¶#hæØ¾ @Ô  ¤  è  è  þÈ°Lª©ëI¿>Áyù÷l² config/src/uart_receiver_left.c   hèÊ^.r2ÂhèÊ^.r2Â @Ð  ¤  è  è  ±o§g¨é¨`Ja*+©üê!  config/src/uart_receiver_right.c  iü0SÂÁiü0SÂÁ @ç  ¤  è  è   Mi£yöRtçüdY config/src/uart_switch_left.c     i*?i'ÿ ¿ @m~  ¤  è  è  w(óÀU¦¹¨:ëîzÜÎéPD¨µ config/src/uart_switch_right.c    h89«(h89xK$ :  ¤  è  è  ÆÁ4«Øh&ævÁ­õó6  config/west.yml   h v:>h v:> :  ¤  è  è   %Â³V#jÌÜS.Ë	\?¬ zephyr/module.yml TREE  R 29 4
-%yË×Qx¾"$ì»*±boards 1 1
-UÉ¶gF¤H3{:Üm6ÑÅshields 1 0
-ÕdÐ¼=ÙhÅ^7Ìm[^config 24 2
-ºÉå¯#QæN¡TM@å>«src 11 0
-¤Së©9Öþ§Ê$y$}÷Nâ2include 7 1
-ÌãVÚ÷{å£xëCÅ$²B¼zmk 7 1
-ê]¸
-U¸¹:êk½Ò¸4¶òùevents 1 0
-fÈÒÃÿJROâàzephyr 1 0
+Æ`qØ!Ç &config/include/zmk/uart_switch_right.h    i	SI[i	S~ @Ì  ¤  è  è  ªolÁ5>%`¸9x@â]ãjÎ config/src/CMakeLists.txt i×¹"îêi×¹ &Îª @Í  ¤  è  è  ÕÔð=:¨öÒY)²<Á;µ[Î config/src/led_debug.c    iJm]¤´iJm*Ç6 @ç  ¤  è  è  ¯î:Çº:IkRÃªW  config/src/split_mouse_central.c  iP6ÞiP6ê¸ @î  ¤  è  è  Ëý¸¸[±,Y/ðq"¼¹b  config/src/split_mouse_service.c  i ®ôØ~i ®ô	Z @o  ¤  è  è  '|ñ4ÚªÊ&ýQÂÕ'¼¬O !config/src/uart_move_mouse_left.c iMãÅiMãZç @m~  ¤  è  è  oVg§Ög|P¡*«ÄÌ "config/src/uart_move_mouse_right.c        hæE¶#hæØ¾ @Ô  ¤  è  è  þÈ°Lª©ëI¿>Áyù÷l² config/src/uart_receiver_left.c   hèÊ^.r2ÂhèÊ^.r2Â @Ð  ¤  è  è  ±o§g¨é¨`Ja*+©üê!  config/src/uart_receiver_right.c  iEÞ#5þiEÞ#fX @¼  ¤  è  è   Mi£yöRtçüdY config/src/uart_switch_left.c     iF2ciF1¦¨¡ @ä  ¤  è  è  w(óÀU¦¹¨:ëîzÜÎéPD¨µ config/src/uart_switch_right.c    h89«(h89xK$ :  ¤  è  è  ÆÁ4«Øh&ævÁ­õó6  config/west.yml   h v:>h v:> :  ¤  è  è   %Â³V#jÌÜS.Ë	\?¬ zephyr/module.yml TREE  Q 28 4
+éEÕ4Ëeé]Ù´ÆÎ=´¿boards 2 1
+N¤´!$Ù^ZÏ
+ñþöshields 2 1
+Ù\8aÇþºSöãÑè*W>]®õcorne 1 0
+p,Á'Jxøßµ<î8¹¿config 22 2
+ÿ(ZQ
+ 2dýHsrc 10 0
+üFfoÛßla%+I÷b¨Kinclude 6 1
+Kêeª[ ØJ>ÙÕ°ÊÔ;zmk 6 0
+ªSiÌÌeWñ¦µÀÚF£zephyr 1 0
 ­ºòµ´-ÔykæqÜ#*H	.github 1 1
 ¦¼73a!êµÐ¡±[v\C;¹workflows 1 0
 OæùE5HÎ/HoE
-#åÛûöýWýÃÚö/ÑÚOìªé7
+#åÛû}Ä%^z´Ím[èQõº¾êj
 ```
 
 
@@ -1504,7 +1503,7 @@ OæùE5HÎ/HoE
 ## arquivo: /home/segodimo/zmkpromicro/.git/COMMIT_EDITMSG
 
 ```text
-mouse l e r funcionando primeira vez
+test eliminate warnings
 
 ```
 
@@ -1941,6 +1940,23 @@ xQËnÓ@eí¯8Ô]´R/@bY­äJ°±nÆ7aÇcfÆ´ê¢X Øæüc\
 wG|¼ WÚ3âÖ|#ÝÈñhÉt£êNÛªªtÝ¢ÒbÄûõìô^ñ4¿Jß>DÎªsAeÔø½ßþ t¦L³Ô+cÂs4wõåáO$àú¨ölæ©!%ÉEØòÝ(Â·ý7ï
 z©¢Dös§·{êÚ6zÿÔÊÐÎMôðX¾ÐüåLB
 ËH²Ð¿uÿï§÷q6¾NÊø}Q$ù¼|æãâC9IHTÊCþr_Ý>¬Ýê¼l/ÓQ­5'ÏåºMô*ÇùdYd6ïåax§Ù»ôf<¸à7)ß
+```
+
+
+## arquivo: /home/segodimo/zmkpromicro/.git/objects/87/80fdb881b85bb12c592ff071229b028dbcb962
+
+```text
+## arquivo: /home/segodimo/zmkpromicro/.git/objects/87/80fdb881b85bb12c592ff071229b028dbcb962 (latin-1)
+
+```text
+xVínÛFìo>Å
+ÉaLZ¶c«®(í%C.Ò4 äÉ:â)äQµÓæaþÐ×Ðuî(©e9!ì1ÉÛÛÝÙ[:LdHµÚñÁ/D%EÌéçÏ|:~È;¥<Ù¿±¶y{+Ò[\WSëí­aRp%¥;«»']¬V[¦Ôc_;'&BYä<Èy6×VCktað8yX¦V»{\u[Ã¶ô¼K¿?ðz
+O³È¦f·sá_¿]½´}Û»ñÚÕ3Ërö,Ú£áÐoÑAíôU(EE®ä¦,c$ÉðÅ&GÞr#£ù¿4¨.KÏXfÓåøMOÇFâ^.äKSÂbïc³c½ùH¤Þ;è_·ý²ö½ ïõnü¦Ü4Úô»E¸V`xf·åUÜûíÞ_NNuÀB@ÛÍÚÁ£Ë½ç#Ø<éa! 1Ü*l«1h|ií ¯§' ·u°êi>b©Á@ÓxÊÓ"+îLsÅ(WY)
+UP"P¶R½ÍÖ2t¾Qa¿`ú\áQ 
+¬3Ûoñ4Õ B »ËK0@­l1$Ô.ýëÆý¾Tc¦Ø7òt
+ÔP³	
+úNêÐfEfu,Á µÊFð]Æuá©à±©àa­< Ô¥KdF
+»Ì§3Á2ªLæß¤KáâyyÞ®CÂ±|Ûöªú¬-*UTj£à·àjîG3	¨¯g>ëÁ@oÅÁÓ·«#Ùò.ü·5]LNKÛëÕè½_î©üoO5#IÕ¶ÌFgcSDäèßèL(N/)J4ÝsËÍ_½Fc³ÎonX	¾¯[4eÿï®×Ääl´è¯µx×éü÷ßåãÚë]ÏZwí¶M%®WÅÈ°,ÇV³Y)MoVAÖw¿öüWµírQ¤ó¯ó$Ec6a1£)O$,Ó_LÜUÅ4c£+ÊªW"æm³§+k¯V­?,bD<ÒÊÅg.GíQ¦V¥ÒT>ãªÈRzåùLø3ãâKÙ	>¦Ûûm*ë èTíM³hóRÂH§<RÜm£ÓË":×óPxE~eq7ÛsíÃ"Ë?Ô>>«äF½L6­³sHWEG='w=¾ãúÒ_ï0é]0E,üGRÁ8r^Ñ¢BeÑõÅúª
 ```
 
 
@@ -2573,6 +2589,20 @@ x+)JMU02°`01 ½ôÌÒ$e{ÌÅ_m½°PtctY3õNC3 WG_W½Ü
 ```
 
 
+## arquivo: /home/segodimo/zmkpromicro/.git/objects/aa/195369cccc9a9a14651a8d57f1a6b5c0da46a3
+
+```text
+## arquivo: /home/segodimo/zmkpromicro/.git/objects/aa/195369cccc9a9a14651a8d57f1a6b5c0da46a3 (latin-1)
+
+```text
+x+)JMU0²0b040031QÈIMOIM*M×Ë`PîÒ/àÓøÉû=úK
+sÓf¦ËaPeÅ9%ñ¹ù¥Å©ñÅ©EeÉ©@
+BYÜ¶5n*
+%ÍLë÷7IæÕPXR_
+ÕVÔñ[{¶}î1©º/m÷$éïÂxU:2Ó3@Z.í¼Tûìgw½ñnîß>8þñ	BÖR\Yµ`g·Û³9Oê­o/;:yÂSÕ,ªaWùl1çÛÍÓQ;ïu~å=PxCñ8 3Auæ
+```
+
+
 ## arquivo: /home/segodimo/zmkpromicro/.git/objects/aa/632620062f65a9b5652c27fa69399e5d971d46
 
 ```text
@@ -2832,6 +2862,16 @@ x­½nÂ0;û)®C²ÀÀÒ¥¡?
 ```
 
 
+## arquivo: /home/segodimo/zmkpromicro/.git/objects/a8/29e7d83d2d84ca26bdc11593d0cf77d4abf86a
+
+```text
+## arquivo: /home/segodimo/zmkpromicro/.git/objects/a8/29e7d83d2d84ca26bdc11593d0cf77d4abf86a (latin-1)
+
+```text
+xAnÄ sæóÀ0ØH«(/Ø{ã¡í -&Â¬òýø¹TªÒVk4ùémtgö!Iuu)2grZFÏkX7ó#Ç Eç-9B¼`Vvu[Ì,EØ+/×øn¾Ú«ÓC*è~bo¹Ôö¹W)ÏwmõÜ§+½Ø@7ë­5½þþos¥CèWúQý4ãKo
+```
+
+
 ## arquivo: /home/segodimo/zmkpromicro/.git/objects/54/aa1b5d98db7e15f6d772efec20ef31d0d1957b
 
 ```text
@@ -2915,6 +2955,42 @@ x+)JMU022a040031QHÎ/ÊKÕKÎÏKcøóLaó_6Ëé·!ÞëøÂ×PTe§Væ&
 ```
 
 
+## arquivo: /home/segodimo/zmkpromicro/.git/objects/e5/e7ea1d38641422074bcace034b7ae45b20decc
+
+```text
+## arquivo: /home/segodimo/zmkpromicro/.git/objects/e5/e7ea1d38641422074bcace034b7ae45b20decc (latin-1)
+
+```text
+x­koHð>ûW¬ZÉJªRÛiÚ^^$qìØ.à$×/ãMÉ5­î¿ßÌÎ.çáF-²¼;ïçÎÂ2Nlÿã?z¯:ì3Òì..¯J¶î²½þ^yW}µOy´¼)Ó¼ VävçÃsÍB\¬xRFÏ?1{â½×é¼\ñ(
+üùl2õ&ÓchôåùöìÔôOu
+öú}Æz=ö¾ßZÄ5Kì½cBbÐ#QÆ7+Î>GIvSö²<
+yQoVe6¾óìê.ï­Jm%«(¹,z$#þ5~1haºâÅ«¦Ü_·ÑCª¾¯¯{Ë²-¹I¿æwº79Ò¢ØÂ¥d;¹|ÚX~¹DN§»^ßú"F?'<g?]§ýÅ>w¿GÿíÎ/Â ¦=68<`ÿ "|"ÌÓ8~X
+ûÑê± 9ØÊ(M4þ-KÈ>ú&Å-Ñ¬e´æZjëàVd¯´uïú}ÅýóúW<î$KÍ@:é_h¦°Ö·Ò'lõüÃsÉs-ãy*'ï:h«ÓK¯ê'iÊâ¿âET|j
+dÓu)[ÆðZîµR¦A¦­$ä/dÇ'<Fî¹îSolºwå¥<$©¼µ¨iï^gÌ2GßPxøðÎäxÜ&Ôz 	äcË<¯yùIm~cGnÞ/Gèx**KßOææn#)Áp
+ÿæ@Ìßc¨00û!`ob]`6­lk Ä~ÉbÂnâÒ3c¥*1ºÙ7lÓ5Û/´Ñb
+Ä;ðHCþGÁÈ³ ÂáøÚÌQGîÜ¦-w<¥ÓiqiV¼#Bý!ûXÁüM<'
++â-µqMüB7Ó!Ûç "¿ÒrNÈÀâ¨¡Ù§
+FÀB3ÛèAüp&¹8(ÇOFp?ö ¥[(·NaÒ³n\²}¸ÕuCà·ñ¤bqÄÖ^uj.Cé¿<ÿÙ.ñtHC7;lNöéø[Ð!©**f¤g6$¹çð¢tu·Sê¡¢ÛÊdÊ©Ðéy¨îï[ákJÓÃýJD¨T¸xÂ
+ô
+ÎÎÀÍF'kHZ@ÈIJú0÷Ë¾:ePö,K,
+¯eD%×"\«a?I®I2:U¶'Óûx_
+FX%¦­´PÚk*h¥v'Ô=i c«?jôvÍ¨à?Û®p?@ÇîBrdgl[ëX#qdEUDj(Åsk!§ÓÜ1¦òtç2 `vhZ¦gîÖ-·YWô¦SQl¡ÖõtÁb;Ö]9N¥'s89áT¡Ç~jþºæ|:+ Ñ£ïaë­âÑíù~R«ÆP°0#-9¦°Ú Ñö9MÃØEò`Ï¬¢"ÃÒ$X·Ñtãboßr¬l_(#|LD±Â»UM)T×imÒ&$5ìËfÐ
+Nî8->>_·7#¼}ÐNJ7¢ºrïirTüõFngóüWg¥;çálhË1'eVÄßSL|Ïª±¯`5öLc_Ajì·¨²Q­kÈªmXô®ÒEÈiAV
+ýÚ5¤üâ>U½P]¹:³Ä%U'H) {áûiâ3Cw|I|ÎÅÓvi8}ô +×¬õ ì6çfMÜ2mÖ«¯1Ç43 ßvðûCó
+```
+
+
+## arquivo: /home/segodimo/zmkpromicro/.git/objects/e5/8802c9d59b67769b3cd3590a249503e70b5033
+
+```text
+## arquivo: /home/segodimo/zmkpromicro/.git/objects/e5/8802c9d59b67769b3cd3590a249503e70b5033 (latin-1)
+
+```text
+x½KNÃ0Yç£ U´ÊGxTBV¡P$vÓLKTÇ¶üPU!VCp	ÎÃ¸v¢P±Æ±Ç=¿ÿqAyãÃñN<¯·Ï×w¸äl^-$ðpMAT+`\ÖÖÈ4Â(ö6;ÓÂ³v"u8'êßËqØBr#Ò^Â%BªàÎn³ëüîþêfÏÎ§$ )áÐþØÂ³?NNðvjCO¤¢b#±Yôôü³@÷ÊW¡à+!2RPüK¾{Á ñ¸Óª4ÑÆæó%YûíÒö'T±t¦éÑ~tt
+·Ó^¶iØöÆ ­}FjljwýöðÎêpJwí× ¦Dð£(.8¥ÕSÔÆã%®k"r-	Ssû±¢R«Ê÷¾Ó´A
+```
+
+
 ## arquivo: /home/segodimo/zmkpromicro/.git/objects/7f/010af727ebe5e3ab749e212891bdfe6d5d9bfd
 
 ```text
@@ -2927,6 +3003,24 @@ $i¶Ö_Ú2¤ì5ú^Hop
 kÐós´]È´¤	¶ÊõZd¢|×ÈÔDUP©
 Öj¶Ú aó\®RÌÇ ¾In¨7®£ø4`5l9p¥!Y£]Éwr¹\GÒG(A¢À>äyGéå%äúÿè|ß¨¼öw¸n¢j§ 3¿Ô
 öªé?.8SmfÌ\h}ôG 
+```
+
+
+## arquivo: /home/segodimo/zmkpromicro/.git/objects/7f/ee3ac7ba1e163a499a9f6b989352c390aa9757
+
+```text
+## arquivo: /home/segodimo/zmkpromicro/.git/objects/7f/ee3ac7ba1e163a499a9f6b989352c390aa9757 (latin-1)
+
+```text
+x­WÍnÛFîYO1NÑReëÇ¿£ ¬¸DÉåiäre¦H\Rzès=ôAübYr©E+A[Vwfvfv¾ov?tà¨}Úúî{/`~ârxõ/f«¨qÇ£û³×­)?¼½õÛþÎÕÇ4³­êø	a(fü­ÔD>Û¸µø@.×hæìü®ás×r¹ýÄ©Ä5ï9IÌ-Oå:ÁèÒz?º¸ô­qÿÒ¼ôÇF¼ð=&AÆÙ~z£á[óÒúåý;týýAõ¼RA/baáO0°Äs­VûtK1î=Æå$tH7ëæÆ¼°Ì¡9!£¹6ëÐ\ºFÑøÂ®+y©¤ÍåéÉÐxxDc«½KgQOid.¶³KþôgsüÛÂvma«¸)]áÒæH^Ô+zù{syvJ'Ç4ÒØn=)S(0©te*LenMÁ,Ë<Ê<Ë<¶å×àÂO´á:qbyÙójíTP[n¦eeÿçO¨Åj¥Wü@UWíûÍî aÂ®À8ãÒ±Ú.¸!,xä-fK¸ª9x8³ÄF}¦6,æëB&¬AÆ'²¦gÞ×ª2EÏ¡¦â­áÂ±ûÐs¡FuTr¼uû<¨V~[éMÁØ£iøò¾Ã+8©B:G>E\$Q@H»ìN&·ÍsxÓ?*ò']Nå¦æ$Sè Æ!Lú0ã·)íS^iü@_`¯e×lÿ+/²­qdé·*Yo}J}Vb«T¨(ÖÞÃ
+}ßBáMk¥b¸ô¦ØQ&¦rã$BàÞùtÓ2e4k¸Ë:¸«:(ò7ü"QHDâïwXýB`[2Ã'M%±{3q#q.8¢ÕáVk!LZòbbé{ÏbÜ¯ !Çê4	ØAV]5¿
+d©`#÷RQQú»ZA/ÄÒ#¶dZêq?Æ3­½µÞ
+¦^àÅ3î¼Ó0	Üê3MÎç1FwÀ{y852¨j²e{z=]åàÌáµ§+/2Ûû¯©ÛÖá¹æ¨7¬êáS`æðm!°BÈxê0³×çæòå³:P"÷_§ßT9RªJ=v]´$U¤Â³ia¤{3ñz;¶´ïm<[I]ÒVÜÖëõ¬áhb¾ýø5U+m#*ìn­s¢¹túÇîà¦¯ÖÛò1#Oô$¡¹vÁ:¸Ó\Í¶n|vBõ¨ºd7AF$ä)2$D(JXÝÈ
+K¦Ði»JNÌõ
+ÊNnÛDgÚsY¹i½ËAÀýkÝéIkxÂ¤úZ[Úþ,Lö6L¦ÜI!÷Z;b\,åé¡þ¯X%7Ê ½î¸HÒÙÑQvv½òñ;Ós)å]En×ÏtVxàË¹¦0E#Wø.IüOg¤µXÔ§¡ÔXÎEI¦\;
+:<84­rQ¸|¡rèZ¦ù¤âÂ¼î>Ð	è§î¸ÛÃ³ÞyÌ^eLEýÏryL;í~þàýh<î?þñøûÆýîà¥¬YáÄÀ·çvâE¦áñïÇ¿BèA®»OðdMV9öo·´Ò#!ey©Ò@Äl£³uqDðÄY/p=G0àKræÍ ¯pJ GS[¨ßU¦ä"æÒýefÌoñ¼Éc"ËNê1ò´vìX÷rÒÇ7ù¿¹t'£ú.SP(®ü{½ò;Äm ;áüñO<íx3 oàÚ²Dz0Ù
+×Â.B¤Ê"CæÉhxd<ßt1:Ã{SÅõÇky-»FËEêÐ½º½îÄ
+óµö-½_ÍÑØ|Ä5þãr
 ```
 
 
@@ -2954,6 +3048,17 @@ x+)JMU0³4b040031QpöMÌNõÉ,.)Ö+©(aèv[p3ó«RÞöÎÍ)ëkz,OAU¦¤&�
 ú" z½E}VÍñyvÚqï»×jO¡êsóKSãsNIÍK©Ý§ãª¡¤Íïxò9CzÛ{Û×PÔäd@\T.Ï~sÙûgô'Tý_÷­ÁzÎ,¨rBE@µgrÞìYp=­I1¡ôB÷I3ÕÔn²ÐØäU9£3ºuG«Ó°sSNl[Z\u7På	¾¿WÕ>±NÓQÜÖõñó´·áO1U¼ÂúTÄHrÓÊªúI«Dï>ÖuÏ
 ª²4±dfY*ÌàÔ´ lm&·Vê«öwFà¡«ê{ÖøãÐQÒrZp¢MãëßêÎøÅ×¨¬¬¥(595³,µ(>bØ¿|Vµ®|=Ãsÿd»?¿çlÂªfAþòô3§½\Ðé%(¯¥½òÏ+Ed
 Åå%ÉpãY}3W~kÔXòüÏÆ)Ó±¨^®ñ¹ç@è²+¬^¿«ºsîeË­ BÊ
+```
+
+
+## arquivo: /home/segodimo/zmkpromicro/.git/objects/15/4e839aa4b48a219524d95e5acf190af1fef602
+
+```text
+## arquivo: /home/segodimo/zmkpromicro/.git/objects/15/4e839aa4b48a219524d95e5acf190af1fef602 (latin-1)
+
+```text
+x+)JMU06a01 âÌÔb1Çÿõï
+þöøâ­ðùv±ë¾ B­W
 ```
 
 
@@ -3557,6 +3662,18 @@ x+)JMU02°`01 ½ôÌÒ$e{ÌÅ_m½°PtctY3õNC3 WG_W½Ü
 ```
 
 
+## arquivo: /home/segodimo/zmkpromicro/.git/objects/96/17739908c055b2197b3a59bce3bfa7e7d9faa9
+
+```text
+## arquivo: /home/segodimo/zmkpromicro/.git/objects/96/17739908c055b2197b3a59bce3bfa7e7d9faa9 (latin-1)
+
+```text
+x½ËJÄ0]ÏS½¤ÂxwÀ®D¤à®¤Í-&!A|w´#±¸6|IþóÔ\Öhyy~4W­h¬æèsúá¨¶¤b°¡Û«ßËñØ»NQÂ'nÐ-ºy*ªçûÇ×»r]­ßDt¶X%á	Æc~±X]ÿà_Ã´HÃÔAbXDzþY ¯Ë]ªät
+Öþï+G­ÆRë¼iXnég§5À¼¡E±<%d4dlXJüÎpÙ¡a¢`Ðd_ÐÂÛc¿qpàz^éqÿ5¸cpåµ¤Ü|´ÀûØH- ßÂ¾£ª²
+³ºË5-}{¢/
+```
+
+
 ## arquivo: /home/segodimo/zmkpromicro/.git/objects/96/8b52716240738d962b769c8622f2f58c601a86
 
 ```text
@@ -3868,6 +3985,26 @@ x+)JMU02°`01 ½ôÌÒ$e{ÌÅ_m½°PtctY3õNC3 WG_W½Ü
 ```
 
 
+## arquivo: /home/segodimo/zmkpromicro/.git/objects/ff/281c5a1e510a0f1e008c01321e928564fd481d
+
+```text
+## arquivo: /home/segodimo/zmkpromicro/.git/objects/ff/281c5a1e510a0f1e008c01321e928564fd481d (latin-1)
+
+```text
+x+)JMU062`040031QHÎ/ÊKÕËN­ÌM,`xúü¬E»÷©sÌÞUO¢îAVV¢ÆvÞËìïí«¾"ZÖÓ¬å5Ë>b*Í/K-ÊI¬d&^<ã@è&Éj«È=÷/~ó×JÕEéPßµ<²ðÓÁ÷g¿K Ä9uµ0£v0¼:;½l¶ÍåH.©ÌÏ¹M@!3/9§4%AÄCêxêªh^vR7¯n8uÅ¢¢¸(á[à¬üÛ÷sUµù<¿'­ðZWZ\¢WÃÐqì Ióê72øÕ\ûõ3 #
+```
+
+
+## arquivo: /home/segodimo/zmkpromicro/.git/objects/d9/5c3861c7fe8fba53f6e3d1e82a579f3e5daef5
+
+```text
+## arquivo: /home/segodimo/zmkpromicro/.git/objects/d9/5c3861c7fe8fba53f6e3d1e82a579f3e5daef5 (latin-1)
+
+```text
+x+)JMU0³`040031QÐKÏ,ÉNM-`x6÷ÑìM¯9{wk®+ºqèIOðD PHÎ/ÊKe*Ða<¨>¯Ã«âÇý­6ïú'XìÜ ]vÜ
+```
+
+
 ## arquivo: /home/segodimo/zmkpromicro/.git/objects/d9/a77a4662976a002213db4af0a93537a1e8e112
 
 ```text
@@ -4061,6 +4198,20 @@ MôÚ U£bí¶»ÈMX8qf;üñH{½Ø´¸iHÖ>>þüù;?s1�
 xÎÁÂ0FaÎ®bXäØ#!´ìã$þ
 1FÙÕ¸>éIßTK±ãC[BÓQ$Ä!jö¾C|X$áÎ1O]ñhÔ;UçsÔÁñ(°Î§­ºü®gF_íVWºÔ×JZ@§
 ×æR¯Eçå8Õr¦.ôÄzfú±ÎZ³×Ý×ðýiFÝ@ïr'üïÒ².Ëªù æJ
+```
+
+
+## arquivo: /home/segodimo/zmkpromicro/.git/objects/fc/4666119a6f88dbdf6c61252b0e1049f762a84b
+
+```text
+## arquivo: /home/segodimo/zmkpromicro/.git/objects/fc/4666119a6f88dbdf6c61252b0e1049f762a84b (latin-1)
+
+```text
+x+)JMU017`040031QpöMÌNõÉ,.)Ö+©(aÈÏ9ØiÊn§°Ã²ÂáQ,óÇYç *sRSâSRJÓõ®|°µZñmâ¥lZoà)+.ÈÉ,ÏÍ/-NONÍ+)JÌj¨gu|ç¬ùÙ3&°jz8Ô\d
+Å©EeÉ©@
+í
+w4îÞ¨©ÿ¡Pi6SïIP
+¥E ÊR¡¶ä¤¦ uÔ|dk3¹µêTß\µ¿3]Uß³Æ¢Ìôü0±ôå²×f¤×ðIMîX¨µúÈd-E©É©e©EñP+ÄþØà³ªuåëû'Û¬üù=gVõp§¯9íåN/ÑDy-í^)"k(.Ï,IÎÏê¹¸ò[û Æçf4ÎHE5ÌðrÏ=Bí\aõú]Õs/\Vl ¨ðÃÙ
 ```
 
 
@@ -4563,6 +4714,17 @@ xmAK1=÷W²Ã"¨xPöæÑ{É´§Ð¦¥MÅ*þw;è!äå½|
 ```
 
 
+## arquivo: /home/segodimo/zmkpromicro/.git/objects/12/702c01c1279e884a78f8dfb53cee8f9038b9bf
+
+```text
+## arquivo: /home/segodimo/zmkpromicro/.git/objects/12/702c01c1279e884a78f8dfb53cee8f9038b9bf (latin-1)
+
+```text
+x+)JMU0±d040031QÈN­ÌM,/)JÌ+NË/ÊÕK))ÎdÐVr>b¢ÿ"Í%sl®ðí &
+,
+```
+
+
 ## arquivo: /home/segodimo/zmkpromicro/.git/objects/12/561e3c001662dd416a2608a9db27c743cfaaab
 
 ```text
@@ -4810,6 +4972,16 @@ OT¶ùN+¯î×ÊBs&½À7T·b¨Äù×J·Ç~²QCvÌ×Ê)×,p
 kçõFÅ<ÌQÆå0ªn`¦Ü½Õmm·£=´wBP»]c³#¨·Ö7åÞÊsýt>/LhÒÞ¤!^¤[X&0SÌ?RE^@Z,d
 Jtáÿ`[ ,ò§pBÔJïX~g¤í
 &Xý~ÿ=9½®ÿuOSV9YàôÎè=Zø ÝmÂ
+```
+
+
+## arquivo: /home/segodimo/zmkpromicro/.git/objects/14/4b081aea1765aa5b00d84a3e1ad9d5b0cad43b
+
+```text
+## arquivo: /home/segodimo/zmkpromicro/.git/objects/14/4b081aea1765aa5b00d84a3e1ad9d5b0cad43b (latin-1)
+
+```text
+x+)JMU06`01 ªÜlUÁgÎÌ%*ÕþqÙÖ·Ü ò+
 ```
 
 
@@ -5090,6 +5262,19 @@ x+)JMU0´4`040031QHÎ/ÊKÕKÎÏKcXË¾o­Ç÷o¿mJ
 
 ```text
 x+)JMU0´4a040031Q(M,*ÏÍ/K¥Å©ñ9©i%zÉ_?øX>ºÞleónvíi9á|8te¦g´´uíÐü^¯ÝµfËöw[/?*°CÖR\Y³`g·Û³9Oê­o/;:yÂSÕ,ªaWùl1çÛÍÓQ;ïu~å=PxCñ8 ¯÷T
+```
+
+
+## arquivo: /home/segodimo/zmkpromicro/.git/objects/58/295b27e654cf58914f864fa229a49c3cd40eb9
+
+```text
+## arquivo: /home/segodimo/zmkpromicro/.git/objects/58/295b27e654cf58914f864fa229a49c3cd40eb9 (latin-1)
+
+```text
+xUÐÛ
+@á®}¡ë¢ö¡,¬^%4
+"mÂ¨èÝû­Pf]¸]ß¦ªcl&áÓþÑí­-Ï×Clÿ¸û´Í¥¼«zÖaølN£_yÊÃ"û.éÚm¼_é­|S¤Ù.Öß(Ã4å]1½wzJ(1âdFæ$'²¤BO¤'"D @¢¬Vzj=ª(D!
+QAbcµÑ³YÄ 1Câ8ÄYíô<Oô7ï"ã| 6L
 ```
 
 
@@ -5889,6 +6074,21 @@ Jtá©MÕE$ ü)5¡ÒÉ	ßª]{C¥	ÖhÔwzÖÔLè
 ```
 
 
+## arquivo: /home/segodimo/zmkpromicro/.git/objects/6f/6cc18935073e2560b8397840e25d039ce36ace
+
+```text
+## arquivo: /home/segodimo/zmkpromicro/.git/objects/6f/6cc18935073e2560b8397840e25d039ce36ace (latin-1)
+
+```text
+x­S»n0íÌWX","uéQR¡HÒ¡EðM°d0µ
+}Dù¤NýüXM 
+](H}ÏËÞ1¾CãñÃý¼4b9E
+PçoA¹DP!!OÈâi	"KT¤¸  ­Áñe>ÃÎr1õN£a·3ùdæbgîb×Ëmà¸øÑN£áðva"Myª E<ÉdIH2è"rþ"¡­!*PXò\DÚNehxÏ«ùÞzSI%<eÆ¨ÂP@ªÑØåÒ6º·ªà¸ì`½ò½
+¾¦sß6àè»EÈÅBÂÈ×áåYwm½Å{
+õ@Á¾4ß"ß¨â«¦:©TuV¨Ê];3[âÔT*HAt (êjK§!=)àõëP¡Ì®ÆtÅ¶LU-»A³nãªÿÜVÐCÜoÜÆºÝXÍy%FÐ¡ËÆZ]Æm¨÷Ëýºõèßf?V-
+```
+
+
 ## arquivo: /home/segodimo/zmkpromicro/.git/objects/6f/a32f2683f005fd38da3206ebec9f265b45f6ea
 
 ```text
@@ -5901,6 +6101,22 @@ x­»NÃ0ýÒ!YZ1v¬B¢¦¥)åÆ§EÛ)ÐªÄÄ#ðb8
 DiªD1ÍÀrâ{»smÖ¾`å\ÃL|Çma2-ií2A= (÷:º¨
 *µÁ:BÃÀ^$lÖÏ£T!sÀ Iÿzâ:ûjUò$\iÈ@6TV×W½¿iPºr$
 ìÚø$Ïch¥ëpþ©OòCÜSyã¯_¢¡ÿ °ò¡ 3°ôªºE2ú2f³> pG[
+```
+
+
+## arquivo: /home/segodimo/zmkpromicro/.git/objects/6f/561667a71dd698677c0e1a938b50a12aabc4cc
+
+```text
+## arquivo: /home/segodimo/zmkpromicro/.git/objects/6f/561667a71dd698677c0e1a938b50a12aabc4cc (latin-1)
+
+```text
+xSÑjÛ0Ý³¿âÒ1°!ÌnJi×ÁÖxaÌ]`°=l!Û7°,Y
+uJÿ}c%õÆæY¾çèèËuÎeçÉÅÕLÜoöØn{3Ñ}X_oßÏð@>qYULT±}Ïâ%îXÊ6ul¨Ò¤;´é(Vmõw(,
+Z¡rxÃÄ U]|éZÎ4J3btd¢òÖIr,I¹2ÙzEî×Ë¯YJé]öîKîzwëÏ>®È÷ûOÄQ²ô[E7AÀÙx¡E®òaÀOêÿÔJrNþú×«Íxwn´¢à1ºxË÷«ðl6Öµ
+tûª²wëhi¨x{®>jÚíÙïÁl7ìÑÅñàqgkÞíªë÷×ÒKZþ¸ü	·Ö£oeò\´ÃMÛ}*Nzv,z¿3">Ö	½
+·?§&¤f>½ÚTlrã¿#7)Î¸¾u[0)(¿&JVP)°ë$²ÓPÐXp
+Z#XEaNØ±ÎPy7¶9g¢&-ÕÚþ´áù.Bmä&x
+~¦G:
 ```
 
 
@@ -6332,6 +6548,18 @@ xSKnÛ0íZ§&¥PüKÒ°
 ```
 
 
+## arquivo: /home/segodimo/zmkpromicro/.git/objects/e9/9e45d5349a97cb1965e95d14d9b4c6ce3db4bf
+
+```text
+## arquivo: /home/segodimo/zmkpromicro/.git/objects/e9/9e45d5349a97cb1965e95d14d9b4c6ce3db4bf (latin-1)
+
+```text
+x+)JMU02°`01 ½ôÌÒ$e{ÌÅ_m½°PtctY3õNC3 WG_W½ÜvÆ¹.-Ó¸ª.üLíöÿã÷ùcòRDýg-ÙÒ¥8Uåf\ÔyI®ÿ¾1AMI*ÍÌIÑ«LÌÍa8ðtWÙÿs7DÊHÙ¾Ø!×½ZbLr~^Zf:Ã
+(¹@.~9F#¹I­)=d!
+ªR2*Öîú´uÂºW*³ºÞQÖòà QÛ
+```
+
+
 ## arquivo: /home/segodimo/zmkpromicro/.git/objects/e9/bb7e046607e728162bdaa0e3ecf31185173381
 
 ```text
@@ -6656,6 +6884,7 @@ e43d6dce064c164d0d0049e53a7746dbb2f9420e 37f9f691852551c47563ed78f8076d2f7fb5e51
 1b90401fdf6ec6cb9479e1a8042343a983db9c9f 5f4a5cef19c2e25cc5ddcaec470d37050a98ad74 Your Name <segodimo@gmail.com> 1761911187 -0300	commit: test split-ble
 5f4a5cef19c2e25cc5ddcaec470d37050a98ad74 eb266f079679fe474991fc03f46a2dd1a78ffac3 Your Name <segodimo@gmail.com> 1761925634 -0300	commit: led-debug init auto
 eb266f079679fe474991fc03f46a2dd1a78ffac3 ced215df91eacea3ae7c51f01f6d5a65aa53c588 Your Name <segodimo@gmail.com> 1761935349 -0300	commit: mouse l e r funcionando primeira vez
+ced215df91eacea3ae7c51f01f6d5a65aa53c588 a829e7d83d2d84ca26bdc11593d0cf77d4abf86a Your Name <segodimo@gmail.com> 1762349804 -0300	commit: test eliminate warnings
 
 ```
 
@@ -6704,6 +6933,7 @@ e43d6dce064c164d0d0049e53a7746dbb2f9420e 37f9f691852551c47563ed78f8076d2f7fb5e51
 1b90401fdf6ec6cb9479e1a8042343a983db9c9f 5f4a5cef19c2e25cc5ddcaec470d37050a98ad74 Your Name <segodimo@gmail.com> 1761911187 -0300	commit: test split-ble
 5f4a5cef19c2e25cc5ddcaec470d37050a98ad74 eb266f079679fe474991fc03f46a2dd1a78ffac3 Your Name <segodimo@gmail.com> 1761925634 -0300	commit: led-debug init auto
 eb266f079679fe474991fc03f46a2dd1a78ffac3 ced215df91eacea3ae7c51f01f6d5a65aa53c588 Your Name <segodimo@gmail.com> 1761935349 -0300	commit: mouse l e r funcionando primeira vez
+ced215df91eacea3ae7c51f01f6d5a65aa53c588 a829e7d83d2d84ca26bdc11593d0cf77d4abf86a Your Name <segodimo@gmail.com> 1762349804 -0300	commit: test eliminate warnings
 
 ```
 
@@ -6750,6 +6980,7 @@ e43d6dce064c164d0d0049e53a7746dbb2f9420e 37f9f691852551c47563ed78f8076d2f7fb5e51
 1b90401fdf6ec6cb9479e1a8042343a983db9c9f 5f4a5cef19c2e25cc5ddcaec470d37050a98ad74 Your Name <segodimo@gmail.com> 1761911190 -0300	update by push
 5f4a5cef19c2e25cc5ddcaec470d37050a98ad74 eb266f079679fe474991fc03f46a2dd1a78ffac3 Your Name <segodimo@gmail.com> 1761925637 -0300	update by push
 eb266f079679fe474991fc03f46a2dd1a78ffac3 ced215df91eacea3ae7c51f01f6d5a65aa53c588 Your Name <segodimo@gmail.com> 1761935352 -0300	update by push
+ced215df91eacea3ae7c51f01f6d5a65aa53c588 a829e7d83d2d84ca26bdc11593d0cf77d4abf86a Your Name <segodimo@gmail.com> 1762349807 -0300	update by push
 
 ```
 
@@ -7731,7 +7962,7 @@ fi
 ## arquivo: /home/segodimo/zmkpromicro/.git/refs/heads/master
 
 ```text
-ced215df91eacea3ae7c51f01f6d5a65aa53c588
+a829e7d83d2d84ca26bdc11593d0cf77d4abf86a
 
 ```
 
@@ -7739,7 +7970,7 @@ ced215df91eacea3ae7c51f01f6d5a65aa53c588
 ## arquivo: /home/segodimo/zmkpromicro/.git/refs/remotes/origin/master
 
 ```text
-ced215df91eacea3ae7c51f01f6d5a65aa53c588
+a829e7d83d2d84ca26bdc11593d0cf77d4abf86a
 
 ```
 

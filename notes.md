@@ -11,10 +11,11 @@ cd ~/zmkesp
 ```
 
 ```bash
-e /home/segodimo/corne/zmk-config/config/rec_corne.keymap
+e /home/segodimo/zmk-ws/zmkpromicro/config/corne.keymap
 cd ~/corne/zmk-config | term
 cd ~/corne/out_firmware | term
 e ~/corne/zmk-config/config/rec_corne.keymap
+e /home/segodimo/corne/zmk-config/config/rec_corne.keymap
 cd ~/14java/proyectos-java/exeptions/09exeptions.md
 cd ~/14java/proyectos-java/exeptions | term
 ```

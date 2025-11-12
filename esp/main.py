@@ -185,15 +185,15 @@ def start(i2c=None, mpu=None, mpr=None, pots=None, vib=None, led=None, force_cal
     triggers = [
 
         {
-            "buttons": {4, 8},
-            "condition": lambda gs: gs.stepY == 0,
+            "buttons": {8},
+            "condition": lambda gs: gs.stepY == 1,
             "action": toggle_ready,
             "last_state": False,
             "returns_ready": True
         },
         {
-            "buttons": {7, 8},
-            "condition": lambda gs: gs.stepY == 0,
+            "buttons": {5},
+            "condition": lambda gs: gs.stepY == 1,
             "action": toggle_mouse,
             "last_state": False,
             "returns_mouse": True

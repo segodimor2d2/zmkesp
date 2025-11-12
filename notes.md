@@ -1,13 +1,28 @@
 $$$$
 
+
 zmk v3.5.0
 
 ```bash
-cd ~/zmk | term
+cd ~/zmk-ws | term
 cd ~/zmkesp/firmwar | term
-cd ~/zmkpromicro | term
+cd ~/zmk-ws/zmkpromicro | term
 cd ~/zmkesp
 ```
+
+```bash
+e /home/segodimo/corne/zmk-config/config/rec_corne.keymap
+cd ~/corne/zmk-config | term
+cd ~/corne/out_firmware | term
+e ~/corne/zmk-config/config/rec_corne.keymap
+cd ~/14java/proyectos-java/exeptions/09exeptions.md
+cd ~/14java/proyectos-java/exeptions | term
+```
+
+
+
+LKJ*#$sdf
+
 
 Sophia Dai 
 ErgO, a smart ring
@@ -48,6 +63,8 @@ eu poderia enviar os dados dx e dy do mouse do peripheral para o central via zmk
 ---
 
 ## corne
+- roadmap do ZMK
+- home end
 - spacebar no 3er botão da direita
 - "=" no 1,2 (a)
 
@@ -63,7 +80,7 @@ jjk- modo Hold é uma ação similar ao -2 gyro que deixa o Hold liberado
 - usar dados do acelerômetro para o mouse
     - o gyro controla a direção
     - valor absoluto do acelerômetro se converte em velocidade do movimento do mouse
-
+jk
 - reviçar o pull/down com resistores para os eletrodos
     - 1MΩ 2.2MΩ 3.3MΩ 4.7MΩ 10MΩ 22MΩ
     - isolar os eletrodos do ambiente
@@ -32517,6 +32534,330 @@ No central: como adicionar callback em `split_central_notify_cb()` pra decodific
 eu quero achar uma solução feita no zmk-config e não no zmk do repositório,
 mantendo compatibilidade com o ZMK 3.5.0 (sem quebrar o split original),
 
+--- 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+✅ **AGORA TEMOS A PROVA FINAL DO QUE ESTAVA ACONTECENDO.**
+
+A mensagem:
+
+```
+west: unknown command "build";
+workspace /home/segodimo/zmk does not define this extension command
+```
+
+SIGNIFICA:
+
+# ✅ **SEU WORKSPACE (/home/segodimo/zmk) NÃO É UM WORKSPACE WEST VÁLIDO.**
+
+Ou seja:
+
+❌ Ele **não contém** um módulo Zephyr registrado
+❌ Ele **não contém** um manifest valido
+❌ Ele **não contém** o comando `west build`
+✅ Portanto, o west **não reconhece nenhum comando do ZMK**
+
+Isto explica absolutamente TUDO:
+
+* seu módulo não era reconhecido
+* seus shields custom não eram reconhecidos
+* o west.yml que você editou não funcionava
+* o overlay original continuava aparecendo
+* `west topdir` apontava para `/home/segodimo/zmk`
+* mas *não era um workspace de verdade*
+
+---
+
+# ✅ ENTÃO QUAL É O PROBLEMA?
+
+Você está dentro de um **repositório ZMK cloneado do GitHub**, mas você **nunca rodou o comando `west init`** para transformá-lo em um workspace.
+
+O diretório correto de build do ZMK não é `/home/segodimo/zmk`.
+
+O correto é:
+
+✅ Um workspace criado pelo usuário
+❌ Não um clone puro do ZMK
+
+---
+
+# ✅ COMO CRIAR UM WORKSPACE WEST CORRETO
+
+Solução 100% limpa, confiável e garantida.
+
+### ✅ PASSO 1 — Criar o workspace
+
+Escolha um local para o workspace, por exemplo:
+
+```
+/home/segodimo/zmk-ws
+```
+
+Crie:
+
+```bash
+mkdir ~/zmk-ws
+cd ~/zmk-ws
+```
+
+---
+
+### ✅ PASSO 2 — Inicializar o workspace com o ZMK oficial
+
+```bash
+# west init -l /home/segodimo/zmk/app
+west init -m https://github.com/zmkfirmware/zmk.git
+```
+
+
+
+Isso faz:
+
+✅ `/home/segodimo/zmk-ws/west.yml` ser criado
+✅ O repositório ZMK ser registrado
+✅ O comando `west build` começar a existir novamente
+
+---
+
+### ✅ PASSO 3 — Atualizar o workspace
+
+```bash
+west update
+```
+
+Agora você terá esta estrutura:
+
+```
+zmk-ws/
+ ├ zmk/          ← o ZMK oficial
+ ├ zephyr/       ← Zephyr
+ ├ modules/      ← módulos adicionais
+ ├ zmkpromicro/  ← vamos adicionar aqui
+ └ west.yml
+```
+
+---
+
+### ✅ PASSO 4 — Registrar seu módulo custom zmkpromicro
+
+Abra:
+
+```bash
+nano ~/zmk-ws/west.yml
+```
+
+E adicione:
+
+```yaml
+projects:
+  - name: zmkpromicro
+    path: zmkpromicro
+    remote: local
+    revision: master
+```
+
+E na seção de remotes, adicione:
+
+```yaml
+  - name: local
+    url-base: file:///home/segodimo
+```
+
+---
+
+### ✅ PASSO 5 — Atualize novamente
+
+```bash
+west update
+```
+
+Agora aparecerá:
+
+```
+=== Cloning zmkpromicro
+```
+
+ou:
+
+```
+=== Updating zmkpromicro
+```
+
+---
+
+### ✅ PASSO 6 — Agora sim compile:
+
+```bash
+west build -p always -s zmk/app -b nice_nano_v2 -- -DSHIELD=corne_left -DZMK_CONFIG=/home/segodimo/zmkpromicro/config
+```
+
+---
+
+# ✅ **AGORA TUDO FUNCIONARÁ**
+
+comportamentos esperados:
+
+✅ Seus shields custom substituem os do ZMK
+✅ Seu `corne_left.dtsi` custom é carregado
+✅ O overlay original desaparece
+✅ Seu `boards/shields/corne_left.yaml` é detectado
+✅ O módulo zmkpromicro aparece no log
+✅ O build funciona normalmente
+
+---
+
+# ✅ **ME DÊ APENAS ISSO:**
+
+1️⃣ Você quer **que eu gere automaticamente o west.yml perfeito** para o workspace novo?
+
+2️⃣ Você quer que eu escreva os comandos exatos, passo a passo, sem nem pensar?
+
+Só responder:
+**“Sim, gere meu workspace completo”**
+---
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Excelente pergunta — esses comandos do **West (ferramenta do Zephyr/ZMK)** parecem muito parecidos, mas há **diferenças sutis e importantes** entre eles.
+Vamos destrinchar **cada um** dos parâmetros e o que muda entre os exemplos 👇
+
+---
+
+### 🧩 1️⃣
+
+```bash
+west build -p always -s zmk/app -d build -b nice_nano_v2 -- -DSHIELD=corne_left -DZMK_CONFIG=/home/segodimo/zmk-ws/zmkpromicro/config
+```
+
+🔹 **Significado:**
+
+* `-p always` → sempre apaga e recria a pasta de build (build limpa).
+* `-s zmk/app` → define o diretório da aplicação (ZMK).
+* `-d build` → define a pasta de saída (`build`).
+* `-b nice_nano_v2` → define a placa alvo.
+* `--` → separa argumentos do CMake.
+* `-DSHIELD=corne_left` → define o shield (lado esquerdo do Corne).
+* `-DZMK_CONFIG=...` → define o caminho da configuração personalizada.
+
+🔸 **Resumo:**
+👉 É um **build completo e limpo**, típico para garantir que não há arquivos residuais.
+---------------------------------------------------------------------------------------
+
+### 🧩 2️⃣
+
+```bash
+west build -p always -s zmk/app -d build -b nice_nano_v2 -- -DSHIELD=corne_left -DZMK_CONFIG=/home/segodimo/zmk-ws/zmkpromicro/config -DCMAKE_VERBOSE_MAKEFILE=1 | grep ZMK_CONFIG
+```
+
+🔹 **Diferença principal:**
+
+* Adiciona `-DCMAKE_VERBOSE_MAKEFILE=1` → faz o CMake imprimir **todos os comandos e flags** usados na compilação (modo detalhado).
+* Usa `| grep ZMK_CONFIG` → **filtra** a saída, mostrando apenas linhas que contêm `ZMK_CONFIG`.
+
+🔸 **Resumo:**
+👉 Mesmo build limpo, mas agora você está **debugando** se o `ZMK_CONFIG` foi realmente passado e reconhecido.
+--------------------------------------------------------------------------------------------------------------
+
+### 🧩 3️⃣
+
+```bash
+west build -p always -s zmk/app -b nice_nano_v2 -- -DSHIELD=corne_left -DZMK_CONFIG=/home/segodimo/zmk-ws/zmkpromicro/config
+```
+
+🔹 **Diferença:**
+
+* **Não especifica `-d build`**, então o `west` usa o **diretório padrão** `build/` dentro da pasta atual.
+
+  * Se você estiver em `/home/segodimo/zmk-ws/`, o output vai para `/home/segodimo/zmk-ws/build`.
+  * Mas se estiver dentro de outra pasta, pode gerar um build em outro lugar.
+
+🔸 **Resumo:**
+👉 Idêntico ao primeiro, só muda o **local da pasta de build** (implícita em vez de explícita).
+-----------------------------------------------------------------------------------------------
+
+### 🧩 4️⃣
+
+```bash
+west build -n -s zmk/app -d build -b nice_nano_v2 -- -DSHIELD=corne_left -DZMK_CONFIG=/home/segodimo/zmk-ws/zmkpromicro/config
+```
+
+🔹 **Diferença:**
+
+* `-n` (ou `--dry-run`) → **não executa a compilação**, apenas **mostra o que seria feito**.
+
+  * Não cria arquivos, apenas exibe os comandos de build.
+
+🔸 **Resumo:**
+👉 Serve para **testar configurações ou depurar variáveis CMake** sem realmente compilar.
+-----------------------------------------------------------------------------------------
+
+### 🧩 5️⃣
+
+```bash
+west build -p always -s zmk/app -b nice_nano_v2 -- -DSHIELD=corne_left -DZMK_CONFIG=/home/segodimo/zmk-ws/zmkpromicro/config -DCMAKE_VERBOSE_MAKEFILE=1 | tee build.log
+```
+
+🔹 **Diferença:**
+
+* `-DCMAKE_VERBOSE_MAKEFILE=1` → modo detalhado (como o 2º).
+* `| tee build.log` → salva **toda a saída** (stdout) no arquivo `build.log`, **enquanto ainda mostra na tela**.
+
+🔸 **Resumo:**
+👉 É o comando ideal para **depuração completa e registro** da build — útil para compartilhar logs (por exemplo, ao pedir ajuda).
+
+---
+
+### 📋 Comparativo rápido:
+
+|  #  | Flag principal              | O que faz                   | Observações                   |                       |
+| :-: | --------------------------- | --------------------------- | ----------------------------- | --------------------- |
+|  1  | `-p always -d build`        | Build limpa e completa      | Padrão recomendado            |                       |
+|  2  | `-DCMAKE_VERBOSE_MAKEFILE=1 | grep`                       | Build detalhada e filtrada    | Para checar variáveis |
+|  3  | Sem `-d`                    | Build no diretório padrão   | Mesmo efeito se em pasta raiz |                       |
+|  4  | `-n`                        | Simulação (sem compilar)    | Para testar configs           |                       |
+|  5  | `tee build.log`             | Build detalhada e salva log | Para depuração                |                       |
+
+---
+
+Se quiser, posso te mostrar **qual comando é ideal** para cada tipo de tarefa (por exemplo: testar configs, gerar firmware, depurar erro de `ZMK_CONFIG`, etc.). Quer que eu monte essa tabela de “quando usar qual”?
+
+
+
+
+
+
+
+
+
+
+
+
 ---
 # python print_allfiles_path.py /home/segodimo/zmkpromicro
 python print_allfiles_path.py /home/segodimo/zmkpromicro
@@ -32602,6 +32943,13 @@ Local do erro: app/src/keymap.c linha 87
 Tipo de erro: excess elements in array initializer - excesso de elementos na inicialização do array
 
 Contexto: Ocorre durante o processamento das layers do keymap usando macros do Zephyr
+
+
+
+
+git checkout -b main
+git push -u origin main
+   
 
 
 

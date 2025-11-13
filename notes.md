@@ -7,6 +7,7 @@ zmk v3.5.0
 cd ~/zmk-ws | term
 cd ~/zmkesp/firmwar | term
 cd ~/zmk-ws/zmkpromicro | term
+cd ~/zmkesp | term
 cd ~/zmkesp
 ```
 
@@ -199,6 +200,7 @@ mpremote reset
 mpremote kill
 
 mpremote connect /dev/ttyUSB0 fs cp esp/main.py :main.py
+
 mpremote connect /dev/ttyUSB0 fs cp esp/config.py :config.py
 
 mpremote connect /dev/ttyUSB0 fs cp esp/pots.py :pots.py

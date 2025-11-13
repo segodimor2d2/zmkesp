@@ -271,7 +271,7 @@ def start(i2c=None, mpu=None, mpr=None, pots=None, vib=None, led=None, force_cal
             eventos.append([abclevel, i, 0, config.THIS_IS])
             gyro_state.wait2Zero = True
 
-        if mouse_ready and 4 in ativos:  # só envia se botão 4 não está pressionado
+        if mouse_ready and 0 in ativos:  # só envia se botão 0 não está pressionado
             dx, dy = gyromouse(gyro[0], gyro[1])
             if dx != 0 or dy != 0:
                 # print(f'mouse: dx={dx}, dy={dy}')

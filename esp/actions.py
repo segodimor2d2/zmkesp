@@ -1,7 +1,7 @@
 from machine import Pin, UART
 import time
 from printlogs import log
-from config import VIBRAR_LIGADO, VIBRAR_DESLIGADO, VIBRAR_LONGO, VIBRAR_ALERTA
+from config import THIS_IS, VIBRAR_LIGADO, VIBRAR_DESLIGADO, VIBRAR_LONGO, VIBRAR_ALERTA
 
 # UART - ajuste TX e RX conforme o seu hardware
 uart = UART(1, baudrate=115200, tx=17, rx=16)
@@ -71,7 +71,9 @@ def gyromouse(gx, gy, scale=360.0, deadzone=200.0):
 
     # Inverte os sentidos
     dx = -dx
-    dy = -dy
+    if THIS_IS == 0:
+        dy = -dy
+
     return dx, dy
 
 

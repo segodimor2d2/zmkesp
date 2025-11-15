@@ -787,19 +787,16 @@ eu estou achando que o problema é que o relese de qualquer botão não é envia
 eu gostaria de testar na função tozmk = potsgyrotozmk(*ev) se é isso que está causando o problema
 
 será que eu consigo fazer um teste neste codigo para validar o que está acontecendo?
+o teste não pode gerar tantos logs então tem que ser um teste otimizado para detectar o problemas
 
-def potsgyrotozmk(abclevel, mapped_i, status, side):
-    """
-    Traduz (abclevel, gx, gy, status) -> (row, col, status)
-    side: 0 = left, 1 = right
-    """
-    log(f'{mapped_i}, {abclevel}, {status}, {side}', 4)
-    mapping = MAPL if side == 0 else MAPR
-    key = (mapped_i, abclevel[0], abclevel[1])
-    if key not in mapping:
-        return None  # tecla não mapeada
-    row, col = mapping[key]
-    return row, col, status
+apareceu isso no meomento de precionar o botão e logo teve que precionar de novo para parar de fazer o loop,
+que euro saber se o teste tem algum indicio de que algo está errado
+
+no 
 
 
+estou tendo problemas justo quando abclevel muda mentais um botão esta ativo sem fazer o relese dele mesmo,
+um exemplo seria quando aperto o botão 'f' o abclevel muda para otro valor e eu solto o 'f', então o botão entra em loop 
+como eu faço para garantir que o botão seja liberado no release quando abclevel mudar?
 
+esse codigo funciona com micropython

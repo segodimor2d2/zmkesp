@@ -178,8 +178,7 @@ def start(i2c=None, mpu=None, mpr=None, pots=None, vib=None, led=None, force_cal
     stable_count = [0, 0, 0]
 
     last_ativos = set()  # mantém o estado anterior
-    last_abclevel = [0, 0]  # mantém o último abclevel
-    force_release = False
+    saved_abc = {}
 
     # Loop principal
     key_ready = False
@@ -251,27 +250,18 @@ def start(i2c=None, mpu=None, mpr=None, pots=None, vib=None, led=None, force_cal
         # --- detectar press ---
         novos = ativos - last_ativos
         for i in novos:
-            eventos.append([abclevel, i, 1, config.THIS_IS])
+            saved_abc[i] = abclevel[:]  # cópia segura no MicroPython
+            eventos.append([saved_abc[i], i, 1, config.THIS_IS])
             gyro_state.wait2Zero = False
             gyro_state.cycle = 0
 
         # --- detectar release ---
         liberados = last_ativos - ativos
         for i in liberados:
-            eventos.append([abclevel, i, 0, config.THIS_IS])
+            old_abc = saved_abc.get(i, abclevel)
+            eventos.append([old_abc, i, 0, config.THIS_IS])
+            saved_abc.pop(i, None)
             gyro_state.wait2Zero = True
-
-        # --- detecta mudança de abclevel ---
-        if abclevel != last_abclevel:
-            force_release = True
-
-        # --- se flag ativada, solta tudo ---
-        if force_release:
-            for i in last_ativos:
-                eventos.append([abclevel, i, 0, config.THIS_IS])
-            gyro_state.wait2Zero = True
-            last_ativos = set()
-            force_release = False
 
         # --- envia todos os eventos ---
         for ev in eventos:
@@ -295,7 +285,6 @@ def start(i2c=None, mpu=None, mpr=None, pots=None, vib=None, led=None, force_cal
 
         # atualiza estado
         last_ativos = ativos
-        last_abclevel = abclevel[:]
 
         """FIM E LIMPEZA"""
         # Reset se parado

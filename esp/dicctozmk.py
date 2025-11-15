@@ -98,44 +98,16 @@ MAPR = {
 
 }
 
-_last_press_state = {}  # (mapped_i) -> abclevel
-
 def potsgyrotozmk(abclevel, mapped_i, status, side):
     """
     Traduz (abclevel, gx, gy, status) -> (row, col, status)
     side: 0 = left, 1 = right
     """
-
+    log(f'{mapped_i}, {abclevel}, {status}, {side}', 4)
     mapping = MAPL if side == 0 else MAPR
     key = (mapped_i, abclevel[0], abclevel[1])
-
-    global _last_press_state
-
-    # --- DETECTA PRESS ---
-    if status == 1:   # press
-        _last_press_state[mapped_i] = abclevel[:]   # salva abclevel original
-
-    # --- DETECTA RELEASE ---
-    else:
-        if mapped_i in _last_press_state:
-            abclevel_press = _last_press_state[mapped_i]
-
-            # RELEASE com abclevel diferente -> BUG MUITO PROVÁVEL
-            if abclevel_press != abclevel:
-                print(f"[BUG-RELEASE] btn={mapped_i} press={abclevel_press} release={abclevel}")
-
-        # RELEASE não tem mapeamento
-        if key not in mapping:
-            print(f"[MISS] btn={mapped_i} lev={abclevel} status={status}")
-            return None
-
-        # RELEASE OK → limpar estado
-        if status == 0 and mapped_i in _last_press_state:
-            del _last_press_state[mapped_i]
-
-    # --- MAPEAMENTO NORMAL ---
     if key not in mapping:
-        return None
-
+        return None  # tecla não mapeada
     row, col = mapping[key]
     return row, col, status
+

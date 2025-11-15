@@ -70,8 +70,8 @@ def gyromouse(gx, gy, scale=360.0, deadzone=200.0):
     dy = int(max(-128, min(127, gy / scale)))
 
     # Inverte os sentidos
-    dx = -dx
     if THIS_IS == 0:
+        dx = -dx
         dy = -dy
 
     return dx, dy
@@ -123,11 +123,11 @@ def tsttap(row, col, delay=0.1):
     send_charPs([row, col, False])
 
 
-def vibrar(pino_vibracao, n_pulsos, step=None, ready=False):
+def vibrar(pino_vibracao, n_pulsos, step=None, key_ready=False):
     if pino_vibracao is None:
         log("vibrador não inicializado", 1)
         return
-    if ready:
+    if key_ready:
         for _ in range(n_pulsos):
             try:
                 pino_vibracao.on()

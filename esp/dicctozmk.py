@@ -30,22 +30,26 @@ MAPL = {
     (0, -1,  0): (2, 5),  # b
 
     (5,  1,  0): (3, 0),  # mo4
-    (5,  0,  0): (3, 0),  # mo4
-    (5, -1,  0): (3, 0),  # mo4
-    (6,  1,  0): (3, 1),  # space
-    (6,  0,  0): (3, 1),  # space
-    (6, -1,  0): (3, 1),  # space
-    (7,  1,  0): (3, 2),  # mo2
-    (7,  0,  0): (3, 2),  # mo2
-    (7, -1,  0): (3, 2),  # mo2
-    (8,  1,  0): (0, 0),  # esc
-    (8,  0,  0): (0, 0),  # esc
-    (8, -1,  0): (0, 0),  # esc
+    # (5,  0,  0): (3, 0),  # mo4
+    # (5, -1,  0): (3, 0),  # mo4
+
+    # (6,  1,  0): (0, 0),  # esc
+    (6,  0,  0): (0, 0),  # esc
+    (6, -1,  0): (0, 0),  # esc
+
+    # (7,  1,  0): (3, 1),  # space
+    (7,  0,  0): (3, 1),  # space
+    (7, -1,  0): (3, 1),  # space
+
+    (8,  1,  0): (3, 2),  # mo2
+    # (8,  0,  0): (3, 2),  # mo2
+    # (8, -1,  0): (3, 2),  # mo2
 
     # --- Gyro (1,1) [P,M,Y](row, col) ---
-    (4,  0,  1): (3, 3),  # esc
-    (3,  0,  1): (2, 0),  # ctrl
+    (4,  0,  1): (0, 0),  # esc
     (3,  0,  1): (1, 0),  # shift
+    (2,  0,  1): (2, 0),  # ctrl
+    (1,  0,  1): (3, 4),  # bspc
 }
 
 MAPR = {
@@ -70,32 +74,68 @@ MAPR = {
     (3, -1,  0): (2, 9),  # .
     (4, -1,  0): (2, 10), # ;
 
-    (5,  0,  0): (3, 4),   # bspc
-    (5,  1,  0): (3, 4),   # bspc
-    (5, -1,  0): (3, 4),   # bspc
-    (6,  1,  0): (3, 5),   # mo1
-    (6, -1,  0): (3, 5),   # mo1
-    (6,  0,  0): (3, 5),   # mo1
-    (7,  1,  0): (3, 6),   # enter
+    (5,  1,  0): (3, 5),   # mo1
+    # (5, -1,  0): (3, 5),   # mo1
+    # (5,  0,  0): (3, 5),   # mo1
+
+    (6,  1,  0): (3, 4),   # bspc
+    # (6,  0,  0): (3, 4),   # bspc
+    (6, -1,  0): (3, 4),   # bspc
+
+    # (7,  1,  0): (3, 6),   # enter
     (7, -1,  0): (3, 6),   # enter
     (7,  0,  0): (3, 6),   # enter
-    (8,  1,  0): (3, 7),   # mo3
-    (8, -1,  0): (3, 7),   # mo3
-    (8,  0,  0): (3, 7),   # mo3
 
+    (8,  1,  0): (3, 7),   # mo3
+    # (8, -1,  0): (3, 7),   # mo3
+    # (8,  0,  0): (3, 7),   # mo3
+
+    # --- Gyro (1,1) [P,M,Y](row, col) ---
+    (4,  0,  1): (0, 0),  # esc
+    (3,  0,  1): (1, 0),  # shift
+    (2,  0,  1): (2, 0),  # ctrl
+    (1,  0,  1): (3, 4),  # bspc
 
 }
+
+_last_press_state = {}  # (mapped_i) -> abclevel
 
 def potsgyrotozmk(abclevel, mapped_i, status, side):
     """
     Traduz (abclevel, gx, gy, status) -> (row, col, status)
     side: 0 = left, 1 = right
     """
-    log(f'{mapped_i}, {abclevel}, {status}, {side}', 4)
+
     mapping = MAPL if side == 0 else MAPR
     key = (mapped_i, abclevel[0], abclevel[1])
+
+    global _last_press_state
+
+    # --- DETECTA PRESS ---
+    if status == 1:   # press
+        _last_press_state[mapped_i] = abclevel[:]   # salva abclevel original
+
+    # --- DETECTA RELEASE ---
+    else:
+        if mapped_i in _last_press_state:
+            abclevel_press = _last_press_state[mapped_i]
+
+            # RELEASE com abclevel diferente -> BUG MUITO PROVÁVEL
+            if abclevel_press != abclevel:
+                print(f"[BUG-RELEASE] btn={mapped_i} press={abclevel_press} release={abclevel}")
+
+        # RELEASE não tem mapeamento
+        if key not in mapping:
+            print(f"[MISS] btn={mapped_i} lev={abclevel} status={status}")
+            return None
+
+        # RELEASE OK → limpar estado
+        if status == 0 and mapped_i in _last_press_state:
+            del _last_press_state[mapped_i]
+
+    # --- MAPEAMENTO NORMAL ---
     if key not in mapping:
-        return None  # tecla não mapeada
+        return None
+
     row, col = mapping[key]
     return row, col, status
-

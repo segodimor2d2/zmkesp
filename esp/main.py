@@ -20,13 +20,13 @@ def post_data(url, data):
         print("Erro no POST:", e)
 
 def restart(vib, segundos=3):
-    vibrar(vib, 1, 2, ready=True)
+    vibrar(vib, 1, 2, key_ready=True)
 
     import machine
     machine.reset()
 
 def liberar_repl(vib, led, segundos=3):
-    vibrar(vib, 1, 2, ready=True)
+    vibrar(vib, 1, 2, key_ready=True)
 
     import webrepl
     import network
@@ -75,7 +75,7 @@ def liberar_repl(vib, led, segundos=3):
     try:
         if webrepl.is_running():
             print("WebREPL já ativo")
-            vibrar(vib, 1, 2, ready=True)
+            vibrar(vib, 1, 2, key_ready=True)
         else:
             webrepl.start()
 
@@ -99,18 +99,23 @@ def liberar_repl(vib, led, segundos=3):
     # print(f"Liberando REPL por {segundos}s...")
     # inicio = time.time()
     # while time.time() - inicio < segundos:
-    #     vibrar(vib, 1, 1, ready=True)
+    #     vibrar(vib, 1, 1, key_ready=True)
     #     time.sleep(1)
     # print("Loop retomado.")
 
-def toggle_ready(ready, vib):
-    ready = not ready
-    vibrar(vib, 3, 0, ready=True)
-    return ready
+def toggle_onoff(onoff_ready, vib):
+    onoff_ready = not onoff_ready
+    vibrar(vib, 3, 0, onoff_ready=True)
+    return onoff_ready
+
+def toggle_ready(key_ready, vib):
+    key_ready = not key_ready
+    vibrar(vib, 3, 0, key_ready=True)
+    return key_ready
 
 def toggle_mouse(mouse_ready, vib, gyro=None):
     new_state = not mouse_ready
-    vibrar(vib, 3, 0, ready=True)
+    vibrar(vib, 3, 0, key_ready=True)
     if new_state and gyro is not None:
         reset_mouse_center(gyro[0], gyro[1])  # aqui define novo centro
     return new_state
@@ -118,18 +123,18 @@ def toggle_mouse(mouse_ready, vib, gyro=None):
 
 # --- define triggers fora do start ---
 
-def process_triggers(ativos, gyro_state, triggers, ready, mouse_ready, vib):
+def process_triggers(ativos, gyro_state, triggers, key_ready, mouse_ready, vib):
     for trig in triggers:
         current_state = all(b in ativos for b in trig["buttons"]) and trig["condition"](gyro_state)
         if current_state and not trig["last_state"]:
             if trig.get("returns_ready", False):
-                ready = trig["action"](ready, vib)
+                key_ready = trig["action"](key_ready, vib)
             elif trig.get("returns_mouse", False):
                 mouse_ready = trig["action"](mouse_ready, vib)
             else:
                 trig["action"]()
         trig["last_state"] = current_state
-    return ready, mouse_ready
+    return key_ready, mouse_ready
 
 def start(i2c=None, mpu=None, mpr=None, pots=None, vib=None, led=None, force_calib=False):
     # Inicializa hardware se não passado
@@ -139,7 +144,7 @@ def start(i2c=None, mpu=None, mpr=None, pots=None, vib=None, led=None, force_cal
     if mpr is None: mpr = init_mpr121(i2c)
     if led is None: led = init_led(2)
 
-    vibrar(vib, 3, 0, ready=True)
+    vibrar(vib, 3, 0, key_ready=True)
     piscaled(led, 100, 2)
 
     remap_list = config.INDEX_MAP_POTS 
@@ -153,7 +158,7 @@ def start(i2c=None, mpu=None, mpr=None, pots=None, vib=None, led=None, force_cal
     accl_state = AcclState()
 
     # # Se quiser calibrar o acelerômetro:
-    # acclthresholds = calc_accl_hysteresis(mpu, vib, ready, force_calib)
+    # acclthresholds = calc_accl_hysteresis(mpu, vib, key_ready, force_calib)
     # print("\nThresholds Acelerometro", acclthresholds)
 
     # print("------------------------------------")
@@ -177,7 +182,7 @@ def start(i2c=None, mpu=None, mpr=None, pots=None, vib=None, led=None, force_cal
     force_release = False
 
     # Loop principal
-    ready = False
+    key_ready = False
     mouse_ready = False 
     num = 0
 
@@ -202,8 +207,8 @@ def start(i2c=None, mpu=None, mpr=None, pots=None, vib=None, led=None, force_cal
             "buttons": {4, 6, 8},
             "condition": lambda gs: True,
             # "condition": lambda gs: gs.stepY == 3,
-            # "action": lambda: liberar_repl(vib, led, segundos=20),
-            "action": lambda: testmouse(),
+            "action": lambda: liberar_repl(vib, led, segundos=20),
+            # "action": lambda: testmouse(),
             "last_state": False,
             "returns_ready": False
         },
@@ -222,17 +227,14 @@ def start(i2c=None, mpu=None, mpr=None, pots=None, vib=None, led=None, force_cal
         # x[P] Y[L] Z[V]
         # print(f'x{accl[0]},y{accl[1]},z{accl[2]}')
 
-
-
         # Atualiza acelerômetro
         # accl_state = accl_principal(accl, acclthresholds, accl_state)
 
         # Atualiza giroscópio
-        gyro_state = gyro_principal(gyro, gy1, gy2, vib, ready, gyro_state)
+        gyro_state = gyro_principal(gyro, gy1, gy2, vib, key_ready, gyro_state)
 
         # Atualiza potenciômetros
         abclevel = [gyro_state.stepX, gyro_state.stepY]
-
 
         mask = mpr.get_touched_mask()
         num_electrodes = mpr.electrodes
@@ -242,21 +244,9 @@ def start(i2c=None, mpu=None, mpr=None, pots=None, vib=None, led=None, force_cal
         # print(f'ativos: {ativos}')
 
         # --- processa triggers ---
-        ready, mouse_ready = process_triggers(ativos, gyro_state, triggers, ready, mouse_ready, vib)
+        key_ready, mouse_ready = process_triggers(ativos, gyro_state, triggers, key_ready, mouse_ready, vib)
 
         eventos = []  # lista de eventos a enviar
-
-        # --- detecta mudança de abclevel ---
-        if abclevel != last_abclevel:
-            force_release = True
-
-        # --- se flag ativada, solta tudo ---
-        if force_release:
-            for i in last_ativos:
-                eventos.append([abclevel, i, 0, config.THIS_IS])
-            gyro_state.wait2Zero = True
-            last_ativos = set()
-            force_release = False
 
         # --- detectar press ---
         novos = ativos - last_ativos
@@ -271,7 +261,30 @@ def start(i2c=None, mpu=None, mpr=None, pots=None, vib=None, led=None, force_cal
             eventos.append([abclevel, i, 0, config.THIS_IS])
             gyro_state.wait2Zero = True
 
-        if mouse_ready and 0 in ativos:  # só envia se botão 0 não está pressionado
+        # --- detecta mudança de abclevel ---
+        if abclevel != last_abclevel:
+            force_release = True
+
+        # --- se flag ativada, solta tudo ---
+        if force_release:
+            for i in last_ativos:
+                eventos.append([abclevel, i, 0, config.THIS_IS])
+            gyro_state.wait2Zero = True
+            last_ativos = set()
+            force_release = False
+
+        # --- envia todos os eventos ---
+        for ev in eventos:
+            # ev [[M, Y], pot, status, R/L]
+            print(f'evento {ev}, key_ready={key_ready}, ready_mouse={mouse_ready}')
+
+            if key_ready:
+                tozmk = potsgyrotozmk(*ev)
+                log(f'tozmk {tozmk}', 0)
+                send_charPs(tozmk)
+
+        # --- botão ativa o mouse ---
+        if mouse_ready and 1 in ativos and not key_ready:  # só envia se botão 1 não está pressionado
             dx, dy = gyromouse(gyro[0], gyro[1])
             if dx != 0 or dy != 0:
                 # print(f'mouse: dx={dx}, dy={dy}')
@@ -279,16 +292,6 @@ def start(i2c=None, mpu=None, mpr=None, pots=None, vib=None, led=None, force_cal
 
         # if 4 in liberados and mouse_ready:
         #     reset_mouse_center(gyro[0], gyro[1])
-
-        # --- envia todos os eventos ---
-        for ev in eventos:
-            # ev [[M, Y], pot, status, R/L]
-            print(f'evento {ev}, ready={ready}, ready_mouse={mouse_ready}')
-
-            if ready:
-                tozmk = potsgyrotozmk(*ev)
-                log(f'tozmk {tozmk}', 0)
-                send_charPs(tozmk)
 
         # atualiza estado
         last_ativos = ativos
@@ -300,7 +303,7 @@ def start(i2c=None, mpu=None, mpr=None, pots=None, vib=None, led=None, force_cal
             gyro_state.cycle += 1
             if gyro_state.cycle == config.CYCLE_RESET_LIMIT:
                 gyro_state.stepX = gyro_state.stepY = 0
-                vibrar(vib, 2, ready=ready)
+                vibrar(vib, 2, key_ready=key_ready)
                 gyro_state.wait2Zero = False
                 gyro_state.cycle = 0
         
@@ -313,7 +316,7 @@ def start(i2c=None, mpu=None, mpr=None, pots=None, vib=None, led=None, force_cal
 
 
 if __name__ == "__main__":
-    vibrar(init_vibrator(), 4, ready=True)
+    vibrar(init_vibrator(), 4, key_ready=True)
     # liberar_repl(init_vibrator(), init_led(2), 3)  # <-- webrepl ativado
     start(force_calib=False)
 

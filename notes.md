@@ -13,6 +13,7 @@ cd ~/zmkesp
 
 ```bash
 e /home/segodimo/zmk-ws/zmkpromicro/config/corne.keymap
+e /home/segodimo/zmk-ws/zmk/app/boards/shields/corne/corne.dtsi
 cd ~/corne/zmk-config | term
 cd ~/corne/out_firmware | term
 e ~/corne/zmk-config/config/rec_corne.keymap
@@ -269,14 +270,16 @@ rm -rf build
 west build -t pristine
 
 # LEFT
-west build -p always -s app -b nice_nano_v2 -- -DSHIELD=corne_left -DZMK_CONFIG=/home/segodimo/zmkpromicro/config
+west build -p always -s zmk/app -b nice_nano_v2 -- -DSHIELD=corne_left -DZMK_CONFIG=/home/segodimo/zmk-ws/zmkpromicro/config
+<!-- west build -p always -s app -b nice_nano_v2 -- -DSHIELD=corne_left -DZMK_CONFIG=/home/segodimo/zmkpromicro/config -->
 cp build/zephyr/zmk.uf2 ../zmkesp/firmwar/corne_left.uf2
 <!-- cp build/zephyr/zmk.uf2 ../corne/promicro_out/corne_left-nice_nano_v2-zmk.uf2 -->
 sudo mount /dev/sdd /mnt/corne         
 sudo cp build/zephyr/zmk.uf2 /mnt/corne
 
 # RIGHT
-west build -p always -s app -b nice_nano_v2 -- -DSHIELD=corne_right -DZMK_CONFIG=/home/segodimo/zmkpromicro/config
+west build -p always -s zmk/app -b nice_nano_v2 -- -DSHIELD=corne_right -DZMK_CONFIG=/home/segodimo/zmk-ws/zmkpromicro/config
+<!-- west build -p always -s app -b nice_nano_v2 -- -DSHIELD=corne_right -DZMK_CONFIG=/home/segodimo/zmkpromicro/config -->
 cp build/zephyr/zmk.uf2 ../zmkesp/firmwar/corne_right.uf2
 <!-- cp build/zephyr/zmk.uf2 ../corne/promicro_out/corne_right-nice_nano_v2-zmk.uf2 -->
 sudo mount /dev/sdd /mnt/corne         
@@ -800,3 +803,102 @@ um exemplo seria quando aperto o botão 'f' o abclevel muda para otro valor e eu
 como eu faço para garantir que o botão seja liberado no release quando abclevel mudar?
 
 esse codigo funciona com micropython
+
+```python
+
+
+    # (5,  1,  0): (0, 0),  # esc
+    (5,  0,  0): (0, 0),  # esc
+    (5, -1,  0): (0, 0),  # esc
+
+    (6,  1,  0): (3, 0),  # mo4
+    # (6,  0,  0): (3, 0),  # mo4
+    # (6, -1,  0): (3, 0),  # mo4
+
+    # (7,  1,  0): (3, 1),  # space
+    (7,  0,  0): (3, 1),  # space
+    (7, -1,  0): (3, 1),  # space
+
+    (8,  1,  0): (3, 2),  # mo2
+    # (8,  0,  0): (3, 2),  # mo2
+    # (8, -1,  0): (3, 2),  # mo2
+
+    # --- Gyro (1,1) [P,M,Y](row, col) ---
+    (4,  0,  1): (0, 0),  # esc
+    (3,  0,  1): (1, 0),  # shift
+    (2,  0,  1): (2, 0),  # ctrl
+    (1,  0,  1): (3, 4),  # bspc
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    # (5,  1,  0): (3, 4),   # bspc
+    (5,  0,  0): (3, 4),   # bspc
+    (5, -1,  0): (3, 4),   # bspc
+
+    (6,  1,  0): (3, 5),   # mo1
+    # (6, -1,  0): (3, 5),   # mo1
+    # (6,  0,  0): (3, 5),   # mo1
+
+    # (7,  1,  0): (3, 6),   # enter
+    (7, -1,  0): (3, 6),   # enter
+    (7,  0,  0): (3, 6),   # enter
+
+    (8,  1,  0): (3, 7),   # mo3
+    # (8, -1,  0): (3, 7),   # mo3
+    # (8,  0,  0): (3, 7),   # mo3
+
+    # --- Gyro (1,1) [P,M,Y](row, col) ---
+    (4,  0,  1): (0, 0),  # esc
+    (3,  0,  1): (1, 0),  # shift
+    (2,  0,  1): (2, 0),  # ctrl
+    (1,  0,  1): (3, 4),  # bspc
+
+```
+
+
+$$$$
+
+# 0 mo 1  
+# 1 mo 2  
+# 2 mo 3 
+# 3 ko 4  
+# 4 kp SPACE  
+# 5 kp ENTER  
+# 6 kp BSPC  
+# 7 kp LALT  
+# 8 kp DELETE  
+# 9 kp TAB   
+# 10 kp MINUS  
+# 11 kp LS(FSLH)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -12,6 +12,7 @@ cd ~/zmkesp
 ```
 
 ```bash
+e /home/segodimo/zmkesp/esp/dicctozmk.py
 e /home/segodimo/zmk-ws/zmkpromicro/config/corne.keymap
 e /home/segodimo/zmk-ws/zmk/app/boards/shields/corne/corne.dtsi
 cd ~/corne/zmk-config | term
@@ -873,18 +874,19 @@ esse codigo funciona com micropython
 
 $$$$
 
-# 0 mo 1  
-# 1 mo 2  
-# 2 mo 3 
-# 3 ko 4  
-# 4 kp SPACE  
-# 5 kp ENTER  
-# 6 kp BSPC  
-# 7 kp LALT  
-# 8 kp DELETE  
-# 9 kp TAB   
-# 10 kp MINUS  
-# 11 kp LS(FSLH)
+# [v] 0 mo 1  
+# [v] 1 mo 2  
+# [v] 2 mo 3 
+# [v] 3 mo 4  
+# [v] 4 kp SPACE  
+# [v] 5 kp ENTER  
+# [v] 6 kp BSPC  
+# [v] 7 kp LALT  
+
+# [v] 8 kp DELETE  
+# [v] 9 kp TAB   
+# [v] 10 kp MINUS  
+# [v] 11 kp LS(FSLH)
 
 
 

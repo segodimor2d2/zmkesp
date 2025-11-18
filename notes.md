@@ -891,11 +891,66 @@ $$$$
 
 
 
+```python
+
+
+
+        # --- AÇÃO 1: MOVIMENTO (4) E CLICK ESQUERDO SUSTENIDO (6) ---
+        # Se 4 E 6 estiverem ativos, use buttons = 1 (Left Click)
+        if mouse_ready and 4 in ativos and 6 in ativos and not key_ready:
+            dx, dy = gyromouse(gyro[0], gyro[1])
+            if dx != 0 or dy != 0:
+                print(f'mouse: dx={dx}, dy={dy}, buttons=1 (LClick Hold)')
+                send_mouse(dx, dy, 0, 0, 1)
+
+        # --- AÇÃO 2: MOVIMENTO APENAS (4) ---
+        # Se 4 estiver ativo, mas 6 não (o 'elif' garante isso), use buttons = 0
+        elif mouse_ready and 4 in ativos and not key_ready:
+            dx, dy = gyromouse(gyro[0], gyro[1])
+            if dx != 0 or dy != 0:
+                # print(f'mouse: dx={dx}, dy={dy}')
+                send_mouse(dx, dy, 0, 0, 0)
+
+        # --- AÇÃO 3: CLICK DIREITO (7) ---
+        # Se 7 estiver ativo, use buttons = 2 (Right Click). (Corrigindo o valor do seu código antigo)
+        elif mouse_ready and 7 in ativos and not key_ready:
+            dx, dy = gyromouse(gyro[0], gyro[1])
+            if dx != 0 or dy != 0:
+                send_mouse(dx, dy, 0, 0, 2)
+
+        # --- AÇÃO 4: CLICK ESQUERDO E DIREITO (2) ---
+        # Se 2 estiver ativo, use buttons = 3 (Left + Right Click). (Mantendo a lógica do seu código antigo)
+        elif mouse_ready and 2 in ativos and not key_ready:
+            dx, dy = gyromouse(gyro[0], gyro[1])
+            if dx != 0 or dy != 0:
+                send_mouse(dx, dy, 0, 0, 3)
 
 
 
 
 
+
+
+
+
+        # --- botão ativa o mouse ---
+        if mouse_ready and 4 in ativos and not key_ready:
+            dx, dy = gyromouse(gyro[0], gyro[1])
+            if dx != 0 or dy != 0:
+                # print(f'mouse: dx={dx}, dy={dy}')
+                send_mouse(dx, dy, 0, 0, 0) # SEM BOTÃO
+
+        elif mouse_ready and 7 in ativos and not key_ready:
+            dx, dy = gyromouse(gyro[0], gyro[1])
+            if dx != 0 or dy != 0:
+                send_mouse(dx, dy, 0, 0, 1) # BOTÃO DIREITO
+
+        elif mouse_ready and 2 in ativos and not key_ready:
+            dx, dy = gyromouse(gyro[0], gyro[1])
+            if dx != 0 or dy != 0:
+                send_mouse(dx, dy, 0, 0, 2) # BOTÃO ESQUERDO
+
+```
 
 
 

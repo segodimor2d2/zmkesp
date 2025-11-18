@@ -273,27 +273,28 @@ def start(i2c=None, mpu=None, mpr=None, pots=None, vib=None, led=None, force_cal
                 log(f'tozmk {tozmk}', 0)
                 send_charPs(tozmk)
 
+
         # --- botão ativa o mouse ---
-        if mouse_ready and 4 in ativos and not key_ready:
+        if mouse_ready and 7 in ativos and 4 in ativos and not key_ready:
             dx, dy = gyromouse(gyro[0], gyro[1])
             if dx != 0 or dy != 0:
-                # print(f'mouse: dx={dx}, dy={dy}')
-                send_mouse(dx, dy, 0, 0, 0)
+                send_mouse(dx, dy, 0, 0, 1) # BOTÃO ESQUERDO
+
+        elif mouse_ready and 7 in ativos and 3 in ativos and not key_ready:
+            dx, dy = gyromouse(gyro[0], gyro[1])
+            if dx != 0 or dy != 0:
+                send_mouse(dx, dy, 0, 0, 3) # BOTÃO DIREITO
+
+        elif mouse_ready and 7 in ativos and 2 in ativos and not key_ready:
+            dx, dy = gyromouse(gyro[0], gyro[1])
+            if dx != 0 or dy != 0:
+                send_mouse(dx, dy, 0, 0, 5) # BOTÃO MEDIO
 
         elif mouse_ready and 7 in ativos and not key_ready:
             dx, dy = gyromouse(gyro[0], gyro[1])
             if dx != 0 or dy != 0:
-                send_mouse(dx, dy, 0, 0, 1)
-
-        elif mouse_ready and 2 in ativos and not key_ready:
-            dx, dy = gyromouse(gyro[0], gyro[1])
-            if dx != 0 or dy != 0:
-                send_mouse(dx, dy, 0, 0, 3)
-
-        # if mouse_ready and 1 in ativos and not key_ready:
-        #     dx, dy = gyromouse(gyro[0], gyro[1])
-        #     if dx != 0 or dy != 0:
-        #         send_mouse(dx, dy, 0, 0, 3)
+                # print(f'mouse: dx={dx}, dy={dy}')
+                send_mouse(dx, dy, 0, 0, 0) # SEM BOTÃO
 
         # if 4 in liberados and mouse_ready:
         #     reset_mouse_center(gyro[0], gyro[1])

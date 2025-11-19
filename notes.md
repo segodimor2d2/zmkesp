@@ -7,8 +7,8 @@ zmk v3.5.0
 cd ~/zmk-ws | term
 cd ~/zmkesp/firmwar | term
 cd ~/zmk-ws/zmkpromicro | term
-cd ~/zmkesp | term
 cd ~/zmkesp
+cd ~/zmkesp | term
 ```
 
 ```bash
@@ -871,26 +871,6 @@ esse codigo funciona com micropython
 
 ```
 
-
-$$$$
-
-# [v] 0 mo 1  
-# [v] 1 mo 2  
-# [v] 2 mo 3 
-# [v] 3 mo 4  
-# [v] 4 kp SPACE  
-# [v] 5 kp ENTER  
-# [v] 6 kp BSPC  
-# [v] 7 kp LALT  
-
-# [v] 8 kp DELETE  
-# [v] 9 kp TAB   
-# [v] 10 kp MINUS  
-# [v] 11 kp LS(FSLH)
-
-
-
-
 ```python
 
 
@@ -951,6 +931,75 @@ $$$$
                 send_mouse(dx, dy, 0, 0, 2) # BOTÃO ESQUERDO
 
 ```
+
+
+
+
+ao ligar tudo começa desativado porque key_ready esta False,
+ao ativar com a função toggle_ready eu posso usar os botões porque key_ready é True,
+ao ativar com a função toggle_mouse eu posso usar o mouse porque mouse_ready é True,
+
+eu quero que ao ativar ao usar o toggle_mouse o key_ready seja False com mouse_ready True,
+e ao usar o toggle_mouse de novo o mouse_ready seja False com key_ready True,
+a ideia e intercalar os mouse_ready e o key_ready, cada ver que eu usar a função toggle_mouse,
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+$$$$
+
+# [v] 0 mo 1  
+# [v] 1 mo 2  
+# [v] 2 mo 3 
+# [v] 3 mo 4  
+# [v] 4 kp SPACE  
+# [v] 5 kp ENTER  
+# [v] 6 kp BSPC  
+# [v] 7 kp LALT  
+
+# [v] 8 kp DELETE  
+# [v] 9 kp TAB   
+# [v] 10 kp MINUS  
+# [v] 11 kp LS(FSLH)
+
+
+
+
+# [v] 0 &kp KRP_DIVIDE /
+# [v] 1 &kp RRA(W) ?
+# [v] 2 &kp ERXCL !
+
+# [x] 3 &kp RA(UNDERSCORE) \
+# [x] 4 &kp LBKT '
+# [x] 5 &kp LS(LEFT_BRACE) `
+# [x] 6 &kp SQT ~
+
+# [x] 7 &kp xxxxx &
+# [x] 7 &kp xxxxx "
+
+
+
+
+&kp KP_DIVIDE 
+&kp RA(W)     
+&kp EXCL      
+&kp RA(UNDERSCORE) 
+&kp LBKT 
+&kp LS(LEFT_BRACE)  
+&kp SQT  
+
+
+
 
 
 

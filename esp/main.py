@@ -103,11 +103,6 @@ def liberar_repl(vib, led, segundos=3):
     #     time.sleep(1)
     # print("Loop retomado.")
 
-def toggle_onoff(onoff_ready, vib):
-    onoff_ready = not onoff_ready
-    vibrar(vib, 3, 0, onoff_ready=True)
-    return onoff_ready
-
 def toggle_ready(key_ready, vib):
     key_ready = not key_ready
     vibrar(vib, 3, 0, key_ready=True)
@@ -242,7 +237,7 @@ def start(i2c=None, mpu=None, mpr=None, pots=None, vib=None, led=None, force_cal
         ativos = {remap[i] for i in range(num_electrodes) if mask & (1 << i) and i in remap}
         # print(f'ativos: {ativos}')
 
-        # --- processa triggers ---
+        # --- processa triggers ativa/desativa ready ---
         key_ready, mouse_ready = process_triggers(ativos, gyro_state, triggers, key_ready, mouse_ready, vib)
 
         eventos = []  # lista de eventos a enviar
@@ -275,22 +270,22 @@ def start(i2c=None, mpu=None, mpr=None, pots=None, vib=None, led=None, force_cal
 
 
         # --- botão ativa o mouse ---
-        if mouse_ready and 7 in ativos and 4 in ativos and not key_ready:
+        if mouse_ready and 4 in ativos and 7 in ativos and not key_ready:
             dx, dy = gyromouse(gyro[0], gyro[1])
             if dx != 0 or dy != 0:
                 send_mouse(dx, dy, 0, 0, 1) # BOTÃO ESQUERDO
 
-        elif mouse_ready and 7 in ativos and 3 in ativos and not key_ready:
+        elif mouse_ready and 4 in ativos and 3 in ativos and not key_ready:
             dx, dy = gyromouse(gyro[0], gyro[1])
             if dx != 0 or dy != 0:
                 send_mouse(dx, dy, 0, 0, 3) # BOTÃO DIREITO
 
-        elif mouse_ready and 7 in ativos and 2 in ativos and not key_ready:
+        elif mouse_ready and 4 in ativos and 2 in ativos and not key_ready:
             dx, dy = gyromouse(gyro[0], gyro[1])
             if dx != 0 or dy != 0:
                 send_mouse(dx, dy, 0, 0, 5) # BOTÃO MEDIO
 
-        elif mouse_ready and 7 in ativos and not key_ready:
+        elif mouse_ready and 4 in ativos and not key_ready:
             dx, dy = gyromouse(gyro[0], gyro[1])
             if dx != 0 or dy != 0:
                 # print(f'mouse: dx={dx}, dy={dy}')

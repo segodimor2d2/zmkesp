@@ -13,6 +13,7 @@ cd ~/zmkesp | term
 
 ```bash
 e /home/segodimo/zmkesp/esp/dicctozmk.py
+e /home/segodimo/zmkesp/esp/main.py
 e /home/segodimo/zmk-ws/zmkpromicro/config/corne.keymap
 e /home/segodimo/zmk-ws/zmk/app/boards/shields/corne/corne.dtsi
 cd ~/corne/zmk-config | term
@@ -1002,8 +1003,29 @@ $$$$
 
 
 
+eu quero adicionar esta função para mudar o estado do key_ready usando a função toggle_ready
 
 
+def switch_ready(key_ready, mouse_ready, vib):
+    if key_ready:
+        toggle_ready(key_ready, vib)
+    # else mouse_ready:
+    #     vibrar(vib, 1, 1, key_ready=True)
+
+
+
+eu quero ligar inicialmente o teclado e se usar a função de novo quero desligar tudo
+
+def toggle_ready(key_ready, mouse_ready, vib):
+    if not key_ready and not mouse_ready:
+        key_ready = True
+        vibrar(vib, 3, 0, key_ready=True)
+        return key_ready, mouse_ready
+    elif key_ready or mouse_ready:
+        key_ready = False
+        mouse_ready = False
+        vibrar(vib, 3, 0, key_ready=True)
+        return key_ready, mouse_ready
 
 
 

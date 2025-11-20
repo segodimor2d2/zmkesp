@@ -103,10 +103,28 @@ def liberar_repl(vib, led, segundos=3):
     #     time.sleep(1)
     # print("Loop retomado.")
 
-def toggle_ready(key_ready, vib):
-    key_ready = not key_ready
+def switch_ready(key_ready, mouse_ready, vib):
+    if key_ready:
+        # desliga teclado → liga mouse
+        vibrar(vib, 3, 0, key_ready=True)
+        return False, True
+
+    elif mouse_ready:
+        # desliga mouse → liga teclado
+        vibrar(vib, 3, 0, key_ready=True)
+        return True, False
+
+    return key_ready, mouse_ready
+
+def toggle_ready(key_ready, mouse_ready, vib):
+    if not key_ready and not mouse_ready:
+        vibrar(vib, 3, 0, key_ready=True)
+        return True, False
+
+    # Caso 2: teclado ou mouse ligado → desliga tudo
     vibrar(vib, 3, 0, key_ready=True)
-    return key_ready
+    return False, False
+
 
 def toggle_mouse(mouse_ready, vib, gyro=None):
     new_state = not mouse_ready
@@ -123,9 +141,9 @@ def process_triggers(ativos, gyro_state, triggers, key_ready, mouse_ready, vib):
         current_state = all(b in ativos for b in trig["buttons"]) and trig["condition"](gyro_state)
         if current_state and not trig["last_state"]:
             if trig.get("returns_ready", False):
-                key_ready = trig["action"](key_ready, vib)
-            elif trig.get("returns_mouse", False):
-                mouse_ready = trig["action"](mouse_ready, vib)
+                key_ready, mouse_ready = trig["action"](key_ready, mouse_ready, vib)
+            elif trig.get("returns_switch", False):
+                key_ready, mouse_ready = trig["action"](key_ready, mouse_ready, vib)
             else:
                 trig["action"]()
         trig["last_state"] = current_state
@@ -184,18 +202,21 @@ def start(i2c=None, mpu=None, mpr=None, pots=None, vib=None, led=None, force_cal
     triggers = [
 
         {
-            "buttons": {8},
+            "buttons": {8,7},
+            # "condition": lambda gs: True,
             "condition": lambda gs: gs.stepY == 1,
             "action": toggle_ready,
             "last_state": False,
             "returns_ready": True
         },
         {
-            "buttons": {5},
+            "buttons": {8},
+
+            # "condition": lambda gs: True,
             "condition": lambda gs: gs.stepY == 1,
-            "action": toggle_mouse,
+            "action": switch_ready,
             "last_state": False,
-            "returns_mouse": True
+            "returns_switch": True
         },
         {
             "buttons": {4, 6, 8},

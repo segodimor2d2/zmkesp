@@ -9,6 +9,9 @@ cd ~/zmkesp/firmwar | term
 cd ~/zmk-ws/zmkpromicro | term
 cd ~/zmkesp
 cd ~/zmkesp | term
+cd ~/zmk-ws/zmk/app/src/behaviors/locale/ | term
+
+
 ```
 
 ```bash
@@ -959,6 +962,35 @@ a ideia e intercalar os mouse_ready e o key_ready, cada ver que eu usar a funç�
 
 $$$$
 
+
+3 0  &mo 1 
+3 1  &mo 2 
+3 2  &mo 3
+3 3  &kp ENTER 
+3 4  &kp SPACE 
+3 5  &kp DELETE
+3 6  &kp TAB 
+3 7  &kp KP_DIVIDE 
+3 8  &kp BSPC 
+3 9  &kp TAB  
+3 10 &kp MINUS 
+3 11 &kp LS(FSLH)
+
+4 0  kp ESC 
+4 1  kp LSHFT 
+4 2  kp LCTRL 
+4 3  kp LALT
+4 4  kp LEFT_ARROW 
+4 5  kp DOWN 
+4 6  kp UP 
+4 7  kp RIGHT 
+4 8  mkp LCLK 
+4 9  mkp RCLK 
+4 10 mkp MCLK  
+4 11 kp GRAVE
+
+
+
 # [v] 0 mo 1  
 # [v] 1 mo 2  
 # [v] 2 mo 3 
@@ -973,22 +1005,144 @@ $$$$
 # [v] 10 kp MINUS  
 # [v] 11 kp LS(FSLH)
 
-
-
-
-# [v] 0 &kp KRP_DIVIDE /
+<!-- # [v] 0 &kp KRP_DIVIDE / -->
 # [v] 1 &kp RRA(W) ?
 # [v] 2 &kp ERXCL !
 
-# [x] 3 &kp RA(UNDERSCORE) \
-# [x] 4 &kp LBKT '
+<!-- &kp LA(PIPE) -->
+<!-- &kp RBKT     -->
+
 # [x] 5 &kp LS(LEFT_BRACE) `
 # [x] 6 &kp SQT ~
 
 # [x] 7 &kp xxxxx &
 # [x] 7 &kp xxxxx "
 
+# BACKSLASH [Backslash] and | [Pipe] RBRC \
 
+
+
+
+
+&kp RA(UNDERSCORE)
+
+
+&kp EXCL     
+&kp RA(W)    
+&kp KP_DIVIDE
+
+
+### &kp EXCL       /
+### &kp RA(W)      ?
+### &kp KP_DIVIDE  !
+
+### &kp LEFT_PARENTHESIS   (
+### &kp RIGHT_PARENTHESIS  )
+
+### &kp LEFT_BRACKET ´
+### &kp RIGHT_BRACKET [
+### &kp BACKSLASH ]
+
+### &kp LEFT_BRACE   `
+### &kp RIGHT_BRACE  {
+### &kp RBRC         {
+### &kp LS(RIGHT_BRACKET) {
+
+### &kp NON_US_BSLH \
+### &kp NON_US_BACKSLASH \
+
+### &kp DOUBLE_QUOTES  `
+### &kp LEFT_BRACE   \
+### &kp NUBS         ^
+
+### &kp GRAVE            '
+### &kp NON_US_BACKSLASH \
+### &kp UNDERSCORE       _
+
+### &kp LBKT      ´
+### &kp PIPE      }
+### &kp RBKT      [
+
+### &kp DOUBLE_QUOTES  &
+### &kp AMPS           ^
+### &kp UNDERSCORE     _
+
+### &kp DOUBLE_QUOTES ~
+### &kp DQT           ^
+### &kp SINGLE_QUOTE  ~
+
+### &kp SQT         ~
+### &kp APOSTROPHE  ~
+### &kp APOS        ~
+
+### &kp TILDE      "
+### &kp NON_US_HASH] 
+### &kp TILDE2     _ 
+ 
+### &kp GRAVE            '
+### &kp NON_US_BACKSLASH \ 
+### &kp UNDERSCORE      _  
+
+
+
+
+
+# &kp RA(UNDERSCORE) \ !!!
+
+# &kp BACKSLASH      
+# &kp LA(BACKSLASH)  
+# &kp NON_US_BSLH    
+
+# &kp DOUBLE_QUOTES  
+# &kp LEFT_BRACE     
+# &kp NUBS           
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+LA(RBKT)Left Alt + ] [Right Bracket] and } [Right Brace]
+LA(RIGHT_BRACKET)Left Alt + ] [Right Bracket] and } [Right Brace]
+
+LA(BACKSLASH)Left Alt + \ [Backslash] and | [Pipe]
+LA(PIPE)
+
+LA(SINGLE_QUOTE)Left Alt + ' [Apostrophe] and " [Quote (Double)]
+LA(DOUBLE_QUOTES)Left Alt + " [Quote (Double)]
+
+
+
+
+&kp LA(RBKT)           &kp LA(PIPE)
+
+
+
+
+
+
+
+
+&kp LBKT   &kp KP_DIVIDE  &none  &kp RBKT      &kp LS(LEFT_BRACE)  &none        &kp RA(UNDERSCORE)  &kp MINUS   &kp PLUS   &kp PRCNT  &kp DOUBLE_QUOTES  &kp DELETE
+&kp SQT    &kp RA(W)      &none  &kp LA(PIPE)  &kp PIPE            &none        &kp N0              &kp STAR    &kp HASH   &kp DLLR   &kp AMPS        &kp GRAVE
+&kp MINUS  &non           &none  &none         &kp RBRC            &none        &kp EQUAL           &kp AT      &kp EXCL   &kp RA(W)  &kp UNDERSCORE  &kp AMPS
 
 
 &kp KP_DIVIDE 
@@ -1027,6 +1181,9 @@ def toggle_ready(key_ready, mouse_ready, vib):
         vibrar(vib, 3, 0, key_ready=True)
         return key_ready, mouse_ready
 
+
+
+usando zmk v3.5.0 como mudo o teclado para ABNT2 na confuguração?
 
 
 

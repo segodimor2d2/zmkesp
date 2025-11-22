@@ -204,7 +204,7 @@ def start(i2c=None, mpu=None, mpr=None, pots=None, vib=None, led=None, force_cal
         {
             "buttons": {8},
             # "condition": lambda gs: True,
-            "condition": lambda gs: gs.stepY == -1,
+            "condition": lambda gs: gs.stepY == -2,
             "action": toggle_ready,
             "last_state": False,
             "returns_ready": True
@@ -291,17 +291,21 @@ def start(i2c=None, mpu=None, mpr=None, pots=None, vib=None, led=None, force_cal
 
 
         # --- botão ativa o mouse ---
-        if mouse_ready and 4 in ativos and 7 in ativos and not key_ready:
+        if mouse_ready and 4 in ativos and 6 in ativos and not key_ready:
+            dx, dy = gyromouse(gyro[0], gyro[1])
+            if dx != 0 or dy != 0:
+                send_mouse(dx, dy, 0, 0, 1) # BOTÃO ESQUERDO
+        elif mouse_ready and 4 in ativos and 3 in ativos and not key_ready:
             dx, dy = gyromouse(gyro[0], gyro[1])
             if dx != 0 or dy != 0:
                 send_mouse(dx, dy, 0, 0, 1) # BOTÃO ESQUERDO
 
-        elif mouse_ready and 4 in ativos and 3 in ativos and not key_ready:
+        elif mouse_ready and 4 in ativos and 2 in ativos and not key_ready:
             dx, dy = gyromouse(gyro[0], gyro[1])
             if dx != 0 or dy != 0:
                 send_mouse(dx, dy, 0, 0, 3) # BOTÃO DIREITO
 
-        elif mouse_ready and 4 in ativos and 2 in ativos and not key_ready:
+        elif mouse_ready and 4 in ativos and 1 in ativos and not key_ready:
             dx, dy = gyromouse(gyro[0], gyro[1])
             if dx != 0 or dy != 0:
                 send_mouse(dx, dy, 0, 0, 5) # BOTÃO MEDIO

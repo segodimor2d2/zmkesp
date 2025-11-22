@@ -119,7 +119,7 @@ def switch_ready(key_ready, mouse_ready, vib):
 def toggle_ready(key_ready, mouse_ready, vib):
     if not key_ready and not mouse_ready:
         vibrar(vib, 3, 0, key_ready=True)
-        return False, True
+        return True, False 
 
     # Caso 2: teclado ou mouse ligado → desliga tudo
     vibrar(vib, 3, 0, key_ready=True)
@@ -202,9 +202,9 @@ def start(i2c=None, mpu=None, mpr=None, pots=None, vib=None, led=None, force_cal
     triggers = [
 
         {
-            "buttons": {8,7},
+            "buttons": {8},
             # "condition": lambda gs: True,
-            "condition": lambda gs: gs.stepY == 1,
+            "condition": lambda gs: gs.stepY == -1,
             "action": toggle_ready,
             "last_state": False,
             "returns_ready": True

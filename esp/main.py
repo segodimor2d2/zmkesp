@@ -119,7 +119,7 @@ def switch_ready(key_ready, mouse_ready, vib):
 def toggle_ready(key_ready, mouse_ready, vib):
     if not key_ready and not mouse_ready:
         vibrar(vib, 3, 0, key_ready=True)
-        return True, False
+        return False, True
 
     # Caso 2: teclado ou mouse ligado → desliga tudo
     vibrar(vib, 3, 0, key_ready=True)

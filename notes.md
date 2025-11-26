@@ -11,7 +11,6 @@ cd ~/zmkesp
 cd ~/zmkesp | term
 cd ~/zmk-ws/zmk/app/src/behaviors/locale/ | term
 
-
 ```
 
 ```bash
@@ -23,14 +22,26 @@ cd ~/corne/zmk-config | term
 cd ~/corne/out_firmware | term
 e ~/corne/zmk-config/config/rec_corne.keymap
 e /home/segodimo/corne/zmk-config/config/rec_corne.keymap
+
+e /home/segodimo/00notes_apuntes/010nvimNotes.md
 cd ~/14java/proyectos-java/exeptions/09exeptions.md
 cd ~/14java/proyectos-java/exeptions | term
+
+# 531 bluetooth
+e /home/segodimo/00notes_apuntes/011archlinux.md
 ```
 
 
+## rec_corne
+[x] - add restart no promicro dos dois lados
 
-LKJ*#$sdf
 
+## corne
+[x] - add restart no promicro dos dois lados
+[x] - roadmap do ZMK
+
+<!-- LKJ*#$sdf -->
+<!-- 1090 -->
 
 Sophia Dai 
 ErgO, a smart ring
@@ -70,12 +81,6 @@ eu poderia enviar os dados dx e dy do mouse do peripheral para o central via zmk
 
 ---
 
-## corne
-- roadmap do ZMK
-- home end
-- spacebar no 3er botão da direita
-- "=" no 1,2 (a)
-
 
 - remapear puntos
 
@@ -107,6 +112,34 @@ jk
 - v fechar release quando muda o gyro
 
 --- --- ---
+
+
+
+
+lua require("telescope.builtin").find_files()
+lua require("telescope.builtin").find_files()
+
+require('telescope.builtin').registers()
+lua require('telescope.builtin').registers()
+
+## copiar
+1. selecione o texto "v"
+2. pressione '"'
+3. pressione letra que va assignar
+4. pressione "y" yank
+
+ex. "ay
+
+## colar
+<!-- 0. selecione o texto "v" (opcional) -->
+1. pressione '"'
+2. pressione letra que asignó
+3. pressione "p" paste
+
+ex. "ap
+
+
+
 
 
 ---

@@ -204,7 +204,7 @@ def start(i2c=None, mpu=None, mpr=None, pots=None, vib=None, led=None, force_cal
         {
             "buttons": {8},
             # "condition": lambda gs: True,
-            "condition": lambda gs: gs.stepY == -2,
+            "condition": lambda gs: gs.stepY == -1,
             "action": toggle_ready,
             "last_state": False,
             "returns_ready": True

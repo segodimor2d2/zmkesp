@@ -21,6 +21,7 @@ e /home/segodimo/zmk-ws/zmk/app/boards/shields/corne/corne.dtsi
 cd ~/corne/zmk-config | term
 cd ~/corne/out_firmware | term
 e ~/corne/zmk-config/config/rec_corne.keymap
+cd /home/segodimo/corne/zmk-config/ | term
 e /home/segodimo/corne/zmk-config/config/rec_corne.keymap
 
 e /home/segodimo/00notes_apuntes/010nvimNotes.md
@@ -30,6 +31,32 @@ cd ~/14java/proyectos-java/exeptions | term
 # 531 bluetooth
 e /home/segodimo/00notes_apuntes/011archlinux.md
 ```
+
+
+---
+
+IR$ 00 - j0
+
+R$ 00 - PROMICRO NRF52840
+R$ 00 - ESP32 DEVKIT V1
+R$ 14 - MPR121 Breakout v12 - MPR121 modulo touch screen 12 Bit
+R$ 00 - MPU-6050
+R$ 10 - motor de vibração vibracall 1027 3v
+
+
+
+
+MPR121 Breakout v12 
+10 https://pt.aliexpress.com/item/1005007041787476.html?spm=a2g0o.productlist.main.1.7c97SFu3SFu3br&algo_pvid=b5744202-ad09-4fd5-9f81-3dc0818f135f&algo_exp_id=b5744202-ad09-4fd5-9f81-3dc0818f135f-0&pdp_ext_f={"order"%3A"212"%2C"eval"%3A"1"%2C"fromPage"%3A"search"}&pdp_npi=6%40dis!BRL!20.50!11.94!!!3.52!2.05!%40210319b717642448734994969ef15f!12000039193594061!sea!BR!0!ABX!1!0!n_tag%3A-29910%3Bd%3Ac2a4937e%3Bm03_new_user%3A-29895%3BpisId%3A5000000187759702&curPageLogUid=CYBdk2vrWlad&utparam-url=scene%3Asearch|query_from%3A|x_object_id%3A1005007041787476|_p_origin_prod%3A
+26.55+11.95=38.5
+38.5/10 3.85
+
+10 https://pt.aliexpress.com/item/1005008464284816.html?spm=a2g0o.productlist.main.3.7c97SFu3SFu3br&algo_pvid=58b7ea9b-1cd8-4d3d-87d5-5084a1dbe20b&algo_exp_id=58b7ea9b-1cd8-4d3d-87d5-5084a1dbe20b-2&pdp_ext_f={"order"%3A"55"%2C"eval"%3A"1"%2C"fromPage"%3A"search"}&pdp_npi=6%40dis!BRL!35.93!25.27!!!6.17!4.34!%402101e80317642449802024498e136b!12000045247865065!sea!BR!0!ABX!1!0!n_tag%3A-29910%3Bd%3Ac2a4937e%3Bm03_new_user%3A-29895%3BpisId%3A5000000187759702&curPageLogUid=TEJvvXNCFqhc&utparam-url=scene%3Asearch|query_from%3A|x_object_id%3A1005008464284816|_p_origin_prod%3A
+25.27+11,31=36.58
+36.58/10 3.658
+
+R$ 35 - R$ 07 - motor de vibração vibracall 1027 3v
+R$ 56 - R$ 5.6 - motor de vibração vibracall 1027 3v
 
 
 ## rec_corne

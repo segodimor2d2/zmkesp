@@ -72,7 +72,7 @@ THRES_PERCENT = 0.1     # 0.05 (5%) | 0.2 (20%)
 GY1, GY2 = 1, 0    # Ordem dos eixos: X,Y (T,M=1,0) (M,T=0,1)
 
 if THIS_IS == 0: # Inverter sentido do eixo
-    INVERT_X, INVERT_Y, INVERT_Z = True, True, True # T,M 
+    INVERT_X, INVERT_Y, INVERT_Z = True, False, True # T,M 
 else:
     INVERT_X, INVERT_Y, INVERT_Z = True, True, True  # T,M
 

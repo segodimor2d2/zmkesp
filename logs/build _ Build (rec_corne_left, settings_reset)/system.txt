@@ -1,0 +1,8 @@
+2025-12-16T12:33:38.9520000Z Job is waiting for a hosted runner to come online.
+2025-12-16T12:33:38.9520000Z Job is about to start running on the hosted runner: GitHub Actions 1000000615
+2025-12-16T12:33:38.9320000Z Requested labels: ubuntu-latest
+2025-12-16T12:33:38.9320000Z Job defined at: zmkfirmware/zmk/.github/workflows/build-user-config.yml@refs/heads/main
+2025-12-16T12:33:38.9320000Z Reusable workflow chain:
+2025-12-16T12:33:38.9320000Z segodimor2d2/zmk-config/.github/workflows/build.yml@refs/heads/master (82fc3e7f4a5c3da51bd9a6af7233f32da7ab9a41)
+2025-12-16T12:33:38.9320000Z -> zmkfirmware/zmk/.github/workflows/build-user-config.yml@refs/heads/main (930b5cc058698986fabc1be96427c14937e983ea)
+2025-12-16T12:33:38.9320000Z Waiting for a runner to pick up this job...

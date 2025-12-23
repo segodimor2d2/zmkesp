@@ -10,7 +10,7 @@ INDEX_MAP_L = 9,10,11,4,3,2,1,0,5,6,7,8
 PINOS_VIB_L = 26
 
 INDEX_MAP_R = 8,7,6,5,0,1,2,3,4,9,10,11
-PINOS_VIB_R = 33
+PINOS_VIB_R = 26
 
 # ============================================================
 # IDENTIFICAÇÃO DO CHIP / DEFINIÇÃO DO LADO
@@ -19,8 +19,8 @@ chip_id = ubinascii.hexlify(machine.unique_id()).decode()
 print("Chip ID:", chip_id)  # Exemplo: '240ac4083456'
 
 # IDs conhecidos dos dois lados
-alesp = '083af27f9c38'
-aresp = '78e36d170944'
+alesp = '78e36d650258'
+aresp = 'ece334147530'
 
 # Define se este chip é o lado L (0) ou R (1)
 THIS_IS = 0 if chip_id == alesp else 1
@@ -68,14 +68,13 @@ MAD_MIN = 0.8 # -40 thresholds OFF
 SAMPLES = 5       # Amostras para suavisar a curva do giroscópio
 LIMGYRO = 14000   # 8000 (sensível) | 20000 (menos sensível)
 THRES_PERCENT = 0.1     # 0.05 (5%) | 0.2 (20%)
-GY1, GY2 = 0, 1    # Ordem dos eixos: X depois Y
 
-if THIS_IS == 0:
-    INVERT_X, INVERT_Y, INVERT_Z = True, False, True  # T,M Inverter sentido do eixo
-    # INVERT_X, INVERT_Y, INVERT_Z = False, True, True  # T,M Se inverter X e Y Bug
+GY1, GY2 = 1, 0    # Ordem dos eixos: X,Y (T,M=1,0) (M,T=0,1)
+
+if THIS_IS == 0: # Inverter sentido do eixo
+    INVERT_X, INVERT_Y, INVERT_Z = True, True, True # T,M 
 else:
-    INVERT_X, INVERT_Y, INVERT_Z = True, True, True   # T,M Inverter sentido do eixo
-
+    INVERT_X, INVERT_Y, INVERT_Z = True, True, True  # T,M
 
 CALIB_ACCL_FILE = "accl_calib.json"
 SAMPLES_ACCL = 100
@@ -83,6 +82,10 @@ TIME_ACCL_SAMPLES = 70
 ACCL_MAD_MAX = 5 # 5
 MARGIN_MIN = 2000 # 2000
 MARGIN_MAX = 4000 # 4000
+
+# MOUSE SENSITIVITY - fator de normalização (maior = menos sensível)
+MOUSESENSX = 160.0
+MOUSESENSY = 360.0
 
 # Sensibilidade separada por eixo e sentido
 # "X": 1.5 Eixo X vai disparar mais facilmente (thresholds ficam 50% menores).

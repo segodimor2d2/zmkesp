@@ -1,7 +1,7 @@
 from machine import Pin, UART
 import time
 from printlogs import log
-from config import THIS_IS, VIBRAR_LIGADO, VIBRAR_DESLIGADO, VIBRAR_LONGO, VIBRAR_ALERTA
+from config import THIS_IS, GY1, GY2, MOUSESENSX, MOUSESENSY, VIBRAR_LIGADO, VIBRAR_DESLIGADO, VIBRAR_LONGO, VIBRAR_ALERTA
 
 # UART - ajuste TX e RX conforme o seu hardware
 uart = UART(1, baudrate=115200, tx=17, rx=16)
@@ -49,9 +49,9 @@ def reset_mouse_center(gx, gy):
     _mouse_offset = [gx, gy]
     # print(f"[INFO] Mouse center resetado para gx={gx}, gy={gy}")
 
-def gyromouse(gx, gy, scale=360.0, deadzone=200.0):
+def gyromouse(gx, gy, deadzone=200.0):
     """
-    scale    : fator de normalização (maior = menos sensível)
+    MOUSESENSX, MOUSESENSY : fator de normalização (maior = menos sensível)
     deadzone : zona morta para ignorar pequenas variações (ruído)
     """
 
@@ -66,15 +66,18 @@ def gyromouse(gx, gy, scale=360.0, deadzone=200.0):
         gy = 0
 
     # Normaliza e limita
-    dx = int(max(-128, min(127, gx / scale)))
-    dy = int(max(-128, min(127, gy / scale)))
+    dx = int(max(-128, min(127, gx / MOUSESENSX)))
+    dy = int(max(-128, min(127, gy / MOUSESENSY)))
 
-    # Inverte os sentidos
+
+    # Inverte os sentidos do mouse
     if THIS_IS == 0:
         dx = -dx
         dy = -dy
 
-    return dx, dy
+    # Ordem dos eixos do mouse - GY1, GY2 
+    return (dx, dy) if (GY1 == 0 and GY2 == 1) else (dy, dx)
+
 
 
 def testmouse():

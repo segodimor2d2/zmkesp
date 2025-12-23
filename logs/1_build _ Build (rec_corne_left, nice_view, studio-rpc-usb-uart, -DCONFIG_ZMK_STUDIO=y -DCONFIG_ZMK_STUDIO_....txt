@@ -1,0 +1,2002 @@
+﻿2025-12-16T12:33:42.1733516Z Current runner version: '2.329.0'
+2025-12-16T12:33:42.1759095Z ##[group]Runner Image Provisioner
+2025-12-16T12:33:42.1759886Z Hosted Compute Agent
+2025-12-16T12:33:42.1760513Z Version: 20251202.455
+2025-12-16T12:33:42.1761113Z Commit: 6c10caca4910e198df60de23adf20ad317c474e3
+2025-12-16T12:33:42.1762036Z Build Date: 2025-12-02T15:56:59Z
+2025-12-16T12:33:42.1762687Z Worker ID: {7ccf95ad-8789-4c24-828a-ba63f7ea1e19}
+2025-12-16T12:33:42.1763487Z ##[endgroup]
+2025-12-16T12:33:42.1763983Z ##[group]Operating System
+2025-12-16T12:33:42.1764534Z Ubuntu
+2025-12-16T12:33:42.1765070Z 24.04.3
+2025-12-16T12:33:42.1765492Z LTS
+2025-12-16T12:33:42.1765929Z ##[endgroup]
+2025-12-16T12:33:42.1766487Z ##[group]Runner Image
+2025-12-16T12:33:42.1767034Z Image: ubuntu-24.04
+2025-12-16T12:33:42.1767507Z Version: 20251208.163.1
+2025-12-16T12:33:42.1768618Z Included Software: https://github.com/actions/runner-images/blob/ubuntu24/20251208.163/images/ubuntu/Ubuntu2404-Readme.md
+2025-12-16T12:33:42.1770135Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20251208.163
+2025-12-16T12:33:42.1771224Z ##[endgroup]
+2025-12-16T12:33:42.1772437Z ##[group]GITHUB_TOKEN Permissions
+2025-12-16T12:33:42.1774338Z Contents: read
+2025-12-16T12:33:42.1774919Z Metadata: read
+2025-12-16T12:33:42.1775424Z Packages: read
+2025-12-16T12:33:42.1775964Z ##[endgroup]
+2025-12-16T12:33:42.1777998Z Secret source: Actions
+2025-12-16T12:33:42.1778716Z Prepare workflow directory
+2025-12-16T12:33:42.2209610Z Prepare all required actions
+2025-12-16T12:33:42.2267629Z Getting action download info
+2025-12-16T12:33:42.6765850Z Download action repository 'actions/checkout@v4' (SHA:34e114876b0b11c390a56381ad16ebd13914f8d5)
+2025-12-16T12:33:42.7821761Z Download action repository 'actions/cache@v4' (SHA:0057852bfaa89a56745cba8c7296529d2fc39830)
+2025-12-16T12:33:42.9508350Z Download action repository 'actions/upload-artifact@v4' (SHA:ea165f8d65b6e75b540449e92b4886f43607fa02)
+2025-12-16T12:33:43.1472985Z Uses: zmkfirmware/zmk/.github/workflows/build-user-config.yml@refs/heads/main (930b5cc058698986fabc1be96427c14937e983ea)
+2025-12-16T12:33:43.1477886Z ##[group] Inputs
+2025-12-16T12:33:43.1478376Z   build_matrix_path: build.yaml
+2025-12-16T12:33:43.1478860Z   config_path: config
+2025-12-16T12:33:43.1479284Z   fallback_binary: bin
+2025-12-16T12:33:43.1479707Z   archive_name: firmware
+2025-12-16T12:33:43.1480131Z ##[endgroup]
+2025-12-16T12:33:43.1480968Z Complete job name: build / Build (rec_corne_left, nice_view, studio-rpc-usb-uart, -DCONFIG_ZMK_STUDIO=y -DCONFIG_ZMK_STUDIO_...
+2025-12-16T12:33:43.1972349Z ##[group]Checking docker version
+2025-12-16T12:33:43.1984999Z ##[command]/usr/bin/docker version --format '{{.Server.APIVersion}}'
+2025-12-16T12:33:43.3184262Z '1.48'
+2025-12-16T12:33:43.3197663Z Docker daemon API version: '1.48'
+2025-12-16T12:33:43.3198416Z ##[command]/usr/bin/docker version --format '{{.Client.APIVersion}}'
+2025-12-16T12:33:43.3355394Z '1.48'
+2025-12-16T12:33:43.3370046Z Docker client API version: '1.48'
+2025-12-16T12:33:43.3375447Z ##[endgroup]
+2025-12-16T12:33:43.3378293Z ##[group]Clean up resources from previous jobs
+2025-12-16T12:33:43.3384040Z ##[command]/usr/bin/docker ps --all --quiet --no-trunc --filter "label=1709e0"
+2025-12-16T12:33:43.3535825Z ##[command]/usr/bin/docker network prune --force --filter "label=1709e0"
+2025-12-16T12:33:43.3663871Z ##[endgroup]
+2025-12-16T12:33:43.3664366Z ##[group]Create local container network
+2025-12-16T12:33:43.3674493Z ##[command]/usr/bin/docker network create --label 1709e0 github_network_60092b694e8d4895a52c396a0f57816e
+2025-12-16T12:33:43.4189919Z 2bb75005009c7d730c79fa8c2e71893f93cd2091157a0771fb9ff20872e3700a
+2025-12-16T12:33:43.4209596Z ##[endgroup]
+2025-12-16T12:33:43.4233474Z ##[group]Starting job container
+2025-12-16T12:33:43.4252593Z ##[command]/usr/bin/docker pull zmkfirmware/zmk-build-arm:stable
+2025-12-16T12:33:44.3949750Z stable: Pulling from zmkfirmware/zmk-build-arm
+2025-12-16T12:33:44.6478372Z a1a21c96bc16: Pulling fs layer
+2025-12-16T12:33:44.6479699Z 80b3f0d914b4: Pulling fs layer
+2025-12-16T12:33:44.6481294Z 39f6267735b8: Pulling fs layer
+2025-12-16T12:33:45.0481645Z a1a21c96bc16: Download complete
+2025-12-16T12:33:46.3176883Z 39f6267735b8: Verifying Checksum
+2025-12-16T12:33:46.3177634Z 39f6267735b8: Download complete
+2025-12-16T12:33:46.3414543Z a1a21c96bc16: Pull complete
+2025-12-16T12:33:46.5619513Z 80b3f0d914b4: Verifying Checksum
+2025-12-16T12:33:46.5621094Z 80b3f0d914b4: Download complete
+2025-12-16T12:33:55.2387813Z 80b3f0d914b4: Pull complete
+2025-12-16T12:34:05.7804809Z 39f6267735b8: Pull complete
+2025-12-16T12:34:05.7840850Z Digest: sha256:edb1c953438c6f720ddb79c3762f3972013b7fbbaf4fff3592fc869983e7afc5
+2025-12-16T12:34:05.7852284Z Status: Downloaded newer image for zmkfirmware/zmk-build-arm:stable
+2025-12-16T12:34:05.7864072Z docker.io/zmkfirmware/zmk-build-arm:stable
+2025-12-16T12:34:05.7947556Z ##[command]/usr/bin/docker create --name cefb62cffcce4a1885cd9800e6c92b87_zmkfirmwarezmkbuildarmstable_ae8429 --label 1709e0 --workdir /__w/zmk-config/zmk-config --network github_network_60092b694e8d4895a52c396a0f57816e  -e "HOME=/github/home" -e GITHUB_ACTIONS=true -e CI=true -v "/var/run/docker.sock":"/var/run/docker.sock" -v "/home/runner/work":"/__w" -v "/home/runner/actions-runner/cached/externals":"/__e":ro -v "/home/runner/work/_temp":"/__w/_temp" -v "/home/runner/work/_actions":"/__w/_actions" -v "/opt/hostedtoolcache":"/__t" -v "/home/runner/work/_temp/_github_home":"/github/home" -v "/home/runner/work/_temp/_github_workflow":"/github/workflow" --entrypoint "tail" zmkfirmware/zmk-build-arm:stable "-f" "/dev/null"
+2025-12-16T12:34:05.8206580Z 47f5d863af06db48c42b59e6015a6019d2087e224e5abf55b6266e2b27df0f28
+2025-12-16T12:34:05.8235381Z ##[command]/usr/bin/docker start 47f5d863af06db48c42b59e6015a6019d2087e224e5abf55b6266e2b27df0f28
+2025-12-16T12:34:05.9887638Z 47f5d863af06db48c42b59e6015a6019d2087e224e5abf55b6266e2b27df0f28
+2025-12-16T12:34:05.9911309Z ##[command]/usr/bin/docker ps --all --filter id=47f5d863af06db48c42b59e6015a6019d2087e224e5abf55b6266e2b27df0f28 --filter status=running --no-trunc --format "{{.ID}} {{.Status}}"
+2025-12-16T12:34:06.0025628Z 47f5d863af06db48c42b59e6015a6019d2087e224e5abf55b6266e2b27df0f28 Up Less than a second
+2025-12-16T12:34:06.0043910Z ##[command]/usr/bin/docker inspect --format "{{range .Config.Env}}{{println .}}{{end}}" 47f5d863af06db48c42b59e6015a6019d2087e224e5abf55b6266e2b27df0f28
+2025-12-16T12:34:06.0156041Z GITHUB_ACTIONS=true
+2025-12-16T12:34:06.0156503Z CI=true
+2025-12-16T12:34:06.0156874Z HOME=/github/home
+2025-12-16T12:34:06.0157884Z PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+2025-12-16T12:34:06.0158556Z DEBIAN_FRONTEND=noninteractive
+2025-12-16T12:34:06.0159005Z ZEPHYR_VERSION=4.1.0
+2025-12-16T12:34:06.0176125Z ##[endgroup]
+2025-12-16T12:34:06.0184991Z ##[group]Waiting for all services to be ready
+2025-12-16T12:34:06.0186724Z ##[endgroup]
+2025-12-16T12:34:06.0433953Z ##[group]Run actions/checkout@v4
+2025-12-16T12:34:06.0434546Z with:
+2025-12-16T12:34:06.0434806Z   repository: segodimor2d2/zmk-config
+2025-12-16T12:34:06.0435290Z   token: ***
+2025-12-16T12:34:06.0435513Z   ssh-strict: true
+2025-12-16T12:34:06.0435734Z   ssh-user: git
+2025-12-16T12:34:06.0435970Z   persist-credentials: true
+2025-12-16T12:34:06.0436220Z   clean: true
+2025-12-16T12:34:06.0436457Z   sparse-checkout-cone-mode: true
+2025-12-16T12:34:06.0436735Z   fetch-depth: 1
+2025-12-16T12:34:06.0436950Z   fetch-tags: false
+2025-12-16T12:34:06.0437177Z   show-progress: true
+2025-12-16T12:34:06.0437395Z   lfs: false
+2025-12-16T12:34:06.0437601Z   submodules: false
+2025-12-16T12:34:06.0437821Z   set-safe-directory: true
+2025-12-16T12:34:06.0438280Z ##[endgroup]
+2025-12-16T12:34:06.0494463Z ##[command]/usr/bin/docker exec  47f5d863af06db48c42b59e6015a6019d2087e224e5abf55b6266e2b27df0f28 sh -c "cat /etc/*release | grep ^ID"
+2025-12-16T12:34:06.2510773Z Syncing repository: segodimor2d2/zmk-config
+2025-12-16T12:34:06.2512519Z ##[group]Getting Git version info
+2025-12-16T12:34:06.2512938Z Working directory is '/__w/zmk-config/zmk-config'
+2025-12-16T12:34:06.2513780Z [command]/usr/bin/git version
+2025-12-16T12:34:06.2514088Z git version 2.43.0
+2025-12-16T12:34:06.2537449Z ##[endgroup]
+2025-12-16T12:34:06.2553028Z Temporarily overriding HOME='/__w/_temp/a914c94a-50c6-4d82-9da6-9207796d4f0e' before making global git config changes
+2025-12-16T12:34:06.2553946Z Adding repository directory to the temporary git global config as a safe directory
+2025-12-16T12:34:06.2559213Z [command]/usr/bin/git config --global --add safe.directory /__w/zmk-config/zmk-config
+2025-12-16T12:34:06.2590746Z Deleting the contents of '/__w/zmk-config/zmk-config'
+2025-12-16T12:34:06.2594813Z ##[group]Initializing the repository
+2025-12-16T12:34:06.2606481Z [command]/usr/bin/git init /__w/zmk-config/zmk-config
+2025-12-16T12:34:06.2636514Z hint: Using 'master' as the name for the initial branch. This default branch name
+2025-12-16T12:34:06.2637389Z hint: is subject to change. To configure the initial branch name to use in all
+2025-12-16T12:34:06.2638072Z hint: of your new repositories, which will suppress this warning, call:
+2025-12-16T12:34:06.2638490Z hint: 
+2025-12-16T12:34:06.2638795Z hint: 	git config --global init.defaultBranch <name>
+2025-12-16T12:34:06.2639120Z hint: 
+2025-12-16T12:34:06.2639429Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+2025-12-16T12:34:06.2640051Z hint: 'development'. The just-created branch can be renamed via this command:
+2025-12-16T12:34:06.2640468Z hint: 
+2025-12-16T12:34:06.2640703Z hint: 	git branch -m <name>
+2025-12-16T12:34:06.2645339Z Initialized empty Git repository in /__w/zmk-config/zmk-config/.git/
+2025-12-16T12:34:06.2656867Z [command]/usr/bin/git remote add origin https://github.com/segodimor2d2/zmk-config
+2025-12-16T12:34:06.2684434Z ##[endgroup]
+2025-12-16T12:34:06.2685199Z ##[group]Disabling automatic garbage collection
+2025-12-16T12:34:06.2689167Z [command]/usr/bin/git config --local gc.auto 0
+2025-12-16T12:34:06.2716215Z ##[endgroup]
+2025-12-16T12:34:06.2716984Z ##[group]Setting up auth
+2025-12-16T12:34:06.2723749Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2025-12-16T12:34:06.2750932Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2025-12-16T12:34:06.2974648Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2025-12-16T12:34:06.3003995Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2025-12-16T12:34:06.3223919Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2025-12-16T12:34:06.3251880Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2025-12-16T12:34:06.3470286Z [command]/usr/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+2025-12-16T12:34:06.3502275Z ##[endgroup]
+2025-12-16T12:34:06.3502770Z ##[group]Fetching the repository
+2025-12-16T12:34:06.3511274Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +82fc3e7f4a5c3da51bd9a6af7233f32da7ab9a41:refs/remotes/origin/master
+2025-12-16T12:34:06.7450112Z From https://github.com/segodimor2d2/zmk-config
+2025-12-16T12:34:06.7450865Z  * [new ref]         82fc3e7f4a5c3da51bd9a6af7233f32da7ab9a41 -> origin/master
+2025-12-16T12:34:06.7477050Z ##[endgroup]
+2025-12-16T12:34:06.7477721Z ##[group]Determining the checkout info
+2025-12-16T12:34:06.7553949Z ##[endgroup]
+2025-12-16T12:34:06.7554461Z [command]/usr/bin/git sparse-checkout disable
+2025-12-16T12:34:06.7555273Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+2025-12-16T12:34:06.7557912Z ##[group]Checking out the ref
+2025-12-16T12:34:06.7562362Z [command]/usr/bin/git checkout --progress --force -B master refs/remotes/origin/master
+2025-12-16T12:34:06.7621277Z Reset branch 'master'
+2025-12-16T12:34:06.7622600Z branch 'master' set up to track 'origin/master'.
+2025-12-16T12:34:06.7628795Z ##[endgroup]
+2025-12-16T12:34:06.7660694Z [command]/usr/bin/git log -1 --format=%H
+2025-12-16T12:34:06.7681603Z 82fc3e7f4a5c3da51bd9a6af7233f32da7ab9a41
+2025-12-16T12:34:06.7871117Z ##[group]Run echo "build_dir=$(mktemp -d)" >> $GITHUB_ENV
+2025-12-16T12:34:06.7871776Z [36;1mecho "build_dir=$(mktemp -d)" >> $GITHUB_ENV[0m
+2025-12-16T12:34:06.7874950Z shell: sh -e {0}
+2025-12-16T12:34:06.7875176Z ##[endgroup]
+2025-12-16T12:34:06.8566026Z ##[group]Run if [ -e zephyr/module.yml ]; then
+2025-12-16T12:34:06.8566397Z [36;1mif [ -e zephyr/module.yml ]; then[0m
+2025-12-16T12:34:06.8566774Z [36;1m  export zmk_load_arg=" -DZMK_EXTRA_MODULES='${GITHUB_WORKSPACE}'"[0m
+2025-12-16T12:34:06.8567154Z [36;1m  new_tmp_dir="${TMPDIR:-/tmp}/zmk-config"[0m
+2025-12-16T12:34:06.8567449Z [36;1m  mkdir -p "${new_tmp_dir}"[0m
+2025-12-16T12:34:06.8567737Z [36;1m  echo "base_dir=${new_tmp_dir}" >> $GITHUB_ENV[0m
+2025-12-16T12:34:06.8568000Z [36;1melse[0m
+2025-12-16T12:34:06.8568231Z [36;1m  echo "base_dir=${GITHUB_WORKSPACE}" >> $GITHUB_ENV[0m
+2025-12-16T12:34:06.8568497Z [36;1mfi[0m
+2025-12-16T12:34:06.8568659Z [36;1m[0m
+2025-12-16T12:34:06.8568825Z [36;1mif [ -n "${snippet}" ]; then[0m
+2025-12-16T12:34:06.8569101Z [36;1m  extra_west_args="-S \"${snippet}\""[0m
+2025-12-16T12:34:06.8569376Z [36;1mfi[0m
+2025-12-16T12:34:06.8569533Z [36;1m[0m
+2025-12-16T12:34:06.8569789Z [36;1mecho "zephyr_version=${ZEPHYR_VERSION}" >> $GITHUB_ENV[0m
+2025-12-16T12:34:06.8570148Z [36;1mecho "extra_west_args=${extra_west_args}" >> $GITHUB_ENV[0m
+2025-12-16T12:34:06.8570592Z [36;1mecho "extra_cmake_args=${shield:+-DSHIELD=\"$shield\"}${zmk_load_arg}" >> $GITHUB_ENV[0m
+2025-12-16T12:34:06.8571061Z [36;1mecho "display_name=${shield:+$shield - }${board}" >> $GITHUB_ENV[0m
+2025-12-16T12:34:06.8571839Z [36;1mecho "artifact_name=${artifact_name:-${shield:+$shield-}${board//\//_}-zmk}" >> $GITHUB_ENV[0m
+2025-12-16T12:34:06.8573767Z shell: bash -x {0}
+2025-12-16T12:34:06.8573975Z env:
+2025-12-16T12:34:06.8574160Z   build_dir: /tmp/tmp.DD0xebocdz
+2025-12-16T12:34:06.8574400Z   board: rec_corne_left
+2025-12-16T12:34:06.8574599Z   shield: nice_view
+2025-12-16T12:34:06.8574792Z   artifact_name: rec_corne_studio_left
+2025-12-16T12:34:06.8575048Z   snippet: studio-rpc-usb-uart
+2025-12-16T12:34:06.8575271Z ##[endgroup]
+2025-12-16T12:34:06.9071334Z + '[' -e zephyr/module.yml ']'
+2025-12-16T12:34:06.9072131Z + export 'zmk_load_arg= -DZMK_EXTRA_MODULES='\''/__w/zmk-config/zmk-config'\'''
+2025-12-16T12:34:06.9072631Z + zmk_load_arg=' -DZMK_EXTRA_MODULES='\''/__w/zmk-config/zmk-config'\'''
+2025-12-16T12:34:06.9072983Z + new_tmp_dir=/tmp/zmk-config
+2025-12-16T12:34:06.9073236Z + mkdir -p /tmp/zmk-config
+2025-12-16T12:34:06.9083634Z + echo base_dir=/tmp/zmk-config
+2025-12-16T12:34:06.9085256Z + '[' -n studio-rpc-usb-uart ']'
+2025-12-16T12:34:06.9086170Z + extra_west_args='-S "studio-rpc-usb-uart"'
+2025-12-16T12:34:06.9086811Z + echo zephyr_version=4.1.0
+2025-12-16T12:34:06.9087242Z + echo 'extra_west_args=-S "studio-rpc-usb-uart"'
+2025-12-16T12:34:06.9088251Z + echo 'extra_cmake_args=-DSHIELD="nice_view" -DZMK_EXTRA_MODULES='\''/__w/zmk-config/zmk-config'\'''
+2025-12-16T12:34:06.9089082Z + echo 'display_name=nice_view - rec_corne_left'
+2025-12-16T12:34:06.9089586Z + echo artifact_name=rec_corne_studio_left
+2025-12-16T12:34:06.9162495Z ##[group]Run if [ "/tmp/zmk-config" != "${GITHUB_WORKSPACE}" ]; then
+2025-12-16T12:34:06.9162980Z [36;1mif [ "/tmp/zmk-config" != "${GITHUB_WORKSPACE}" ]; then[0m
+2025-12-16T12:34:06.9163324Z [36;1m  mkdir "/tmp/zmk-config/config"[0m
+2025-12-16T12:34:06.9163633Z [36;1m  cp -R config/* "/tmp/zmk-config/config/"[0m
+2025-12-16T12:34:06.9163895Z [36;1mfi[0m
+2025-12-16T12:34:06.9164160Z shell: sh -e {0}
+2025-12-16T12:34:06.9164332Z env:
+2025-12-16T12:34:06.9164509Z   build_dir: /tmp/tmp.DD0xebocdz
+2025-12-16T12:34:06.9164740Z   base_dir: /tmp/zmk-config
+2025-12-16T12:34:06.9165153Z   zephyr_version: 4.1.0
+2025-12-16T12:34:06.9165400Z   extra_west_args: -S "studio-rpc-usb-uart"
+2025-12-16T12:34:06.9165803Z   extra_cmake_args: -DSHIELD="nice_view" -DZMK_EXTRA_MODULES='/__w/zmk-config/zmk-config'
+2025-12-16T12:34:06.9166210Z   display_name: nice_view - rec_corne_left
+2025-12-16T12:34:06.9166465Z   artifact_name: rec_corne_studio_left
+2025-12-16T12:34:06.9166702Z ##[endgroup]
+2025-12-16T12:34:07.0490887Z ##[group]Run actions/cache@v4
+2025-12-16T12:34:07.0491166Z with:
+2025-12-16T12:34:07.0491847Z   path: /tmp/zmk-config/modules/
+/tmp/zmk-config/tools/
+/tmp/zmk-config/zephyr/
+/tmp/zmk-config/bootloader/
+/tmp/zmk-config/zmk/
+
+2025-12-16T12:34:07.0492654Z   key: Linux-build-cache-zephyr-4.1.0-modules-b8310ad9ba00f43bd390b02b37ee611ddb9c94c197398dc0cb3bd65c3df2d324
+2025-12-16T12:34:07.0493777Z   restore-keys: Linux-build-cache-zephyr-4.1.0-modules-
+Linux-build-
+Linux-
+
+2025-12-16T12:34:07.0494405Z   enableCrossOsArchive: false
+2025-12-16T12:34:07.0494646Z   fail-on-cache-miss: false
+2025-12-16T12:34:07.0494872Z   lookup-only: false
+2025-12-16T12:34:07.0495062Z   save-always: false
+2025-12-16T12:34:07.0495239Z env:
+2025-12-16T12:34:07.0495408Z   build_dir: /tmp/tmp.DD0xebocdz
+2025-12-16T12:34:07.0495637Z   base_dir: /tmp/zmk-config
+2025-12-16T12:34:07.0495840Z   zephyr_version: 4.1.0
+2025-12-16T12:34:07.0496069Z   extra_west_args: -S "studio-rpc-usb-uart"
+2025-12-16T12:34:07.0496505Z   extra_cmake_args: -DSHIELD="nice_view" -DZMK_EXTRA_MODULES='/__w/zmk-config/zmk-config'
+2025-12-16T12:34:07.0496911Z   display_name: nice_view - rec_corne_left
+2025-12-16T12:34:07.0497174Z   artifact_name: rec_corne_studio_left
+2025-12-16T12:34:07.0497425Z   cache_name: cache-zephyr-4.1.0-modules
+2025-12-16T12:34:07.0497666Z ##[endgroup]
+2025-12-16T12:34:07.0501595Z ##[command]/usr/bin/docker exec  47f5d863af06db48c42b59e6015a6019d2087e224e5abf55b6266e2b27df0f28 sh -c "cat /etc/*release | grep ^ID"
+2025-12-16T12:34:07.5575689Z Cache hit for: Linux-build-cache-zephyr-4.1.0-modules-b8310ad9ba00f43bd390b02b37ee611ddb9c94c197398dc0cb3bd65c3df2d324
+2025-12-16T12:34:08.8801744Z Received 8388608 of 659836906 (1.3%), 8.0 MBs/sec
+2025-12-16T12:34:09.8806483Z Received 125829120 of 659836906 (19.1%), 60.0 MBs/sec
+2025-12-16T12:34:10.8805181Z Received 255852544 of 659836906 (38.8%), 81.3 MBs/sec
+2025-12-16T12:34:11.8817809Z Received 381681664 of 659836906 (57.8%), 91.0 MBs/sec
+2025-12-16T12:34:12.8821897Z Received 494927872 of 659836906 (75.0%), 94.4 MBs/sec
+2025-12-16T12:34:13.8863486Z Received 620756992 of 659836906 (94.1%), 98.6 MBs/sec
+2025-12-16T12:34:14.1918082Z Received 659836906 of 659836906 (100.0%), 99.7 MBs/sec
+2025-12-16T12:34:14.1921851Z Cache Size: ~629 MB (659836906 B)
+2025-12-16T12:34:14.2022264Z [command]/usr/bin/tar -xf /__w/_temp/6ca2a72a-ad76-41c8-b88f-9ec868199466/cache.tgz -P -C /__w/zmk-config/zmk-config -z
+2025-12-16T12:34:26.6409857Z Cache restored successfully
+2025-12-16T12:34:26.7677787Z Cache restored from key: Linux-build-cache-zephyr-4.1.0-modules-b8310ad9ba00f43bd390b02b37ee611ddb9c94c197398dc0cb3bd65c3df2d324
+2025-12-16T12:34:26.7824238Z ##[group]Run west init -l "/tmp/zmk-config/config"
+2025-12-16T12:34:26.7824623Z [36;1mwest init -l "/tmp/zmk-config/config"[0m
+2025-12-16T12:34:26.7824987Z shell: sh -e {0}
+2025-12-16T12:34:26.7825161Z env:
+2025-12-16T12:34:26.7825347Z   build_dir: /tmp/tmp.DD0xebocdz
+2025-12-16T12:34:26.7825585Z   base_dir: /tmp/zmk-config
+2025-12-16T12:34:26.7825810Z   zephyr_version: 4.1.0
+2025-12-16T12:34:26.7826036Z   extra_west_args: -S "studio-rpc-usb-uart"
+2025-12-16T12:34:26.7826449Z   extra_cmake_args: -DSHIELD="nice_view" -DZMK_EXTRA_MODULES='/__w/zmk-config/zmk-config'
+2025-12-16T12:34:26.7826880Z   display_name: nice_view - rec_corne_left
+2025-12-16T12:34:26.7827146Z   artifact_name: rec_corne_studio_left
+2025-12-16T12:34:26.7827385Z ##[endgroup]
+2025-12-16T12:34:26.9497008Z === Initializing from existing manifest repository config
+2025-12-16T12:34:26.9497583Z --- Creating /tmp/zmk-config/.west and local configuration file
+2025-12-16T12:34:26.9507804Z === Initialized. Now run "west update" inside /tmp/zmk-config.
+2025-12-16T12:34:26.9723614Z ##[group]Run west update --fetch-opt=--filter=tree:0
+2025-12-16T12:34:26.9723994Z [36;1mwest update --fetch-opt=--filter=tree:0[0m
+2025-12-16T12:34:26.9724366Z shell: sh -e {0}
+2025-12-16T12:34:26.9724546Z env:
+2025-12-16T12:34:26.9724728Z   build_dir: /tmp/tmp.DD0xebocdz
+2025-12-16T12:34:26.9724970Z   base_dir: /tmp/zmk-config
+2025-12-16T12:34:26.9725185Z   zephyr_version: 4.1.0
+2025-12-16T12:34:26.9725412Z   extra_west_args: -S "studio-rpc-usb-uart"
+2025-12-16T12:34:26.9725817Z   extra_cmake_args: -DSHIELD="nice_view" -DZMK_EXTRA_MODULES='/__w/zmk-config/zmk-config'
+2025-12-16T12:34:26.9726213Z   display_name: nice_view - rec_corne_left
+2025-12-16T12:34:26.9726479Z   artifact_name: rec_corne_studio_left
+2025-12-16T12:34:26.9726720Z ##[endgroup]
+2025-12-16T12:34:27.2366350Z === updating zmk (zmk):
+2025-12-16T12:34:27.2393037Z --- zmk: fetching, need revision main
+2025-12-16T12:34:27.7356927Z From https://github.com/zmkfirmware/zmk
+2025-12-16T12:34:27.7357391Z  * branch            main       -> FETCH_HEAD
+2025-12-16T12:34:28.7288131Z Previous HEAD position was e34793e feat(docs): Update New Behavior Guide (#3107)
+2025-12-16T12:34:28.7291714Z HEAD is now at 930b5cc docs: Replace user setup script with ZMK CLI (#3137)
+2025-12-16T12:34:28.7439931Z === updating zephyr (zephyr):
+2025-12-16T12:34:28.7466619Z --- zephyr: fetching, need revision v4.1.0+zmk-fixes
+2025-12-16T12:34:29.3672275Z From https://github.com/zmkfirmware/zephyr
+2025-12-16T12:34:29.3672807Z  * branch              v4.1.0+zmk-fixes -> FETCH_HEAD
+2025-12-16T12:34:44.3050433Z Warning: you are leaving 1 commit behind, not connected to
+2025-12-16T12:34:44.3050967Z any of your branches:
+2025-12-16T12:34:44.3051124Z 
+2025-12-16T12:34:44.3051355Z   dacab4875 scripts: check_init_priorities: drop recursive child parsing
+2025-12-16T12:34:44.3051853Z 
+2025-12-16T12:34:44.3052053Z If you want to keep it by creating a new branch, this may be a good time
+2025-12-16T12:34:44.3052475Z to do so with:
+2025-12-16T12:34:44.3052641Z 
+2025-12-16T12:34:44.3052831Z  git branch <new-branch-name> dacab4875
+2025-12-16T12:34:44.3053156Z 
+2025-12-16T12:34:44.3054250Z HEAD is now at 1c698ff90 drivers: spi: spi_pl022: disable the SSP before reconfiguring
+2025-12-16T12:34:44.3516844Z === updating rec_corne (rec_corne):
+2025-12-16T12:34:44.3517374Z --- rec_corne: initializing
+2025-12-16T12:34:44.3561043Z Initialized empty Git repository in /tmp/zmk-config/rec_corne/.git/
+2025-12-16T12:34:44.3592693Z --- rec_corne: fetching, need revision main
+2025-12-16T12:34:44.8728129Z From https://github.com/a741725193/zmk-new_corne
+2025-12-16T12:34:44.8728688Z  * branch            main       -> FETCH_HEAD
+2025-12-16T12:34:45.4340708Z HEAD is now at 1a89329 Update eyelash_corne.dtsi
+2025-12-16T12:34:45.4397912Z HEAD is now at 1a89329 Update eyelash_corne.dtsi
+2025-12-16T12:34:45.4402233Z === updating lvgl (modules/lib/gui/lvgl):
+2025-12-16T12:34:51.6590467Z Warning: you are leaving 490 commits behind, not connected to
+2025-12-16T12:34:51.6590896Z any of your branches:
+2025-12-16T12:34:51.6591046Z 
+2025-12-16T12:34:51.6591219Z   8a6a2d1d2 zephyr: Move gluecode back to zephyr main repository
+2025-12-16T12:34:51.6591818Z   9fe0a7cc0 zephyr: rename shadow variables
+2025-12-16T12:34:51.6592097Z   5da257f78 zephyr: Add shell for lvgl
+2025-12-16T12:34:51.6592436Z   23d48b551 zephyr: lvgl_mem: Add printing of underlying sys_heap info
+2025-12-16T12:34:51.6592794Z  ... and 486 more.
+2025-12-16T12:34:51.6592921Z 
+2025-12-16T12:34:51.6593100Z If you want to keep them by creating a new branch, this may be a good time
+2025-12-16T12:34:51.6593470Z to do so with:
+2025-12-16T12:34:51.6593584Z 
+2025-12-16T12:34:51.6593680Z  git branch <new-branch-name> 8a6a2d1d2
+2025-12-16T12:34:51.6593865Z 
+2025-12-16T12:34:51.6598179Z HEAD is now at f1db87ee9 feat(theme_mono): Pass small/large fonts to theme init
+2025-12-16T12:34:51.6655381Z === updating zmk-studio-messages (modules/msgs/zmk-studio-messages):
+2025-12-16T12:34:51.6788246Z HEAD is now at 6cb4c28 refactor: Return detailed save changes response.
+2025-12-16T12:34:51.6792987Z === updating canopennode (modules/lib/canopennode):
+2025-12-16T12:34:51.6972550Z HEAD is now at dec12fa stack: map CANopenNode crc16_ccitt() to Zephyr crc16_itu_t()
+2025-12-16T12:34:51.6976312Z === updating chre (modules/lib/chre):
+2025-12-16T12:34:51.6976856Z --- chre: initializing
+2025-12-16T12:34:51.7009844Z Initialized empty Git repository in /tmp/zmk-config/modules/lib/chre/.git/
+2025-12-16T12:34:51.7043064Z --- chre: fetching, need revision 3b32c76efee705af146124fb4190f71be5a4e36e
+2025-12-16T12:34:52.2776630Z From https://github.com/zephyrproject-rtos/chre
+2025-12-16T12:34:52.2777174Z  * [new branch]      zephyr     -> refs/west/zephyr
+2025-12-16T12:34:53.3902836Z HEAD is now at 3b32c76 zephyr: link the .unstable_id data in ROM
+2025-12-16T12:34:53.4359241Z HEAD is now at 3b32c76 zephyr: link the .unstable_id data in ROM
+2025-12-16T12:34:53.4365754Z === updating lz4 (modules/lib/lz4):
+2025-12-16T12:34:53.4367258Z --- lz4: initializing
+2025-12-16T12:34:53.4407226Z Initialized empty Git repository in /tmp/zmk-config/modules/lib/lz4/.git/
+2025-12-16T12:34:53.4451308Z --- lz4: fetching, need revision 11b8a1e22fa651b524494e55d22b69d3d9cebcfd
+2025-12-16T12:34:54.2708730Z From https://github.com/zephyrproject-rtos/lz4
+2025-12-16T12:34:54.2710209Z  * [new branch]      zephyr     -> refs/west/zephyr
+2025-12-16T12:34:54.2720424Z  * [new tag]         lz4-r130   -> lz4-r130
+2025-12-16T12:34:54.2724252Z  * [new tag]         r116       -> r116
+2025-12-16T12:34:54.2724735Z  * [new tag]         r117       -> r117
+2025-12-16T12:34:54.2725189Z  * [new tag]         r118       -> r118
+2025-12-16T12:34:54.2725778Z  * [new tag]         r119       -> r119
+2025-12-16T12:34:54.2728386Z  * [new tag]         r120       -> r120
+2025-12-16T12:34:54.2730036Z  * [new tag]         r121       -> r121
+2025-12-16T12:34:54.2730834Z  * [new tag]         r122       -> r122
+2025-12-16T12:34:54.2735723Z  * [new tag]         r123       -> r123
+2025-12-16T12:34:54.2737895Z  * [new tag]         r124       -> r124
+2025-12-16T12:34:54.2740500Z  * [new tag]         r125       -> r125
+2025-12-16T12:34:54.2741109Z  * [new tag]         r126       -> r126
+2025-12-16T12:34:54.2744467Z  * [new tag]         r127       -> r127
+2025-12-16T12:34:54.2744888Z  * [new tag]         r128       -> r128
+2025-12-16T12:34:54.2745905Z  * [new tag]         r129       -> r129
+2025-12-16T12:34:54.2746588Z  * [new tag]         r130       -> r130
+2025-12-16T12:34:54.2748306Z  * [new tag]         r131       -> r131
+2025-12-16T12:34:54.2752869Z  * [new tag]         rc129v0    -> rc129v0
+2025-12-16T12:34:54.2753622Z  * [new tag]         v1.7.3     -> v1.7.3
+2025-12-16T12:34:54.2756652Z  * [new tag]         v1.7.4     -> v1.7.4
+2025-12-16T12:34:54.2757416Z  * [new tag]         v1.7.4.2   -> v1.7.4.2
+2025-12-16T12:34:54.2758129Z  * [new tag]         v1.7.5     -> v1.7.5
+2025-12-16T12:34:54.2758563Z  * [new tag]         v1.8.0     -> v1.8.0
+2025-12-16T12:34:54.2760523Z  * [new tag]         v1.8.1     -> v1.8.1
+2025-12-16T12:34:54.2761275Z  * [new tag]         v1.8.1.2   -> v1.8.1.2
+2025-12-16T12:34:54.2761959Z  * [new tag]         v1.8.2     -> v1.8.2
+2025-12-16T12:34:54.2764944Z  * [new tag]         v1.8.3     -> v1.8.3
+2025-12-16T12:34:54.2767031Z  * [new tag]         v1.9.0     -> v1.9.0
+2025-12-16T12:34:54.2771853Z  * [new tag]         v1.9.1     -> v1.9.1
+2025-12-16T12:34:54.2772850Z  * [new tag]         v1.9.2     -> v1.9.2
+2025-12-16T12:34:54.2774139Z  * [new tag]         v1.9.3     -> v1.9.3
+2025-12-16T12:34:55.7006105Z HEAD is now at 11b8a1e Merge pull request #2 from parthitce/dev/v1.10.0
+2025-12-16T12:34:55.7153549Z HEAD is now at 11b8a1e Merge pull request #2 from parthitce/dev/v1.10.0
+2025-12-16T12:34:55.7157348Z === updating nanopb (modules/lib/nanopb):
+2025-12-16T12:34:56.5436850Z Warning: you are leaving 13 commits behind, not connected to
+2025-12-16T12:34:56.5437271Z any of your branches:
+2025-12-16T12:34:56.5437426Z 
+2025-12-16T12:34:56.5437652Z   8c60555 Merge pull request #4 from petejohanson/build/find-protoc-fixes
+2025-12-16T12:34:56.5438539Z   0e21d98 Prefer generator/protoc in CMake
+2025-12-16T12:34:56.5438981Z   bf32817 Merge pull request #2 from zmkfirmware/optimize/reduce-stack-usage
+2025-12-16T12:34:56.5439655Z   6276a4f Various stack size reduction tweaks
+2025-12-16T12:34:56.5440143Z  ... and 9 more.
+2025-12-16T12:34:56.5440344Z 
+2025-12-16T12:34:56.5440833Z If you want to keep them by creating a new branch, this may be a good time
+2025-12-16T12:34:56.5460001Z to do so with:
+2025-12-16T12:34:56.5460200Z 
+2025-12-16T12:34:56.5460365Z  git branch <new-branch-name> 8c60555
+2025-12-16T12:34:56.5460663Z 
+2025-12-16T12:34:56.5460861Z HEAD is now at 7307ce3 Update README.md (#1042)
+2025-12-16T12:34:56.5461555Z === updating psa-arch-tests (modules/tee/tf-m/psa-arch-tests):
+2025-12-16T12:34:56.5462120Z --- psa-arch-tests: initializing
+2025-12-16T12:34:56.5493409Z Initialized empty Git repository in /tmp/zmk-config/modules/tee/tf-m/psa-arch-tests/.git/
+2025-12-16T12:34:56.5528847Z --- psa-arch-tests: fetching, need revision 2cadb02a72eacda7042505dcbdd492371e8ce024
+2025-12-16T12:34:56.9983885Z From https://github.com/zephyrproject-rtos/psa-arch-tests
+2025-12-16T12:34:56.9984709Z  * [new branch]      zephyr_psa-arch-tests_v1.6 -> refs/west/zephyr_psa-arch-tests_v1.6
+2025-12-16T12:34:56.9985662Z  * [new tag]         zephyr_psa-arch-tests_v1.6_tf-m_v2.2.0 -> zephyr_psa-arch-tests_v1.6_tf-m_v2.2.0
+2025-12-16T12:34:58.0902274Z HEAD is now at 2cadb02 Merge pull request #10 from mswarowsky/tfm_20_upmerge
+2025-12-16T12:34:58.1396951Z HEAD is now at 2cadb02 Merge pull request #10 from mswarowsky/tfm_20_upmerge
+2025-12-16T12:34:58.1401350Z === updating sof (modules/audio/sof):
+2025-12-16T12:34:58.1402213Z --- sof: initializing
+2025-12-16T12:34:58.1436976Z Initialized empty Git repository in /tmp/zmk-config/modules/audio/sof/.git/
+2025-12-16T12:34:58.1470761Z --- sof: fetching, need revision bc08c9c606324cfba0c104f4ffaf5dd456cb11d6
+2025-12-16T12:34:58.8223241Z From https://github.com/zephyrproject-rtos/sof
+2025-12-16T12:34:58.8224021Z  * [new branch]      CAVS_LPRO_ONLY          -> refs/west/CAVS_LPRO_ONLY
+2025-12-16T12:34:58.8224763Z  * [new branch]      llext-segment           -> refs/west/llext-segment
+2025-12-16T12:34:58.8225834Z  * [new branch]      zephyr                  -> refs/west/zephyr
+2025-12-16T12:34:58.8227871Z  * [new branch]      zephyr-20220914         -> refs/west/zephyr-20220914
+2025-12-16T12:34:58.8229492Z  * [new branch]      zephyr-20230807         -> refs/west/zephyr-20230807
+2025-12-16T12:34:58.8231748Z  * [new branch]      zephyr-20240122         -> refs/west/zephyr-20240122
+2025-12-16T12:34:58.8233768Z  * [new branch]      zephyr-20240604         -> refs/west/zephyr-20240604
+2025-12-16T12:34:58.8235664Z  * [new branch]      zephyr-20241014         -> refs/west/zephyr-20241014
+2025-12-16T12:34:58.8237691Z  * [new branch]      zephyr-20241203-branch  -> refs/west/zephyr-20241203-branch
+2025-12-16T12:34:58.8239293Z  * [new branch]      zephyr-3.7              -> refs/west/zephyr-3.7
+2025-12-16T12:34:58.8241737Z  * [new branch]      zephyr-v2.6             -> refs/west/zephyr-v2.6
+2025-12-16T12:34:58.8243497Z  * [new branch]      zephyr-v3.0             -> refs/west/zephyr-v3.0
+2025-12-16T12:34:58.8245510Z  * [new branch]      zephyr_06042023         -> refs/west/zephyr_06042023
+2025-12-16T12:34:58.8247748Z  * [new branch]      zephyr_wip              -> refs/west/zephyr_wip
+2025-12-16T12:34:58.8249824Z  * [new branch]      zephyr_wip2             -> refs/west/zephyr_wip2
+2025-12-16T12:34:58.8260698Z  * [new tag]         0ead9e7                 -> 0ead9e7
+2025-12-16T12:34:58.8262327Z  * [new tag]         1.0.0                   -> 1.0.0
+2025-12-16T12:34:58.8264111Z  * [new tag]         1.0.1                   -> 1.0.1
+2025-12-16T12:34:58.8266053Z  * [new tag]         1.0.5                   -> 1.0.5
+2025-12-16T12:34:58.8267426Z  * [new tag]         M1.5                    -> M1.5
+2025-12-16T12:34:58.8269258Z  * [new tag]         M2                      -> M2
+2025-12-16T12:34:58.8271137Z  * [new tag]         post_processing_v1      -> post_processing_v1
+2025-12-16T12:34:58.8274372Z  * [new tag]         releases/cnl/v1.0       -> releases/cnl/v1.0
+2025-12-16T12:34:58.8276842Z  * [new tag]         releases/glk/v1.0       -> releases/glk/v1.0
+2025-12-16T12:34:58.8278349Z  * [new tag]         releases/glk/v1.1       -> releases/glk/v1.1
+2025-12-16T12:34:58.8280078Z  * [new tag]         releases/glk/v12.0      -> releases/glk/v12.0
+2025-12-16T12:34:58.8282133Z  * [new tag]         releases/glk/v12.1      -> releases/glk/v12.1
+2025-12-16T12:34:58.8283817Z  * [new tag]         releases/glk/v2.0       -> releases/glk/v2.0
+2025-12-16T12:34:58.8285555Z  * [new tag]         releases/glk/v3.0       -> releases/glk/v3.0
+2025-12-16T12:34:58.8287355Z  * [new tag]         releases/glk/v4.0       -> releases/glk/v4.0
+2025-12-16T12:34:58.8289161Z  * [new tag]         releases/glk/v5.0       -> releases/glk/v5.0
+2025-12-16T12:34:58.8291694Z  * [new tag]         releases/gp2.0/alpha    -> releases/gp2.0/alpha
+2025-12-16T12:34:58.8293784Z  * [new tag]         releases/gp2.0/preAlpha -> releases/gp2.0/preAlpha
+2025-12-16T12:34:58.8296336Z  * [new tag]         releases/icl/v1.0       -> releases/icl/v1.0
+2025-12-16T12:34:58.8298878Z  * [new tag]         releases/jsl/v3.0       -> releases/jsl/v3.0
+2025-12-16T12:34:58.8300922Z  * [new tag]         releases/jsl/v3.0-rc1   -> releases/jsl/v3.0-rc1
+2025-12-16T12:34:58.8302915Z  * [new tag]         releases/jsl/v3.0-rc2   -> releases/jsl/v3.0-rc2
+2025-12-16T12:34:58.8305024Z  * [new tag]         releases/jsl/v4.0       -> releases/jsl/v4.0
+2025-12-16T12:34:58.8307068Z  * [new tag]         releases/jsl/v4.0-rc1   -> releases/jsl/v4.0-rc1
+2025-12-16T12:34:58.8309044Z  * [new tag]         releases/jsl/v4.0-rc2   -> releases/jsl/v4.0-rc2
+2025-12-16T12:34:58.8312098Z  * [new tag]         releases/tgl/v1.0       -> releases/tgl/v1.0
+2025-12-16T12:34:58.8313621Z  * [new tag]         releases/tgl/v10.0      -> releases/tgl/v10.0
+2025-12-16T12:34:58.8315621Z  * [new tag]         releases/tgl/v10.0-rc1  -> releases/tgl/v10.0-rc1
+2025-12-16T12:34:58.8317646Z  * [new tag]         releases/tgl/v11.0-rc1  -> releases/tgl/v11.0-rc1
+2025-12-16T12:34:58.8319743Z  * [new tag]         releases/tgl/v11.0-rc2  -> releases/tgl/v11.0-rc2
+2025-12-16T12:34:58.8322134Z  * [new tag]         releases/tgl/v11.0-rc3  -> releases/tgl/v11.0-rc3
+2025-12-16T12:34:58.8323467Z  * [new tag]         releases/tgl/v11.0-rc4  -> releases/tgl/v11.0-rc4
+2025-12-16T12:34:58.8325656Z  * [new tag]         releases/tgl/v7.0       -> releases/tgl/v7.0
+2025-12-16T12:34:58.8327785Z  * [new tag]         releases/tgl/v7.0-rc1   -> releases/tgl/v7.0-rc1
+2025-12-16T12:34:58.8329924Z  * [new tag]         releases/tgl/v7.0-rc10  -> releases/tgl/v7.0-rc10
+2025-12-16T12:34:58.8331866Z  * [new tag]         releases/tgl/v7.0-rc2   -> releases/tgl/v7.0-rc2
+2025-12-16T12:34:58.8334007Z  * [new tag]         releases/tgl/v7.0-rc3   -> releases/tgl/v7.0-rc3
+2025-12-16T12:34:58.8335105Z  * [new tag]         releases/tgl/v7.0-rc4   -> releases/tgl/v7.0-rc4
+2025-12-16T12:34:58.8336810Z  * [new tag]         releases/tgl/v7.0-rc5   -> releases/tgl/v7.0-rc5
+2025-12-16T12:34:58.8338579Z  * [new tag]         releases/tgl/v7.0-rc6   -> releases/tgl/v7.0-rc6
+2025-12-16T12:34:58.8340527Z  * [new tag]         releases/tgl/v7.0-rc7   -> releases/tgl/v7.0-rc7
+2025-12-16T12:34:58.8342582Z  * [new tag]         releases/tgl/v7.0-rc8   -> releases/tgl/v7.0-rc8
+2025-12-16T12:34:58.8344539Z  * [new tag]         releases/tgl/v7.0-rc9   -> releases/tgl/v7.0-rc9
+2025-12-16T12:34:58.8346880Z  * [new tag]         releases/tgl/v8.0       -> releases/tgl/v8.0
+2025-12-16T12:34:58.8349166Z  * [new tag]         releases/whl/v1.0       -> releases/whl/v1.0
+2025-12-16T12:34:58.8350743Z  * [new tag]         sof-zephyr-06042023     -> sof-zephyr-06042023
+2025-12-16T12:34:58.8352811Z  * [new tag]         v0.1                    -> v0.1
+2025-12-16T12:34:58.8354227Z  * [new tag]         v0.9                    -> v0.9
+2025-12-16T12:34:58.8356248Z  * [new tag]         v0.9.1                  -> v0.9.1
+2025-12-16T12:34:58.8357804Z  * [new tag]         v0.9.1-rc1              -> v0.9.1-rc1
+2025-12-16T12:34:58.8359650Z  * [new tag]         v0.9.1-rc2              -> v0.9.1-rc2
+2025-12-16T12:34:58.8361053Z  * [new tag]         v0.9.1-rc3              -> v0.9.1-rc3
+2025-12-16T12:34:58.8363861Z  * [new tag]         v0.9.5                  -> v0.9.5
+2025-12-16T12:34:58.8365453Z  * [new tag]         v0.9.5-rc1              -> v0.9.5-rc1
+2025-12-16T12:34:58.8367459Z  * [new tag]         v0.9.5-rc2              -> v0.9.5-rc2
+2025-12-16T12:34:58.8368840Z  * [new tag]         v1.0                    -> v1.0
+2025-12-16T12:34:58.8370833Z  * [new tag]         v1.0-rc1                -> v1.0-rc1
+2025-12-16T12:34:58.8372837Z  * [new tag]         v1.0-rc2                -> v1.0-rc2
+2025-12-16T12:34:58.8374480Z  * [new tag]         v1.0-rc3                -> v1.0-rc3
+2025-12-16T12:34:58.8376377Z  * [new tag]         v1.0.1                  -> v1.0.1
+2025-12-16T12:34:58.8377797Z  * [new tag]         v1.0.2                  -> v1.0.2
+2025-12-16T12:34:58.8379761Z  * [new tag]         v1.1                    -> v1.1
+2025-12-16T12:34:58.8381729Z  * [new tag]         v1.1-rc1                -> v1.1-rc1
+2025-12-16T12:34:58.8383657Z  * [new tag]         v1.1-rc2                -> v1.1-rc2
+2025-12-16T12:34:58.8385418Z  * [new tag]         v1.1-rc3                -> v1.1-rc3
+2025-12-16T12:34:58.8387347Z  * [new tag]         v1.2                    -> v1.2
+2025-12-16T12:34:58.8389679Z  * [new tag]         v1.2-rc1                -> v1.2-rc1
+2025-12-16T12:34:58.8390941Z  * [new tag]         v1.2-rc2                -> v1.2-rc2
+2025-12-16T12:34:58.8392789Z  * [new tag]         v1.3                    -> v1.3
+2025-12-16T12:34:58.8394659Z  * [new tag]         v1.3-rc1                -> v1.3-rc1
+2025-12-16T12:34:58.8396778Z  * [new tag]         v1.3-rc2                -> v1.3-rc2
+2025-12-16T12:34:58.8398675Z  * [new tag]         v1.3-rc3                -> v1.3-rc3
+2025-12-16T12:34:58.8400921Z  * [new tag]         v1.3.1                  -> v1.3.1
+2025-12-16T12:34:58.8402387Z  * [new tag]         v1.4                    -> v1.4
+2025-12-16T12:34:58.8404369Z  * [new tag]         v1.4-rc1                -> v1.4-rc1
+2025-12-16T12:34:58.8405857Z  * [new tag]         v1.4.1                  -> v1.4.1
+2025-12-16T12:34:58.8407598Z  * [new tag]         v1.4.2                  -> v1.4.2
+2025-12-16T12:34:58.8409372Z  * [new tag]         v1.4.3                  -> v1.4.3
+2025-12-16T12:34:58.8411008Z  * [new tag]         v1.5                    -> v1.5
+2025-12-16T12:34:58.8413031Z  * [new tag]         v1.5-rc1                -> v1.5-rc1
+2025-12-16T12:34:58.8414952Z  * [new tag]         v1.5-rc2                -> v1.5-rc2
+2025-12-16T12:34:58.8416742Z  * [new tag]         v1.5-rc3                -> v1.5-rc3
+2025-12-16T12:34:58.8419231Z  * [new tag]         v1.5-rc4                -> v1.5-rc4
+2025-12-16T12:34:58.8420279Z  * [new tag]         v1.5-rc5                -> v1.5-rc5
+2025-12-16T12:34:58.8422369Z  * [new tag]         v1.5.1                  -> v1.5.1
+2025-12-16T12:34:58.8424564Z  * [new tag]         v1.6                    -> v1.6
+2025-12-16T12:34:58.8426526Z  * [new tag]         v1.6-rc1                -> v1.6-rc1
+2025-12-16T12:34:58.8427848Z  * [new tag]         v1.6-rc2                -> v1.6-rc2
+2025-12-16T12:34:58.8430220Z  * [new tag]         v1.6-rc3                -> v1.6-rc3
+2025-12-16T12:34:58.8431779Z  * [new tag]         v1.6.1                  -> v1.6.1
+2025-12-16T12:34:58.8434053Z  * [new tag]         zephyr-20220412.1       -> zephyr-20220412.1
+2025-12-16T12:34:58.8435836Z  * [new tag]         zephyr-20230807         -> zephyr-20230807
+2025-12-16T12:34:58.8437276Z  * [new tag]         zephyr-20240122         -> zephyr-20240122
+2025-12-16T12:34:58.8439429Z  * [new tag]         zephyr-20240807         -> zephyr-20240807
+2025-12-16T12:34:58.8440957Z  * [new tag]         zephyr-20241203         -> zephyr-20241203
+2025-12-16T12:34:58.8443182Z  * [new tag]         zephyr-20250728         -> zephyr-20250728
+2025-12-16T12:35:00.7789840Z HEAD is now at bc08c9c6 app: zephyr still requires cmake version 3.20.0
+2025-12-16T12:35:00.8927904Z HEAD is now at bc08c9c6 app: zephyr still requires cmake version 3.20.0
+2025-12-16T12:35:00.8933110Z === updating tf-m-tests (modules/tee/tf-m/tf-m-tests):
+2025-12-16T12:35:00.8934151Z --- tf-m-tests: initializing
+2025-12-16T12:35:00.8970841Z Initialized empty Git repository in /tmp/zmk-config/modules/tee/tf-m/tf-m-tests/.git/
+2025-12-16T12:35:00.9006181Z --- tf-m-tests: fetching, need revision 502ea90105ee18f20c78f710e2ba2ded0fc0756e
+2025-12-16T12:35:01.3663647Z From https://github.com/zephyrproject-rtos/tf-m-tests
+2025-12-16T12:35:01.3664352Z  * [new branch]      v3.7-branch              -> refs/west/v3.7-branch
+2025-12-16T12:35:01.3665112Z  * [new branch]      zephyr_tf-m-tests_v2.2.2 -> refs/west/zephyr_tf-m-tests_v2.2.2
+2025-12-16T12:35:01.3665873Z  * [new tag]         zephyr_tf-m-tests_v2.2.0 -> zephyr_tf-m-tests_v2.2.0
+2025-12-16T12:35:02.2664705Z HEAD is now at 502ea90 Merge pull request #11 from tomi-font/update_2.1.1
+2025-12-16T12:35:02.3130897Z HEAD is now at 502ea90 Merge pull request #11 from tomi-font/update_2.1.1
+2025-12-16T12:35:02.3135259Z === updating tflite-micro (optional/modules/lib/tflite-micro):
+2025-12-16T12:35:02.3136098Z --- tflite-micro: initializing
+2025-12-16T12:35:02.3173360Z Initialized empty Git repository in /tmp/zmk-config/optional/modules/lib/tflite-micro/.git/
+2025-12-16T12:35:02.3208019Z --- tflite-micro: fetching, need revision 8d404de73acf7687831e16d88e86e4f73cfddf8e
+2025-12-16T12:35:02.8586224Z From https://github.com/zephyrproject-rtos/tflite-micro
+2025-12-16T12:35:02.8586904Z  * [new branch]      main             -> refs/west/main
+2025-12-16T12:35:02.8588117Z  * [new branch]      zephyr           -> refs/west/zephyr
+2025-12-16T12:35:02.8588757Z  * [new branch]      zephyr-v3.6.0    -> refs/west/zephyr-v3.6.0
+2025-12-16T12:35:02.8590789Z  * [new branch]      zephyr-v4.1.0    -> refs/west/zephyr-v4.1.0
+2025-12-16T12:35:02.8592838Z  * [new tag]         zephyr_202108023 -> zephyr_202108023
+2025-12-16T12:35:02.8594358Z  * [new tag]         zephyr_20230809  -> zephyr_20230809
+2025-12-16T12:35:02.8596557Z  * [new tag]         zephyr_20240627  -> zephyr_20240627
+2025-12-16T12:35:04.4720524Z HEAD is now at 8d404de third_party_static: exported
+2025-12-16T12:35:04.5914979Z HEAD is now at 8d404de third_party_static: exported
+2025-12-16T12:35:04.5919346Z === updating thrift (optional/modules/lib/thrift):
+2025-12-16T12:35:04.5921947Z --- thrift: initializing
+2025-12-16T12:35:04.5953600Z Initialized empty Git repository in /tmp/zmk-config/optional/modules/lib/thrift/.git/
+2025-12-16T12:35:04.5987390Z --- thrift: fetching, need revision 10023645a0e6cb7ce23fcd7fd3dbac9f18df6234
+2025-12-16T12:35:05.1656291Z From https://github.com/zephyrproject-rtos/thrift
+2025-12-16T12:35:05.1657070Z  * [new branch]      add-zephyr-module-dir -> refs/west/add-zephyr-module-dir
+2025-12-16T12:35:05.1657804Z  * [new branch]      master                -> refs/west/master
+2025-12-16T12:35:05.1658664Z  * [new branch]      update-zephyr-to-thrift-0.20.0 -> refs/west/update-zephyr-to-thrift-0.20.0
+2025-12-16T12:35:05.1660258Z  * [new branch]      zephyr                -> refs/west/zephyr
+2025-12-16T12:35:07.0060898Z HEAD is now at 1002364 Merge pull request #1 from zephyrproject-rtos/add-zephyr-module-dir
+2025-12-16T12:35:07.0207137Z HEAD is now at 1002364 Merge pull request #1 from zephyrproject-rtos/add-zephyr-module-dir
+2025-12-16T12:35:07.0212658Z === updating zephyr-lang-rust (modules/lang/rust):
+2025-12-16T12:35:07.0213262Z --- zephyr-lang-rust: initializing
+2025-12-16T12:35:07.0248458Z Initialized empty Git repository in /tmp/zmk-config/modules/lang/rust/.git/
+2025-12-16T12:35:07.0282206Z --- zephyr-lang-rust: fetching, need revision 37dc7fac3fb0372bc0e78e022bef87fcce68c48d
+2025-12-16T12:35:07.4795292Z From https://github.com/zephyrproject-rtos/zephyr-lang-rust
+2025-12-16T12:35:07.4796084Z  * [new branch]      atomic-objects       -> refs/west/atomic-objects
+2025-12-16T12:35:07.4797498Z  * [new branch]      bounded              -> refs/west/bounded
+2025-12-16T12:35:07.4798749Z  * [new branch]      build                -> refs/west/build
+2025-12-16T12:35:07.4799384Z  * [new branch]      clippy               -> refs/west/clippy
+2025-12-16T12:35:07.4802611Z  * [new branch]      critical             -> refs/west/critical
+2025-12-16T12:35:07.4804043Z  * [new branch]      deprecate-old-async  -> refs/west/deprecate-old-async
+2025-12-16T12:35:07.4805908Z  * [new branch]      doc-update           -> refs/west/doc-update
+2025-12-16T12:35:07.4808559Z  * [new branch]      dt                   -> refs/west/dt
+2025-12-16T12:35:07.4809814Z  * [new branch]      fix-ci               -> refs/west/fix-ci
+2025-12-16T12:35:07.4812346Z  * [new branch]      fix-gpio             -> refs/west/fix-gpio
+2025-12-16T12:35:07.4814419Z  * [new branch]      fix-ra4mq            -> refs/west/fix-ra4mq
+2025-12-16T12:35:07.4816141Z  * [new branch]      fix-zeros            -> refs/west/fix-zeros
+2025-12-16T12:35:07.4818099Z  * [new branch]      fix101               -> refs/west/fix101
+2025-12-16T12:35:07.4819967Z  * [new branch]      fixdocpush           -> refs/west/fixdocpush
+2025-12-16T12:35:07.4821905Z  * [new branch]      fmt                  -> refs/west/fmt
+2025-12-16T12:35:07.4824134Z  * [new branch]      for-4.0              -> refs/west/for-4.0
+2025-12-16T12:35:07.4826151Z  * [new branch]      hack                 -> refs/west/hack
+2025-12-16T12:35:07.4828167Z  * [new branch]      i2c                  -> refs/west/i2c
+2025-12-16T12:35:07.4830379Z  * [new branch]      kobj                 -> refs/west/kobj
+2025-12-16T12:35:07.4832229Z  * [new branch]      lock-cargo           -> refs/west/lock-cargo
+2025-12-16T12:35:07.4834419Z  * [new branch]      main                 -> refs/west/main
+2025-12-16T12:35:07.4836696Z  * [new branch]      notoken              -> refs/west/notoken
+2025-12-16T12:35:07.4838203Z  * [new branch]      onelabels            -> refs/west/onelabels
+2025-12-16T12:35:07.4840652Z  * [new branch]      phil-timeout         -> refs/west/phil-timeout
+2025-12-16T12:35:07.4842759Z  * [new branch]      reldebug             -> refs/west/reldebug
+2025-12-16T12:35:07.4845132Z  * [new branch]      tasks                -> refs/west/tasks
+2025-12-16T12:35:07.4846641Z  * [new branch]      test132              -> refs/west/test132
+2025-12-16T12:35:07.4848950Z  * [new branch]      thread               -> refs/west/thread
+2025-12-16T12:35:07.4851000Z  * [new branch]      time                 -> refs/west/time
+2025-12-16T12:35:07.4852968Z  * [new branch]      v4.0-branch          -> refs/west/v4.0-branch
+2025-12-16T12:35:07.4854965Z  * [new branch]      v4.1-branch          -> refs/west/v4.1-branch
+2025-12-16T12:35:07.4856741Z  * [new branch]      work                 -> refs/west/work
+2025-12-16T12:35:07.4859234Z  * [new branch]      workq-init           -> refs/west/workq-init
+2025-12-16T12:35:07.4861071Z  * [new branch]      zephyr-setup-failure -> refs/west/zephyr-setup-failure
+2025-12-16T12:35:08.2248181Z HEAD is now at 37dc7fa zephyr: printk: Use proper type for `c_char`
+2025-12-16T12:35:08.2329647Z HEAD is now at 37dc7fa zephyr: printk: Use proper type for `c_char`
+2025-12-16T12:35:08.2333556Z === updating zscilib (modules/lib/zscilib):
+2025-12-16T12:35:08.2334062Z --- zscilib: initializing
+2025-12-16T12:35:08.2367455Z Initialized empty Git repository in /tmp/zmk-config/modules/lib/zscilib/.git/
+2025-12-16T12:35:08.2400631Z --- zscilib: fetching, need revision ee1b287d9dd07208d2cc52284240ac25bb66eae3
+2025-12-16T12:35:08.6865832Z From https://github.com/zephyrproject-rtos/zscilib
+2025-12-16T12:35:08.6866671Z  * [new branch]      gh-pages   -> refs/west/gh-pages
+2025-12-16T12:35:08.6867177Z  * [new branch]      master     -> refs/west/master
+2025-12-16T12:35:08.6868542Z  * [new branch]      revert-38-fix_zephyr_3_1 -> refs/west/revert-38-fix_zephyr_3_1
+2025-12-16T12:35:08.6870582Z  * [new tag]         v0.2.0-rc1 -> v0.2.0-rc1
+2025-12-16T12:35:09.4497071Z HEAD is now at ee1b287 samples/tests: Update for hwmv2 board names
+2025-12-16T12:35:09.4626877Z HEAD is now at ee1b287 samples/tests: Update for hwmv2 board names
+2025-12-16T12:35:09.4631127Z === updating acpica (modules/lib/acpica):
+2025-12-16T12:35:10.4201895Z Previous HEAD position was 0333c2af os_specific: zephyr: add generic platform support
+2025-12-16T12:35:10.4206060Z HEAD is now at 8d24867b Merge pull request #5 from dcpleung/kernel/mm_z_phys_map_unmap_rename
+2025-12-16T12:35:10.4212836Z === updating cmsis (modules/hal/cmsis):
+2025-12-16T12:35:11.0822670Z Previous HEAD position was 5a00331 remove cmsis-dsp and cmsis-nn
+2025-12-16T12:35:11.0826882Z HEAD is now at d1b8b20 Backport CMSIS_6#102 to CMSIS 5.9.0
+2025-12-16T12:35:11.0833379Z === updating cmsis-dsp (modules/lib/cmsis-dsp):
+2025-12-16T12:35:13.1491066Z Warning: you are leaving 20 commits behind, not connected to
+2025-12-16T12:35:13.1492053Z any of your branches:
+2025-12-16T12:35:13.1492338Z 
+2025-12-16T12:35:13.1492702Z   ff7b5fd compute Library: fix inline function that is not static
+2025-12-16T12:35:13.1493625Z   e7b3071 do not generate warnings when scalar functions are used with MVE
+2025-12-16T12:35:13.1494377Z   a633ec4 add zephyr/module.yml
+2025-12-16T12:35:13.1494797Z   56c40ed Fix pragma clang warning with gcc
+2025-12-16T12:35:13.1495156Z  ... and 16 more.
+2025-12-16T12:35:13.1495355Z 
+2025-12-16T12:35:13.1495682Z If you want to keep them by creating a new branch, this may be a good time
+2025-12-16T12:35:13.1496229Z to do so with:
+2025-12-16T12:35:13.1496404Z 
+2025-12-16T12:35:13.1496500Z  git branch <new-branch-name> ff7b5fd
+2025-12-16T12:35:13.1496676Z 
+2025-12-16T12:35:13.1496901Z HEAD is now at d80a49b do not generate warnings when scalar functions are used with MVE
+2025-12-16T12:35:13.1506707Z === updating cmsis-nn (modules/lib/cmsis-nn):
+2025-12-16T12:35:14.2060504Z Warning: you are leaving 2 commits behind, not connected to
+2025-12-16T12:35:14.2061235Z any of your branches:
+2025-12-16T12:35:14.2061655Z 
+2025-12-16T12:35:14.2061863Z   0c8669d Merge pull request #1 from XenuIsWatching/zephyr
+2025-12-16T12:35:14.2062387Z   eb02f1b cmsis-nn: add cmsis-nn as a zephyr module
+2025-12-16T12:35:14.2062683Z 
+2025-12-16T12:35:14.2062925Z If you want to keep them by creating a new branch, this may be a good time
+2025-12-16T12:35:14.2063392Z to do so with:
+2025-12-16T12:35:14.2063534Z 
+2025-12-16T12:35:14.2063660Z  git branch <new-branch-name> 0c8669d
+2025-12-16T12:35:14.2063990Z 
+2025-12-16T12:35:14.2065330Z HEAD is now at e9328d6 manifest: zephyr module file
+2025-12-16T12:35:14.2073828Z === updating cmsis_6 (modules/lib/cmsis_6):
+2025-12-16T12:35:14.2074304Z --- cmsis_6: initializing
+2025-12-16T12:35:14.2108907Z Initialized empty Git repository in /tmp/zmk-config/modules/lib/cmsis_6/.git/
+2025-12-16T12:35:14.2142875Z --- cmsis_6: fetching, need revision 783317a3072554acbac86cca2ff24928cbf98d30
+2025-12-16T12:35:14.6990555Z From https://github.com/zephyrproject-rtos/CMSIS_6
+2025-12-16T12:35:14.6991058Z  * [new branch]      main        -> refs/west/main
+2025-12-16T12:35:14.6991897Z  * [new branch]      stable-pre-4.3.0-release -> refs/west/stable-pre-4.3.0-release
+2025-12-16T12:35:14.6994622Z  * [new branch]      upstream    -> refs/west/upstream
+2025-12-16T12:35:14.6995761Z  * [new branch]      v4.3-branch -> refs/west/v4.3-branch
+2025-12-16T12:35:15.9216814Z HEAD is now at 783317a TZ applications can be secure-only (#204)
+2025-12-16T12:35:16.0130066Z HEAD is now at 783317a TZ applications can be secure-only (#204)
+2025-12-16T12:35:16.0134954Z === updating fatfs (modules/fs/fatfs):
+2025-12-16T12:35:16.6559219Z Previous HEAD position was 427159b zephyr: fix ffconf.h override use of STRINGIZE
+2025-12-16T12:35:16.6563027Z HEAD is now at 16245c7 fs: Update driver to version 0.15a
+2025-12-16T12:35:16.6568437Z === updating hal_adi (modules/hal/adi):
+2025-12-16T12:35:16.6569505Z --- hal_adi: initializing
+2025-12-16T12:35:16.6602608Z Initialized empty Git repository in /tmp/zmk-config/modules/hal/adi/.git/
+2025-12-16T12:35:16.6636142Z --- hal_adi: fetching, need revision 633fcecf3717aaa22079cf6121627a879f24df51
+2025-12-16T12:35:17.1285793Z From https://github.com/zephyrproject-rtos/hal_adi
+2025-12-16T12:35:17.1287009Z  * [new branch]      main        -> refs/west/main
+2025-12-16T12:35:17.1287607Z  * [new branch]      msdk-export -> refs/west/msdk-export
+2025-12-16T12:35:19.5833542Z HEAD is now at 633fcec fix(Other): Fix typo with `#include <max32660.h>` in Zephyr wrapper (#1276)
+2025-12-16T12:35:19.7239599Z HEAD is now at 633fcec fix(Other): Fix typo with `#include <max32660.h>` in Zephyr wrapper (#1276)
+2025-12-16T12:35:19.7243654Z === updating hal_ambiq (modules/hal/ambiq):
+2025-12-16T12:35:21.2554693Z Previous HEAD position was 0a7c993 modules: hal_ambiq: Add Ambiq Apollo4 Blue Plus SoC
+2025-12-16T12:35:21.2558193Z HEAD is now at 87a188b hal: ambiq: add apollo3x BT controller deinitialization API.
+2025-12-16T12:35:21.2567470Z === updating hal_atmel (modules/hal/atmel):
+2025-12-16T12:35:22.4430724Z Previous HEAD position was 5ab4300 Remove LITTLE_ENDIAN and __LITTLE_ENDIAN defines
+2025-12-16T12:35:22.4434985Z HEAD is now at da76744 samr35: dac: Rename EMPTY bit-fields to avoid name collision.
+2025-12-16T12:35:22.4445411Z === updating hal_espressif (modules/hal/espressif):
+2025-12-16T12:35:26.7562893Z Warning: you are leaving 4679 commits behind, not connected to
+2025-12-16T12:35:26.7563632Z any of your branches:
+2025-12-16T12:35:26.7563907Z 
+2025-12-16T12:35:26.7564164Z   31fc5758 random: rename header file as in Zephyr.
+2025-12-16T12:35:26.7564999Z   b91c8060 esp32s3: update bootloader to enable all flash memory ranges
+2025-12-16T12:35:26.7566337Z   63f8c4b6 zephyr: Use CONFIG_MP_MAX_NUM_CPUS
+2025-12-16T12:35:26.7567068Z   63506397 esptool: Pad sections to account for alignment
+2025-12-16T12:35:26.7567687Z  ... and 4675 more.
+2025-12-16T12:35:26.7567922Z 
+2025-12-16T12:35:26.7568293Z If you want to keep them by creating a new branch, this may be a good time
+2025-12-16T12:35:26.7568763Z to do so with:
+2025-12-16T12:35:26.7568915Z 
+2025-12-16T12:35:26.7569040Z  git branch <new-branch-name> 31fc5758
+2025-12-16T12:35:26.7569274Z 
+2025-12-16T12:35:26.7575531Z HEAD is now at 202c5955 cache: get cpu id from register
+2025-12-16T12:35:26.7605446Z === updating hal_ethos_u (modules/hal/ethos_u):
+2025-12-16T12:35:27.4459765Z Previous HEAD position was 90ada2e Clarify README regarding CPU choice
+2025-12-16T12:35:27.4462872Z HEAD is now at 50ddffc Cache optimizations
+2025-12-16T12:35:27.4468664Z === updating hal_gigadevice (modules/hal/gigadevice):
+2025-12-16T12:35:27.5064020Z HEAD is now at 2994b7d README.md: add pllmf and pack exception for gd32a50x
+2025-12-16T12:35:27.5068362Z === updating hal_intel (modules/hal/intel):
+2025-12-16T12:35:28.1339085Z Previous HEAD position was b3b43d4 pm: fix handling reset prep in incorrect place
+2025-12-16T12:35:28.1342788Z HEAD is now at 0355bb8 pm: add support for ptl ish d0i2/ipapg
+2025-12-16T12:35:28.1348458Z === updating hal_nordic (modules/hal/nordic):
+2025-12-16T12:35:35.4735590Z Previous HEAD position was 884c4d6 nrfx: Update to version 3.6.0
+2025-12-16T12:35:35.4739642Z HEAD is now at 37ca068 drivers: nrfx_usbreg: clear USBPWRRDY event on initialization
+2025-12-16T12:35:35.4784643Z === updating hal_nuvoton (modules/hal/nuvoton):
+2025-12-16T12:35:36.4208982Z Previous HEAD position was 3e0a4c4 hal: NuMaker M46x: revise API name of M460 FMC erase bank
+2025-12-16T12:35:36.4213002Z HEAD is now at 466c3ee hal: nuvoton: m2l31: fixed TRUE redefined warning
+2025-12-16T12:35:36.4220526Z === updating hal_quicklogic (modules/hal/quicklogic):
+2025-12-16T12:35:37.0790767Z Previous HEAD position was b3a66fe Remove references to FPGA IP core drivers
+2025-12-16T12:35:37.0795317Z HEAD is now at bad8944 HAL: eoss3_dev: add missing `__cplusplus` handling
+2025-12-16T12:35:37.0800977Z === updating hal_renesas (modules/hal/renesas):
+2025-12-16T12:35:39.6564270Z Previous HEAD position was a6cf2af Remove dynamic memory allocation from PD code
+2025-12-16T12:35:39.6568074Z HEAD is now at 3204903 hal: renesas: ra: Modify BSP_PRV_IELS_ENUM for build process
+2025-12-16T12:35:39.6588433Z === updating hal_rpi_pico (modules/hal/rpi_pico):
+2025-12-16T12:35:40.8789212Z Previous HEAD position was fba7162 Merge pull request #5 from soburi/zephyr_timer_modification
+2025-12-16T12:35:40.8792521Z HEAD is now at 7b57b24 Merge pull request #8 from ajf58/merge-2.1.0
+2025-12-16T12:35:40.8804608Z === updating hal_silabs (modules/hal/silabs):
+2025-12-16T12:35:40.8805110Z --- hal_silabs: initializing
+2025-12-16T12:35:40.8839575Z Initialized empty Git repository in /tmp/zmk-config/modules/hal/silabs/.git/
+2025-12-16T12:35:40.8873259Z --- hal_silabs: fetching, need revision 8a173e9e566a396a19d18da4661cb54ce098f268
+2025-12-16T12:35:41.3389232Z From https://github.com/zephyrproject-rtos/hal_silabs
+2025-12-16T12:35:41.3389803Z  * [new branch]      main       -> refs/west/main
+2025-12-16T12:35:47.0913223Z HEAD is now at 8a173e9 wiseconnect: Fix si91x_bus event during platform deinitialization
+2025-12-16T12:35:47.1713193Z HEAD is now at 8a173e9 wiseconnect: Fix si91x_bus event during platform deinitialization
+2025-12-16T12:35:47.1717163Z === updating hal_stm32 (modules/hal/stm32):
+2025-12-16T12:35:59.0694075Z Previous HEAD position was 89ef0a3 stm32cube: stm32h5:  ethernet: PTP clock doesn’t works
+2025-12-16T12:35:59.0696961Z HEAD is now at 55043bc stm32cube: common_ll: Regeneration after cube updates
+2025-12-16T12:35:59.0780644Z === updating hal_tdk (modules/hal/tdk):
+2025-12-16T12:35:59.0781372Z --- hal_tdk: initializing
+2025-12-16T12:35:59.0816590Z Initialized empty Git repository in /tmp/zmk-config/modules/hal/tdk/.git/
+2025-12-16T12:35:59.0850984Z --- hal_tdk: fetching, need revision 6727477af1e46fa43878102489b9672a9d24e39f
+2025-12-16T12:35:59.4725824Z From https://github.com/zephyrproject-rtos/hal_tdk
+2025-12-16T12:35:59.4727359Z  * [new branch]      main        -> refs/west/main
+2025-12-16T12:35:59.4727921Z  * [new branch]      v4.2-branch -> refs/west/v4.2-branch
+2025-12-16T12:36:00.1656678Z HEAD is now at 6727477 Merge pull request #8 from tdk-invn-oss/main
+2025-12-16T12:36:00.1722271Z HEAD is now at 6727477 Merge pull request #8 from tdk-invn-oss/main
+2025-12-16T12:36:00.1726528Z === updating hal_telink (modules/hal/telink):
+2025-12-16T12:36:00.7709751Z Previous HEAD position was 38573af B91 ADC driver support
+2025-12-16T12:36:00.7713773Z HEAD is now at 4226c7f drivers: Disable BLE support
+2025-12-16T12:36:00.7718946Z === updating hal_wch (modules/hal/wch):
+2025-12-16T12:36:00.7719639Z --- hal_wch: initializing
+2025-12-16T12:36:00.7753313Z Initialized empty Git repository in /tmp/zmk-config/modules/hal/wch/.git/
+2025-12-16T12:36:00.7788114Z --- hal_wch: fetching, need revision 1de9d3e406726702ce7cfc504509a02ecc463554
+2025-12-16T12:36:01.1792639Z From https://github.com/zephyrproject-rtos/hal_wch
+2025-12-16T12:36:01.1793259Z  * [new branch]      main       -> refs/west/main
+2025-12-16T12:36:01.8326638Z HEAD is now at 1de9d3e Add hal_wch based on the 'ch32v003fun' project
+2025-12-16T12:36:01.8396547Z HEAD is now at 1de9d3e Add hal_wch based on the 'ch32v003fun' project
+2025-12-16T12:36:01.8400759Z === updating hal_wurthelektronik (modules/hal/wurthelektronik):
+2025-12-16T12:36:02.5011316Z Previous HEAD position was 24ca987 Initialized WE HAL module repository.
+2025-12-16T12:36:02.5015660Z HEAD is now at e3e2797 Remove preprocessor warnings for not enabling float
+2025-12-16T12:36:02.5021115Z === updating hostap (modules/lib/hostap):
+2025-12-16T12:36:02.5021791Z --- hostap: initializing
+2025-12-16T12:36:02.5056245Z Initialized empty Git repository in /tmp/zmk-config/modules/lib/hostap/.git/
+2025-12-16T12:36:02.5090250Z --- hostap: fetching, need revision 697fd2cf5cbbd0c5375fc34761b6a9d7489a67d2
+2025-12-16T12:36:03.1879223Z From https://github.com/zephyrproject-rtos/hostap
+2025-12-16T12:36:03.1879854Z  * [new branch]        main        -> refs/west/main
+2025-12-16T12:36:03.1880384Z  * [new tag]           hostap_2_11 -> hostap_2_11
+2025-12-16T12:36:05.5113686Z HEAD is now at 697fd2cf [noup] zephyr: Fix WPA3 connection issue
+2025-12-16T12:36:05.6167561Z HEAD is now at 697fd2cf [noup] zephyr: Fix WPA3 connection issue
+2025-12-16T12:36:05.6171401Z === updating liblc3 (modules/lib/liblc3):
+2025-12-16T12:36:06.3962836Z Previous HEAD position was 448f3de Merge pull request #8 from carlescufi/rename
+2025-12-16T12:36:06.3966113Z HEAD is now at 48bbd3e Rename lc3 python package to lc3py, and bump version to 1.1.2
+2025-12-16T12:36:06.3972702Z === updating libmctp (modules/lib/libmctp):
+2025-12-16T12:36:06.3973191Z --- libmctp: initializing
+2025-12-16T12:36:06.4006535Z Initialized empty Git repository in /tmp/zmk-config/modules/lib/libmctp/.git/
+2025-12-16T12:36:06.4040504Z --- libmctp: fetching, need revision b97860e78998551af99931ece149eeffc538bdb1
+2025-12-16T12:36:06.8789114Z From https://github.com/zephyrproject-rtos/libmctp
+2025-12-16T12:36:06.8789733Z  * [new branch]      master     -> refs/west/master
+2025-12-16T12:36:06.8790240Z  * [new branch]      zephyr     -> refs/west/zephyr
+2025-12-16T12:36:07.5166471Z HEAD is now at b97860e build MCTP zephyr library only when CONFIG_MCTP is enabled
+2025-12-16T12:36:07.5232350Z HEAD is now at b97860e build MCTP zephyr library only when CONFIG_MCTP is enabled
+2025-12-16T12:36:07.5236032Z === updating libmetal (modules/hal/libmetal):
+2025-12-16T12:36:08.4288908Z Previous HEAD position was b91611a lib: update libmetal to release v2023.04.0
+2025-12-16T12:36:08.4293117Z HEAD is now at 3e8781a lib: update libmetal to release v2024.10.0
+2025-12-16T12:36:08.4299150Z === updating littlefs (modules/fs/littlefs):
+2025-12-16T12:36:09.1934390Z Previous HEAD position was ca583fd Merge tag 'v2.5.0' of https://github.com/littlefs-project/littlefs into zephyr
+2025-12-16T12:36:09.1938421Z HEAD is now at ed0531d Merge pull request #15 from Jappie3/zephyr
+2025-12-16T12:36:09.1944622Z === updating mbedtls (modules/crypto/mbedtls):
+2025-12-16T12:36:12.2983912Z Previous HEAD position was c38dc78d Merge pull request #44 from d3zd3z/zephyr-3.4.0
+2025-12-16T12:36:12.2988191Z HEAD is now at 4952e132 psa: use static key slot buffers to store key material
+2025-12-16T12:36:12.3000324Z === updating mipi-sys-t (modules/debug/mipi-sys-t):
+2025-12-16T12:36:12.9194200Z Previous HEAD position was a819419 library: allow building without wchar support
+2025-12-16T12:36:12.9197984Z HEAD is now at 33e5c23 Fix for warning of potential error using = instead of ==
+2025-12-16T12:36:12.9203721Z === updating nrf_hw_models (modules/bsim_hw_models/nrf_hw_models):
+2025-12-16T12:36:13.7226701Z Previous HEAD position was f459580 TEMP & ECB: Fix INTEN sideeffect prototypes
+2025-12-16T12:36:13.7229995Z HEAD is now at 73a5d58 54 CCM: Fix UBSAN reported issue with zero size VLAs
+2025-12-16T12:36:13.7236560Z === updating nrf_wifi (modules/lib/nrf_wifi):
+2025-12-16T12:36:13.7237043Z --- nrf_wifi: initializing
+2025-12-16T12:36:13.7270961Z Initialized empty Git repository in /tmp/zmk-config/modules/lib/nrf_wifi/.git/
+2025-12-16T12:36:13.7305163Z --- nrf_wifi: fetching, need revision e35f707a782b7c4c0eb83a3b06ca4e6eb693f29f
+2025-12-16T12:36:14.1621832Z From https://github.com/zephyrproject-rtos/nrf_wifi
+2025-12-16T12:36:14.1622585Z  * [new branch]      fix_deinit_rx_race  -> refs/west/fix_deinit_rx_race
+2025-12-16T12:36:14.1623247Z  * [new branch]      main                -> refs/west/main
+2025-12-16T12:36:14.1624926Z  * [new branch]      ncs-v2.9-branch     -> refs/west/ncs-v2.9-branch
+2025-12-16T12:36:14.1626767Z  * [new branch]      nrf70_bm_branch     -> refs/west/nrf70_bm_branch
+2025-12-16T12:36:14.1628396Z  * [new branch]      twt_timeout_nrfwifi -> refs/west/twt_timeout_nrfwifi
+2025-12-16T12:36:14.8794990Z HEAD is now at e35f707 Fix SoftAP mode compilation issues
+2025-12-16T12:36:14.8896551Z HEAD is now at e35f707 Fix SoftAP mode compilation issues
+2025-12-16T12:36:14.8900505Z === updating open-amp (modules/lib/open-amp):
+2025-12-16T12:36:15.6177557Z Previous HEAD position was 42b7c57 cmake: Compile with WITH_DCACHE_RSC_TABLE
+2025-12-16T12:36:15.6181404Z HEAD is now at 52bb178 lib: update open-amp lib to release v2024.10.0
+2025-12-16T12:36:15.6187177Z === updating percepio (modules/debug/percepio):
+2025-12-16T12:36:16.4387058Z Previous HEAD position was a3728ef Merge pull request #4 from peter-mitsis/pmitsis-k_mem_block
+2025-12-16T12:36:16.4391046Z HEAD is now at 49e6dc2 Merge branch 'main' into zephyr
+2025-12-16T12:36:16.4397207Z === updating picolibc (modules/lib/picolibc):
+2025-12-16T12:36:18.7096392Z Previous HEAD position was d07c38ff Version 1.8.2
+2025-12-16T12:36:18.7101358Z HEAD is now at 82d62ed1 zephyr: Disable LTO when building the library
+2025-12-16T12:36:18.7136540Z === updating segger (modules/debug/segger):
+2025-12-16T12:36:19.4189156Z Previous HEAD position was 9d01912 segger: config: RTT spinlock implementation
+2025-12-16T12:36:19.4192575Z HEAD is now at cf56b1d readme: Add readme
+2025-12-16T12:36:19.4198280Z === updating tinycrypt (modules/crypto/tinycrypt):
+2025-12-16T12:36:20.0170490Z Previous HEAD position was 3e9a49d cmake: Fix conditional in root CMakeLists.txt
+2025-12-16T12:36:20.0174903Z HEAD is now at 1012a3e Fix warnings reported by UBSAN
+2025-12-16T12:36:20.0180346Z === updating trusted-firmware-a (modules/tee/tf-a/trusted-firmware-a):
+2025-12-16T12:36:22.4794481Z Previous HEAD position was 421dc050 Merge pull request #3 from SgrrZhf/topics/huizha01/2.9.0-updates
+2025-12-16T12:36:22.4798084Z HEAD is now at 713ffbf9 Merge pull request #4 from ceolin/v2.10.4
+2025-12-16T12:36:22.4808239Z === updating uoscore-uedhoc (modules/lib/uoscore-uedhoc):
+2025-12-16T12:36:23.2355938Z Previous HEAD position was 5fe2cb6 2.2.1
+2025-12-16T12:36:23.2359909Z HEAD is now at 54abc10 Merge pull request #5 from rlubos/upmerge-02-2025
+2025-12-16T12:36:23.2365908Z === updating zcbor (modules/lib/zcbor):
+2025-12-16T12:36:24.0007805Z Previous HEAD position was 67fd8bb Update version from 0.6.99 to 0.7.0
+2025-12-16T12:36:24.0011371Z HEAD is now at 9b07780 Update version to 0.9.1
+2025-12-16T12:36:24.0255979Z ##[group]Run west zephyr-export
+2025-12-16T12:36:24.0256283Z [36;1mwest zephyr-export[0m
+2025-12-16T12:36:24.0256632Z shell: sh -e {0}
+2025-12-16T12:36:24.0256814Z env:
+2025-12-16T12:36:24.0256989Z   build_dir: /tmp/tmp.DD0xebocdz
+2025-12-16T12:36:24.0257227Z   base_dir: /tmp/zmk-config
+2025-12-16T12:36:24.0257442Z   zephyr_version: 4.1.0
+2025-12-16T12:36:24.0257686Z   extra_west_args: -S "studio-rpc-usb-uart"
+2025-12-16T12:36:24.0258097Z   extra_cmake_args: -DSHIELD="nice_view" -DZMK_EXTRA_MODULES='/__w/zmk-config/zmk-config'
+2025-12-16T12:36:24.0258512Z   display_name: nice_view - rec_corne_left
+2025-12-16T12:36:24.0258778Z   artifact_name: rec_corne_studio_left
+2025-12-16T12:36:24.0259010Z ##[endgroup]
+2025-12-16T12:36:24.5667118Z Zephyr (/tmp/zmk-config/zephyr/share/zephyr-package/cmake)
+2025-12-16T12:36:24.5667759Z has been added to the user package registry in:
+2025-12-16T12:36:24.5668071Z ~/.cmake/packages/Zephyr
+2025-12-16T12:36:24.5668212Z 
+2025-12-16T12:36:24.8394317Z ZephyrUnittest (/tmp/zmk-config/zephyr/share/zephyrunittest-package/cmake)
+2025-12-16T12:36:24.8395038Z has been added to the user package registry in:
+2025-12-16T12:36:24.8395504Z ~/.cmake/packages/ZephyrUnittest
+2025-12-16T12:36:24.8395759Z 
+2025-12-16T12:36:24.8658769Z ##[group]Run west build -s zmk/app -d "/tmp/tmp.DD0xebocdz" -b "rec_corne_left" -S "studio-rpc-usb-uart" -- -DZMK_CONFIG=/tmp/zmk-config/config -DSHIELD="nice_view" -DZMK_EXTRA_MODULES='/__w/zmk-config/zmk-config' -DCONFIG_ZMK_STUDIO=y -DCONFIG_ZMK_STUDIO_LOCKING=n
+2025-12-16T12:36:24.8660364Z [36;1mwest build -s zmk/app -d "/tmp/tmp.DD0xebocdz" -b "rec_corne_left" -S "studio-rpc-usb-uart" -- -DZMK_CONFIG=/tmp/zmk-config/config -DSHIELD="nice_view" -DZMK_EXTRA_MODULES='/__w/zmk-config/zmk-config' -DCONFIG_ZMK_STUDIO=y -DCONFIG_ZMK_STUDIO_LOCKING=n[0m
+2025-12-16T12:36:24.8661333Z shell: sh -x {0}
+2025-12-16T12:36:24.8661729Z env:
+2025-12-16T12:36:24.8661912Z   build_dir: /tmp/tmp.DD0xebocdz
+2025-12-16T12:36:24.8662148Z   base_dir: /tmp/zmk-config
+2025-12-16T12:36:24.8662360Z   zephyr_version: 4.1.0
+2025-12-16T12:36:24.8662598Z   extra_west_args: -S "studio-rpc-usb-uart"
+2025-12-16T12:36:24.8663033Z   extra_cmake_args: -DSHIELD="nice_view" -DZMK_EXTRA_MODULES='/__w/zmk-config/zmk-config'
+2025-12-16T12:36:24.8663435Z   display_name: nice_view - rec_corne_left
+2025-12-16T12:36:24.8663709Z   artifact_name: rec_corne_studio_left
+2025-12-16T12:36:24.8664146Z ##[endgroup]
+2025-12-16T12:36:24.9283488Z + west build -s zmk/app -d /tmp/tmp.DD0xebocdz -b rec_corne_left -S studio-rpc-usb-uart -- -DZMK_CONFIG=/tmp/zmk-config/config -DSHIELD=nice_view -DZMK_EXTRA_MODULES=/__w/zmk-config/zmk-config -DCONFIG_ZMK_STUDIO=y -DCONFIG_ZMK_STUDIO_LOCKING=n
+2025-12-16T12:36:25.1303377Z -- west build: generating a build system
+2025-12-16T12:36:25.4026011Z Loading Zephyr default modules (Zephyr base).
+2025-12-16T12:36:25.4027688Z -- Application: /tmp/zmk-config/zmk/app
+2025-12-16T12:36:25.4028186Z -- CMake version: 3.31.6
+2025-12-16T12:36:25.5105534Z -- Found Python3: /usr/bin/python3 (found suitable version "3.12.3", minimum required is "3.10") found components: Interpreter
+2025-12-16T12:36:25.5221774Z -- Cache files will be written to: /tmp/zmk-config/zephyr/.cache
+2025-12-16T12:36:25.5287173Z -- Zephyr version: 4.1.0 (/tmp/zmk-config/zephyr)
+2025-12-16T12:36:25.5918540Z -- Found west (found suitable version "1.5.0", minimum required is "0.14.0")
+2025-12-16T12:36:26.8197607Z -- Board: rec_corne_left
+2025-12-16T12:36:26.9038967Z -- Shield(s): nice_view
+2025-12-16T12:36:26.9345992Z Checking /tmp/zmk-config/rec_corne
+2025-12-16T12:36:26.9346501Z Checking /__w/zmk-config/zmk-config
+2025-12-16T12:36:26.9346856Z Checking /tmp/zmk-config/zmk/app
+2025-12-16T12:36:26.9347173Z found /tmp/zmk-config/zmk/app
+2025-12-16T12:36:26.9349134Z -- ZMK Config directory: /tmp/zmk-config/config
+2025-12-16T12:36:26.9353544Z -- ZMK Config Kconfig: /tmp/zmk-config/config/rec_corne.conf
+2025-12-16T12:36:26.9354221Z rec_corne_left for  for rec_corne_left with version 
+2025-12-16T12:36:26.9356168Z -- Using keymap file: /tmp/zmk-config/config/rec_corne.keymap
+2025-12-16T12:36:26.9356613Z -- Using keymap file: /tmp/zmk-config/config/rec_corne.keymap
+2025-12-16T12:36:26.9358460Z Checking /tmp/zmk-config/zephyr
+2025-12-16T12:36:27.0548604Z -- Snippet(s): studio-rpc-usb-uart
+2025-12-16T12:36:27.0837925Z -- ZEPHYR_TOOLCHAIN_VARIANT not set, trying to locate Zephyr SDK
+2025-12-16T12:36:27.0862197Z -- Found host-tools: zephyr 0.16.9 (/opt/zephyr-sdk-0.16.9)
+2025-12-16T12:36:27.0875047Z -- Found toolchain: zephyr 0.16.9 (/opt/zephyr-sdk-0.16.9)
+2025-12-16T12:36:27.0936530Z -- Found Dtc: /opt/zephyr-sdk-0.16.9/sysroots/x86_64-pokysdk-linux/usr/bin/dtc (found suitable version "1.6.0", minimum required is "1.4.6")
+2025-12-16T12:36:27.0962369Z -- Found BOARD.dts: /__w/zmk-config/zmk-config/boards/arm/rec_corne/rec_corne_left.dts
+2025-12-16T12:36:27.0963242Z -- Found devicetree overlay: /tmp/zmk-config/zmk/app/boards/shields/nice_view/nice_view.overlay
+2025-12-16T12:36:27.0963843Z -- Found devicetree overlay: /tmp/zmk-config/config/rec_corne.keymap
+2025-12-16T12:36:27.0964472Z -- Found devicetree overlay: /tmp/zmk-config/zmk/app/snippets/studio-rpc-usb-uart/studio-rpc-usb-uart.overlay
+2025-12-16T12:36:27.5297415Z 'label' is marked as deprecated in 'properties:' in /tmp/zmk-config/zmk/app/dts/bindings/behaviors/zmk,behavior-tap-dance.yaml for node /behaviors/parenthesis.
+2025-12-16T12:36:27.5299742Z 'label' is marked as deprecated in 'properties:' in /tmp/zmk-config/zmk/app/dts/bindings/behaviors/zmk,behavior-tap-dance.yaml for node /behaviors/bracket.
+2025-12-16T12:36:27.5301058Z 'label' is marked as deprecated in 'properties:' in /tmp/zmk-config/zmk/app/dts/bindings/behaviors/zmk,behavior-tap-dance.yaml for node /behaviors/brace.
+2025-12-16T12:36:27.5599359Z -- Generated zephyr.dts: /tmp/tmp.DD0xebocdz/zephyr/zephyr.dts
+2025-12-16T12:36:27.5600081Z -- Generated pickled edt: /tmp/tmp.DD0xebocdz/zephyr/edt.pickle
+2025-12-16T12:36:27.6990246Z -- Generated devicetree_generated.h: /tmp/tmp.DD0xebocdz/zephyr/include/generated/zephyr/devicetree_generated.h
+2025-12-16T12:36:28.0883256Z -- Including generated dts.cmake file: /tmp/tmp.DD0xebocdz/zephyr/dts.cmake
+2025-12-16T12:36:28.1001156Z CMake Warning at /tmp/zmk-config/zephyr/cmake/modules/dts.cmake:425 (message):
+2025-12-16T12:36:28.1001896Z   dtc raised one or more warnings:
+2025-12-16T12:36:28.1002083Z 
+2025-12-16T12:36:28.1002517Z   /tmp/tmp.DD0xebocdz/zephyr/zephyr.dts:60.25-65.5: Warning
+2025-12-16T12:36:28.1002906Z   (unique_unit_address_if_enabled): /soc/clock@40000000: duplicate
+2025-12-16T12:36:28.1003278Z   unit-address (also used in node /soc/power@40000000)
+2025-12-16T12:36:28.1003491Z 
+2025-12-16T12:36:28.1003640Z   /tmp/tmp.DD0xebocdz/zephyr/zephyr.dts:357.21-361.5: Warning
+2025-12-16T12:36:28.1004060Z   (unique_unit_address_if_enabled): /soc/acl@4001e000: duplicate unit-address
+2025-12-16T12:36:28.1004448Z   (also used in node /soc/flash-controller@4001e000)
+2025-12-16T12:36:28.1004671Z 
+2025-12-16T12:36:28.1004818Z Call Stack (most recent call first):
+2025-12-16T12:36:28.1005278Z   /tmp/zmk-config/zephyr/cmake/modules/zephyr_default.cmake:134 (include)
+2025-12-16T12:36:28.1005843Z   /tmp/zmk-config/zephyr/share/zephyr-package/cmake/ZephyrConfig.cmake:66 (include)
+2025-12-16T12:36:28.1006645Z   /tmp/zmk-config/zephyr/share/zephyr-package/cmake/ZephyrConfig.cmake:92 (include_boilerplate)
+2025-12-16T12:36:28.1007154Z   CMakeLists.txt:9 (find_package)
+2025-12-16T12:36:28.1007376Z 
+2025-12-16T12:36:28.1007380Z 
+2025-12-16T12:36:28.2641654Z /tmp/zmk-config/zephyr/scripts/kconfig/kconfig.py: Kconfig.zephyr:29: '/tmp/tmp.DD0xebocdz/Kconfig/soc/Kconfig.defconfig' not found (in 'source "$(KCONFIG_BINARY_DIR)/soc/Kconfig.defconfig"'). Check that environment variables are set correctly (e.g. $srctree, which is set to '/tmp/zmk-config/zephyr'). Also note that unset environment variables expand to the empty string.
+2025-12-16T12:36:28.2644254Z Parsing /tmp/zmk-config/zmk/app/Kconfig
+2025-12-16T12:36:28.2818518Z CMake Error at /tmp/zmk-config/zephyr/cmake/modules/kconfig.cmake:396 (message):
+2025-12-16T12:36:28.2819287Z   command failed with return code: 1
+2025-12-16T12:36:28.2819697Z Call Stack (most recent call first):
+2025-12-16T12:36:28.2820261Z   /tmp/zmk-config/zephyr/cmake/modules/zephyr_default.cmake:134 (include)
+2025-12-16T12:36:28.2821220Z   /tmp/zmk-config/zephyr/share/zephyr-package/cmake/ZephyrConfig.cmake:66 (include)
+2025-12-16T12:36:28.2822521Z   /tmp/zmk-config/zephyr/share/zephyr-package/cmake/ZephyrConfig.cmake:92 (include_boilerplate)
+2025-12-16T12:36:28.2823251Z   CMakeLists.txt:9 (find_package)
+2025-12-16T12:36:28.2823418Z 
+2025-12-16T12:36:28.2823422Z 
+2025-12-16T12:36:28.2823550Z -- Configuring incomplete, errors occurred!
+2025-12-16T12:36:28.2851911Z FATAL ERROR: command exited with status 1: /usr/local/bin/cmake -DWEST_PYTHON=/usr/bin/python3 -B/tmp/tmp.DD0xebocdz -GNinja -DBOARD=rec_corne_left -DZMK_CONFIG=/tmp/zmk-config/config -DSHIELD=nice_view -DZMK_EXTRA_MODULES=/__w/zmk-config/zmk-config -DCONFIG_ZMK_STUDIO=y -DCONFIG_ZMK_STUDIO_LOCKING=n -DSNIPPET=studio-rpc-usb-uart -S/tmp/zmk-config/zmk/app
+2025-12-16T12:36:28.3103334Z ##[error]Process completed with exit code 1.
+2025-12-16T12:36:28.3154614Z ##[group]Run if [ -f "/tmp/tmp.DD0xebocdz/zephyr/.config" ]
+2025-12-16T12:36:28.3155033Z [36;1mif [ -f "/tmp/tmp.DD0xebocdz/zephyr/.config" ][0m
+2025-12-16T12:36:28.3155316Z [36;1mthen[0m
+2025-12-16T12:36:28.3155597Z [36;1m  grep -v -e "^#" -e "^$" "/tmp/tmp.DD0xebocdz/zephyr/.config" | sort[0m
+2025-12-16T12:36:28.3155902Z [36;1melse[0m
+2025-12-16T12:36:28.3156087Z [36;1m  echo "No Kconfig output"[0m
+2025-12-16T12:36:28.3156315Z [36;1mfi[0m
+2025-12-16T12:36:28.3156566Z shell: sh -e {0}
+2025-12-16T12:36:28.3156741Z env:
+2025-12-16T12:36:28.3156921Z   build_dir: /tmp/tmp.DD0xebocdz
+2025-12-16T12:36:28.3157163Z   base_dir: /tmp/zmk-config
+2025-12-16T12:36:28.3157376Z   zephyr_version: 4.1.0
+2025-12-16T12:36:28.3157603Z   extra_west_args: -S "studio-rpc-usb-uart"
+2025-12-16T12:36:28.3158011Z   extra_cmake_args: -DSHIELD="nice_view" -DZMK_EXTRA_MODULES='/__w/zmk-config/zmk-config'
+2025-12-16T12:36:28.3158406Z   display_name: nice_view - rec_corne_left
+2025-12-16T12:36:28.3158699Z   artifact_name: rec_corne_studio_left
+2025-12-16T12:36:28.3158934Z ##[endgroup]
+2025-12-16T12:36:28.3643056Z No Kconfig output
+2025-12-16T12:36:28.3691026Z ##[group]Run if [ -f "/tmp/tmp.DD0xebocdz/zephyr/zephyr.dts" ]
+2025-12-16T12:36:28.3692143Z [36;1mif [ -f "/tmp/tmp.DD0xebocdz/zephyr/zephyr.dts" ][0m
+2025-12-16T12:36:28.3692444Z [36;1mthen[0m
+2025-12-16T12:36:28.3692690Z [36;1m  cat "/tmp/tmp.DD0xebocdz/zephyr/zephyr.dts"[0m
+2025-12-16T12:36:28.3693060Z [36;1melif [ -f "/tmp/tmp.DD0xebocdz/zephyr/zephyr.dts.pre" ][0m
+2025-12-16T12:36:28.3693378Z [36;1mthen[0m
+2025-12-16T12:36:28.3693624Z [36;1m  cat -s "/tmp/tmp.DD0xebocdz/zephyr/zephyr.dts.pre"[0m
+2025-12-16T12:36:28.3693934Z [36;1melse[0m
+2025-12-16T12:36:28.3694125Z [36;1m  echo "No Devicetree output"[0m
+2025-12-16T12:36:28.3694355Z [36;1mfi[0m
+2025-12-16T12:36:28.3694629Z shell: sh -e {0}
+2025-12-16T12:36:28.3694811Z env:
+2025-12-16T12:36:28.3694990Z   build_dir: /tmp/tmp.DD0xebocdz
+2025-12-16T12:36:28.3695226Z   base_dir: /tmp/zmk-config
+2025-12-16T12:36:28.3695444Z   zephyr_version: 4.1.0
+2025-12-16T12:36:28.3695702Z   extra_west_args: -S "studio-rpc-usb-uart"
+2025-12-16T12:36:28.3696107Z   extra_cmake_args: -DSHIELD="nice_view" -DZMK_EXTRA_MODULES='/__w/zmk-config/zmk-config'
+2025-12-16T12:36:28.3696525Z   display_name: nice_view - rec_corne_left
+2025-12-16T12:36:28.3696795Z   artifact_name: rec_corne_studio_left
+2025-12-16T12:36:28.3697033Z ##[endgroup]
+2025-12-16T12:36:28.4200130Z /dts-v1/;
+2025-12-16T12:36:28.4200363Z 
+2025-12-16T12:36:28.4200489Z / {
+2025-12-16T12:36:28.4200771Z 	#address-cells = < 0x1 >;
+2025-12-16T12:36:28.4201169Z 	#size-cells = < 0x1 >;
+2025-12-16T12:36:28.4201694Z 	model = "rec_corne";
+2025-12-16T12:36:28.4202088Z 	compatible = "recperipherals,rec_corne";
+2025-12-16T12:36:28.4202526Z 	chosen {
+2025-12-16T12:36:28.4202852Z 		zephyr,bt-hci = &bt_hci_controller;
+2025-12-16T12:36:28.4203273Z 		zephyr,entropy = &rng;
+2025-12-16T12:36:28.4203716Z 		zephyr,flash-controller = &flash_controller;
+2025-12-16T12:36:28.4204263Z 		zephyr,code-partition = &code_partition;
+2025-12-16T12:36:28.4204732Z 		zephyr,sram = &sram0;
+2025-12-16T12:36:28.4205123Z 		zephyr,flash = &flash0;
+2025-12-16T12:36:28.4205492Z 		zmk,kscan = &kscan0;
+2025-12-16T12:36:28.4205860Z 		zmk,battery = &vbatt;
+2025-12-16T12:36:28.4206391Z 		zmk,underglow = &led_strip;
+2025-12-16T12:36:28.4206825Z 		zmk,physical-layout = &default_layout;
+2025-12-16T12:36:28.4207287Z 		zmk,backlight = &backlight;
+2025-12-16T12:36:28.4207697Z 		zephyr,display = &nice_view;
+2025-12-16T12:36:28.4208178Z 		zmk,studio-rpc-uart = &snippet_studio_rpc_usb_uart;
+2025-12-16T12:36:28.4208661Z 	};
+2025-12-16T12:36:28.4208921Z 	aliases {
+2025-12-16T12:36:28.4209193Z 	};
+2025-12-16T12:36:28.4209418Z 	soc {
+2025-12-16T12:36:28.4209680Z 		#address-cells = < 0x1 >;
+2025-12-16T12:36:28.4210045Z 		#size-cells = < 0x1 >;
+2025-12-16T12:36:28.4210658Z 		compatible = "nordic,nrf52840-qiaa", "nordic,nrf52840", "nordic,nrf52", "simple-bus";
+2025-12-16T12:36:28.4211304Z 		interrupt-parent = < &nvic >;
+2025-12-16T12:36:28.4211878Z 		ranges;
+2025-12-16T12:36:28.4212209Z 		nvic: interrupt-controller@e000e100 {
+2025-12-16T12:36:28.4212664Z 			#address-cells = < 0x1 >;
+2025-12-16T12:36:28.4213055Z 			compatible = "arm,v7m-nvic";
+2025-12-16T12:36:28.4213433Z 			reg = < 0xe000e100 0xc00 >;
+2025-12-16T12:36:28.4213818Z 			interrupt-controller;
+2025-12-16T12:36:28.4214182Z 			#interrupt-cells = < 0x2 >;
+2025-12-16T12:36:28.4214590Z 			arm,num-irq-priority-bits = < 0x3 >;
+2025-12-16T12:36:28.4215022Z 			phandle = < 0x1 >;
+2025-12-16T12:36:28.4215335Z 		};
+2025-12-16T12:36:28.4215616Z 		systick: timer@e000e010 {
+2025-12-16T12:36:28.4215990Z 			compatible = "arm,armv7m-systick";
+2025-12-16T12:36:28.4216390Z 			reg = < 0xe000e010 0x10 >;
+2025-12-16T12:36:28.4216733Z 			status = "disabled";
+2025-12-16T12:36:28.4217045Z 		};
+2025-12-16T12:36:28.4217314Z 		ficr: ficr@10000000 {
+2025-12-16T12:36:28.4217708Z 			compatible = "nordic,nrf-ficr";
+2025-12-16T12:36:28.4218121Z 			reg = < 0x10000000 0x1000 >;
+2025-12-16T12:36:28.4218513Z 			#nordic,ficr-cells = < 0x1 >;
+2025-12-16T12:36:28.4218924Z 			status = "okay";
+2025-12-16T12:36:28.4219220Z 		};
+2025-12-16T12:36:28.4219818Z 		uicr: uicr@10001000 {
+2025-12-16T12:36:28.4220234Z 			compatible = "nordic,nrf-uicr";
+2025-12-16T12:36:28.4220862Z 			reg = < 0x10001000 0x1000 >;
+2025-12-16T12:36:28.4221220Z 			status = "okay";
+2025-12-16T12:36:28.4221733Z 		};
+2025-12-16T12:36:28.4222026Z 		sram0: memory@20000000 {
+2025-12-16T12:36:28.4222397Z 			compatible = "mmio-sram";
+2025-12-16T12:36:28.4222762Z 			reg = < 0x20000000 0x40000 >;
+2025-12-16T12:36:28.4223119Z 		};
+2025-12-16T12:36:28.4223385Z 		clock: clock@40000000 {
+2025-12-16T12:36:28.4223753Z 			compatible = "nordic,nrf-clock";
+2025-12-16T12:36:28.4224166Z 			reg = < 0x40000000 0x1000 >;
+2025-12-16T12:36:28.4224517Z 			interrupts = < 0x0 0x1 >;
+2025-12-16T12:36:28.4225227Z 			status = "okay";
+2025-12-16T12:36:28.4226084Z 		};
+2025-12-16T12:36:28.4226383Z 		power: power@40000000 {
+2025-12-16T12:36:28.4226802Z 			compatible = "nordic,nrf-power";
+2025-12-16T12:36:28.4227176Z 			reg = < 0x40000000 0x1000 >;
+2025-12-16T12:36:28.4227417Z 			interrupts = < 0x0 0x1 >;
+2025-12-16T12:36:28.4227631Z 			status = "okay";
+2025-12-16T12:36:28.4227823Z 			#address-cells = < 0x1 >;
+2025-12-16T12:36:28.4228037Z 			#size-cells = < 0x1 >;
+2025-12-16T12:36:28.4228247Z 			gpregret1: gpregret1@4000051c {
+2025-12-16T12:36:28.4228483Z 				#address-cells = < 0x1 >;
+2025-12-16T12:36:28.4228696Z 				#size-cells = < 0x1 >;
+2025-12-16T12:36:28.4228918Z 				compatible = "nordic,nrf-gpregret";
+2025-12-16T12:36:28.4229165Z 				reg = < 0x4000051c 0x1 >;
+2025-12-16T12:36:28.4229377Z 				status = "okay";
+2025-12-16T12:36:28.4229554Z 			};
+2025-12-16T12:36:28.4229724Z 			gpregret2: gpregret2@40000520 {
+2025-12-16T12:36:28.4229957Z 				#address-cells = < 0x1 >;
+2025-12-16T12:36:28.4230167Z 				#size-cells = < 0x1 >;
+2025-12-16T12:36:28.4230391Z 				compatible = "nordic,nrf-gpregret";
+2025-12-16T12:36:28.4230635Z 				reg = < 0x40000520 0x1 >;
+2025-12-16T12:36:28.4230829Z 				status = "okay";
+2025-12-16T12:36:28.4231007Z 			};
+2025-12-16T12:36:28.4231170Z 			reg1: regulator@40000578 {
+2025-12-16T12:36:28.4231406Z 				compatible = "nordic,nrf5x-regulator";
+2025-12-16T12:36:28.4232495Z 				reg = < 0x40000578 0x1 >;
+2025-12-16T12:36:28.4232738Z 				regulator-name = "REG1";
+2025-12-16T12:36:28.4232970Z 				regulator-initial-mode = < 0x0 >;
+2025-12-16T12:36:28.4233320Z 			};
+2025-12-16T12:36:28.4233489Z 			reg0: regulator@40000580 {
+2025-12-16T12:36:28.4233743Z 				compatible = "nordic,nrf52x-regulator-hv";
+2025-12-16T12:36:28.4233999Z 				reg = < 0x40000580 0x1 >;
+2025-12-16T12:36:28.4234209Z 				regulator-name = "REG0";
+2025-12-16T12:36:28.4234427Z 				status = "disabled";
+2025-12-16T12:36:28.4234611Z 			};
+2025-12-16T12:36:28.4234762Z 		};
+2025-12-16T12:36:28.4234927Z 		radio: radio@40001000 {
+2025-12-16T12:36:28.4235139Z 			compatible = "nordic,nrf-radio";
+2025-12-16T12:36:28.4235372Z 			reg = < 0x40001000 0x1000 >;
+2025-12-16T12:36:28.4235584Z 			interrupts = < 0x1 0x1 >;
+2025-12-16T12:36:28.4235786Z 			status = "okay";
+2025-12-16T12:36:28.4235968Z 			ieee802154-supported;
+2025-12-16T12:36:28.4236177Z 			ble-2mbps-supported;
+2025-12-16T12:36:28.4236390Z 			ble-coded-phy-supported;
+2025-12-16T12:36:28.4236613Z 			tx-high-power-supported;
+2025-12-16T12:36:28.4236829Z 			ieee802154: ieee802154 {
+2025-12-16T12:36:28.4237052Z 				compatible = "nordic,nrf-ieee802154";
+2025-12-16T12:36:28.4237296Z 				status = "disabled";
+2025-12-16T12:36:28.4237482Z 			};
+2025-12-16T12:36:28.4237658Z 			bt_hci_controller: bt_hci_controller {
+2025-12-16T12:36:28.4237926Z 				compatible = "zephyr,bt-hci-ll-sw-split";
+2025-12-16T12:36:28.4238184Z 				status = "okay";
+2025-12-16T12:36:28.4238364Z 			};
+2025-12-16T12:36:28.4238505Z 		};
+2025-12-16T12:36:28.4238662Z 		uart0: uart@40002000 {
+2025-12-16T12:36:28.4238872Z 			compatible = "nordic,nrf-uarte";
+2025-12-16T12:36:28.4239098Z 			reg = < 0x40002000 0x1000 >;
+2025-12-16T12:36:28.4239312Z 			interrupts = < 0x2 0x1 >;
+2025-12-16T12:36:28.4239520Z 			status = "disabled";
+2025-12-16T12:36:28.4239698Z 		};
+2025-12-16T12:36:28.4239850Z 		i2c0: i2c@40003000 {
+2025-12-16T12:36:28.4240518Z 			compatible = "nordic,nrf-twim";
+2025-12-16T12:36:28.4240988Z 			#address-cells = < 0x1 >;
+2025-12-16T12:36:28.4241623Z 			#size-cells = < 0x0 >;
+2025-12-16T12:36:28.4241927Z 			reg = < 0x40003000 0x1000 >;
+2025-12-16T12:36:28.4242154Z 			interrupts = < 0x3 0x1 >;
+2025-12-16T12:36:28.4242377Z 			easydma-maxcnt-bits = < 0x10 >;
+2025-12-16T12:36:28.4242616Z 			status = "disabled";
+2025-12-16T12:36:28.4242843Z 			zephyr,pm-device-runtime-auto;
+2025-12-16T12:36:28.4243064Z 		};
+2025-12-16T12:36:28.4243236Z 		spi0: nice_view_spi: spi@40003000 {
+2025-12-16T12:36:28.4243484Z 			compatible = "nordic,nrf-spim";
+2025-12-16T12:36:28.4243717Z 			#address-cells = < 0x1 >;
+2025-12-16T12:36:28.4243933Z 			#size-cells = < 0x0 >;
+2025-12-16T12:36:28.4244137Z 			reg = < 0x40003000 0x1000 >;
+2025-12-16T12:36:28.4244344Z 			interrupts = < 0x3 0x1 >;
+2025-12-16T12:36:28.4244556Z 			max-frequency = < 0x7a1200 >;
+2025-12-16T12:36:28.4244786Z 			easydma-maxcnt-bits = < 0x10 >;
+2025-12-16T12:36:28.4245004Z 			status = "okay";
+2025-12-16T12:36:28.4245207Z 			pinctrl-0 = < &spi0_default >;
+2025-12-16T12:36:28.4245442Z 			pinctrl-1 = < &spi0_sleep >;
+2025-12-16T12:36:28.4245675Z 			pinctrl-names = "default", "sleep";
+2025-12-16T12:36:28.4245915Z 			cs-gpios = < &gpio0 0x6 0x0 >;
+2025-12-16T12:36:28.4246133Z 			nice_view: ls0xx@0 {
+2025-12-16T12:36:28.4246336Z 				compatible = "sharp,ls0xx";
+2025-12-16T12:36:28.4246556Z 				spi-max-frequency = < 0xf4240 >;
+2025-12-16T12:36:28.4246781Z 				reg = < 0x0 >;
+2025-12-16T12:36:28.4246958Z 				width = < 0xa0 >;
+2025-12-16T12:36:28.4247136Z 				height = < 0x44 >;
+2025-12-16T12:36:28.4247320Z 			};
+2025-12-16T12:36:28.4247476Z 		};
+2025-12-16T12:36:28.4247623Z 		i2c1: i2c@40004000 {
+2025-12-16T12:36:28.4247829Z 			compatible = "nordic,nrf-twim";
+2025-12-16T12:36:28.4248060Z 			#address-cells = < 0x1 >;
+2025-12-16T12:36:28.4248265Z 			#size-cells = < 0x0 >;
+2025-12-16T12:36:28.4248466Z 			reg = < 0x40004000 0x1000 >;
+2025-12-16T12:36:28.4248675Z 			interrupts = < 0x4 0x1 >;
+2025-12-16T12:36:28.4248891Z 			easydma-maxcnt-bits = < 0x10 >;
+2025-12-16T12:36:28.4249117Z 			status = "disabled";
+2025-12-16T12:36:28.4249332Z 			zephyr,pm-device-runtime-auto;
+2025-12-16T12:36:28.4249544Z 		};
+2025-12-16T12:36:28.4249698Z 		spi1: spi@40004000 {
+2025-12-16T12:36:28.4249907Z 			compatible = "nordic,nrf-spim";
+2025-12-16T12:36:28.4250154Z 			#address-cells = < 0x1 >;
+2025-12-16T12:36:28.4250378Z 			#size-cells = < 0x0 >;
+2025-12-16T12:36:28.4250581Z 			reg = < 0x40004000 0x1000 >;
+2025-12-16T12:36:28.4250818Z 			interrupts = < 0x4 0x1 >;
+2025-12-16T12:36:28.4251033Z 			max-frequency = < 0x7a1200 >;
+2025-12-16T12:36:28.4251259Z 			easydma-maxcnt-bits = < 0x10 >;
+2025-12-16T12:36:28.4251838Z 			status = "disabled";
+2025-12-16T12:36:28.4252028Z 		};
+2025-12-16T12:36:28.4252182Z 		nfct: nfct@40005000 {
+2025-12-16T12:36:28.4252383Z 			compatible = "nordic,nrf-nfct";
+2025-12-16T12:36:28.4252608Z 			reg = < 0x40005000 0x1000 >;
+2025-12-16T12:36:28.4252815Z 			interrupts = < 0x5 0x1 >;
+2025-12-16T12:36:28.4253026Z 			status = "disabled";
+2025-12-16T12:36:28.4253202Z 		};
+2025-12-16T12:36:28.4253367Z 		gpiote: gpiote0: gpiote@40006000 {
+2025-12-16T12:36:28.4253618Z 			compatible = "nordic,nrf-gpiote";
+2025-12-16T12:36:28.4253848Z 			reg = < 0x40006000 0x1000 >;
+2025-12-16T12:36:28.4254051Z 			interrupts = < 0x6 0x5 >;
+2025-12-16T12:36:28.4254251Z 			status = "okay";
+2025-12-16T12:36:28.4254431Z 			instance = < 0x0 >;
+2025-12-16T12:36:28.4254617Z 			phandle = < 0x9 >;
+2025-12-16T12:36:28.4254794Z 		};
+2025-12-16T12:36:28.4254946Z 		adc: adc@40007000 {
+2025-12-16T12:36:28.4255138Z 			compatible = "nordic,nrf-saadc";
+2025-12-16T12:36:28.4255367Z 			reg = < 0x40007000 0x1000 >;
+2025-12-16T12:36:28.4255576Z 			interrupts = < 0x7 0x1 >;
+2025-12-16T12:36:28.4255776Z 			status = "okay";
+2025-12-16T12:36:28.4255955Z 			#io-channel-cells = < 0x1 >;
+2025-12-16T12:36:28.4256191Z 			zephyr,pm-device-runtime-auto;
+2025-12-16T12:36:28.4256415Z 		};
+2025-12-16T12:36:28.4256565Z 		timer0: timer@40008000 {
+2025-12-16T12:36:28.4256926Z 			compatible = "nordic,nrf-timer";
+2025-12-16T12:36:28.4257161Z 			status = "disabled";
+2025-12-16T12:36:28.4257456Z 			reg = < 0x40008000 0x1000 >;
+2025-12-16T12:36:28.4257656Z 			cc-num = < 0x4 >;
+2025-12-16T12:36:28.4257846Z 			max-bit-width = < 0x20 >;
+2025-12-16T12:36:28.4258053Z 			interrupts = < 0x8 0x1 >;
+2025-12-16T12:36:28.4258263Z 			prescaler = < 0x0 >;
+2025-12-16T12:36:28.4258449Z 		};
+2025-12-16T12:36:28.4258600Z 		timer1: timer@40009000 {
+2025-12-16T12:36:28.4258817Z 			compatible = "nordic,nrf-timer";
+2025-12-16T12:36:28.4259046Z 			status = "disabled";
+2025-12-16T12:36:28.4259228Z 			reg = < 0x40009000 0x1000 >;
+2025-12-16T12:36:28.4259431Z 			cc-num = < 0x4 >;
+2025-12-16T12:36:28.4259619Z 			max-bit-width = < 0x20 >;
+2025-12-16T12:36:28.4259824Z 			interrupts = < 0x9 0x1 >;
+2025-12-16T12:36:28.4260028Z 			prescaler = < 0x0 >;
+2025-12-16T12:36:28.4260217Z 			phandle = < 0xa >;
+2025-12-16T12:36:28.4260392Z 		};
+2025-12-16T12:36:28.4260550Z 		timer2: timer@4000a000 {
+2025-12-16T12:36:28.4260765Z 			compatible = "nordic,nrf-timer";
+2025-12-16T12:36:28.4260993Z 			status = "disabled";
+2025-12-16T12:36:28.4261180Z 			reg = < 0x4000a000 0x1000 >;
+2025-12-16T12:36:28.4261384Z 			cc-num = < 0x4 >;
+2025-12-16T12:36:28.4261814Z 			max-bit-width = < 0x20 >;
+2025-12-16T12:36:28.4262024Z 			interrupts = < 0xa 0x1 >;
+2025-12-16T12:36:28.4262228Z 			prescaler = < 0x0 >;
+2025-12-16T12:36:28.4262405Z 		};
+2025-12-16T12:36:28.4262552Z 		rtc0: rtc@4000b000 {
+2025-12-16T12:36:28.4262754Z 			compatible = "nordic,nrf-rtc";
+2025-12-16T12:36:28.4262982Z 			reg = < 0x4000b000 0x1000 >;
+2025-12-16T12:36:28.4263180Z 			cc-num = < 0x3 >;
+2025-12-16T12:36:28.4263366Z 			interrupts = < 0xb 0x1 >;
+2025-12-16T12:36:28.4263571Z 			status = "disabled";
+2025-12-16T12:36:28.4263764Z 			clock-frequency = < 0x8000 >;
+2025-12-16T12:36:28.4263982Z 			prescaler = < 0x1 >;
+2025-12-16T12:36:28.4264159Z 		};
+2025-12-16T12:36:28.4264311Z 		temp: temp@4000c000 {
+2025-12-16T12:36:28.4264519Z 			compatible = "nordic,nrf-temp";
+2025-12-16T12:36:28.4264764Z 			reg = < 0x4000c000 0x1000 >;
+2025-12-16T12:36:28.4264971Z 			interrupts = < 0xc 0x1 >;
+2025-12-16T12:36:28.4265183Z 			status = "okay";
+2025-12-16T12:36:28.4265352Z 		};
+2025-12-16T12:36:28.4265505Z 		rng: random@4000d000 {
+2025-12-16T12:36:28.4265719Z 			compatible = "nordic,nrf-rng";
+2025-12-16T12:36:28.4265942Z 			reg = < 0x4000d000 0x1000 >;
+2025-12-16T12:36:28.4266149Z 			interrupts = < 0xd 0x1 >;
+2025-12-16T12:36:28.4266343Z 			status = "okay";
+2025-12-16T12:36:28.4266510Z 		};
+2025-12-16T12:36:28.4266658Z 		ecb: ecb@4000e000 {
+2025-12-16T12:36:28.4266851Z 			compatible = "nordic,nrf-ecb";
+2025-12-16T12:36:28.4267074Z 			reg = < 0x4000e000 0x1000 >;
+2025-12-16T12:36:28.4267277Z 			interrupts = < 0xe 0x1 >;
+2025-12-16T12:36:28.4267471Z 			status = "okay";
+2025-12-16T12:36:28.4267637Z 		};
+2025-12-16T12:36:28.4267786Z 		ccm: ccm@4000f000 {
+2025-12-16T12:36:28.4267974Z 			compatible = "nordic,nrf-ccm";
+2025-12-16T12:36:28.4268193Z 			reg = < 0x4000f000 0x1000 >;
+2025-12-16T12:36:28.4268400Z 			interrupts = < 0xf 0x1 >;
+2025-12-16T12:36:28.4268614Z 			length-field-length-8-bits;
+2025-12-16T12:36:28.4268841Z 			status = "okay";
+2025-12-16T12:36:28.4269011Z 		};
+2025-12-16T12:36:28.4269172Z 		wdt: wdt0: watchdog@40010000 {
+2025-12-16T12:36:28.4269405Z 			compatible = "nordic,nrf-wdt";
+2025-12-16T12:36:28.4269630Z 			reg = < 0x40010000 0x1000 >;
+2025-12-16T12:36:28.4269836Z 			interrupts = < 0x10 0x1 >;
+2025-12-16T12:36:28.4270043Z 			status = "okay";
+2025-12-16T12:36:28.4270214Z 		};
+2025-12-16T12:36:28.4270366Z 		rtc1: rtc@40011000 {
+2025-12-16T12:36:28.4270564Z 			compatible = "nordic,nrf-rtc";
+2025-12-16T12:36:28.4270785Z 			reg = < 0x40011000 0x1000 >;
+2025-12-16T12:36:28.4270989Z 			cc-num = < 0x4 >;
+2025-12-16T12:36:28.4271173Z 			interrupts = < 0x11 0x1 >;
+2025-12-16T12:36:28.4271379Z 			status = "disabled";
+2025-12-16T12:36:28.4271874Z 			clock-frequency = < 0x8000 >;
+2025-12-16T12:36:28.4272094Z 			prescaler = < 0x1 >;
+2025-12-16T12:36:28.4272278Z 		};
+2025-12-16T12:36:28.4272574Z 		qdec: qdec0: qdec@40012000 {
+2025-12-16T12:36:28.4272802Z 			compatible = "nordic,nrf-qdec";
+2025-12-16T12:36:28.4273135Z 			reg = < 0x40012000 0x1000 >;
+2025-12-16T12:36:28.4273345Z 			interrupts = < 0x12 0x1 >;
+2025-12-16T12:36:28.4273547Z 			status = "disabled";
+2025-12-16T12:36:28.4273724Z 		};
+2025-12-16T12:36:28.4273886Z 		comp: comparator@40013000 {
+2025-12-16T12:36:28.4274100Z 			compatible = "nordic,nrf-comp";
+2025-12-16T12:36:28.4274327Z 			reg = < 0x40013000 0x1000 >;
+2025-12-16T12:36:28.4274532Z 			interrupts = < 0x13 0x1 >;
+2025-12-16T12:36:28.4274767Z 			status = "disabled";
+2025-12-16T12:36:28.4274944Z 		};
+2025-12-16T12:36:28.4275102Z 		egu0: swi0: egu@40014000 {
+2025-12-16T12:36:28.4275348Z 			compatible = "nordic,nrf-egu", "nordic,nrf-swi";
+2025-12-16T12:36:28.4275618Z 			reg = < 0x40014000 0x1000 >;
+2025-12-16T12:36:28.4275825Z 			interrupts = < 0x14 0x1 >;
+2025-12-16T12:36:28.4276025Z 			status = "okay";
+2025-12-16T12:36:28.4276189Z 		};
+2025-12-16T12:36:28.4276342Z 		egu1: swi1: egu@40015000 {
+2025-12-16T12:36:28.4276586Z 			compatible = "nordic,nrf-egu", "nordic,nrf-swi";
+2025-12-16T12:36:28.4276840Z 			reg = < 0x40015000 0x1000 >;
+2025-12-16T12:36:28.4277048Z 			interrupts = < 0x15 0x1 >;
+2025-12-16T12:36:28.4277249Z 			status = "okay";
+2025-12-16T12:36:28.4277410Z 		};
+2025-12-16T12:36:28.4277566Z 		egu2: swi2: egu@40016000 {
+2025-12-16T12:36:28.4277802Z 			compatible = "nordic,nrf-egu", "nordic,nrf-swi";
+2025-12-16T12:36:28.4278058Z 			reg = < 0x40016000 0x1000 >;
+2025-12-16T12:36:28.4278266Z 			interrupts = < 0x16 0x1 >;
+2025-12-16T12:36:28.4278465Z 			status = "okay";
+2025-12-16T12:36:28.4278627Z 		};
+2025-12-16T12:36:28.4278783Z 		egu3: swi3: egu@40017000 {
+2025-12-16T12:36:28.4279020Z 			compatible = "nordic,nrf-egu", "nordic,nrf-swi";
+2025-12-16T12:36:28.4279271Z 			reg = < 0x40017000 0x1000 >;
+2025-12-16T12:36:28.4279474Z 			interrupts = < 0x17 0x1 >;
+2025-12-16T12:36:28.4279676Z 			status = "okay";
+2025-12-16T12:36:28.4279841Z 		};
+2025-12-16T12:36:28.4279993Z 		egu4: swi4: egu@40018000 {
+2025-12-16T12:36:28.4280232Z 			compatible = "nordic,nrf-egu", "nordic,nrf-swi";
+2025-12-16T12:36:28.4280491Z 			reg = < 0x40018000 0x1000 >;
+2025-12-16T12:36:28.4280696Z 			interrupts = < 0x18 0x1 >;
+2025-12-16T12:36:28.4280896Z 			status = "okay";
+2025-12-16T12:36:28.4281063Z 		};
+2025-12-16T12:36:28.4281211Z 		egu5: swi5: egu@40019000 {
+2025-12-16T12:36:28.4281758Z 			compatible = "nordic,nrf-egu", "nordic,nrf-swi";
+2025-12-16T12:36:28.4282059Z 			reg = < 0x40019000 0x1000 >;
+2025-12-16T12:36:28.4282272Z 			interrupts = < 0x19 0x1 >;
+2025-12-16T12:36:28.4282483Z 			status = "okay";
+2025-12-16T12:36:28.4282652Z 		};
+2025-12-16T12:36:28.4282806Z 		timer3: timer@4001a000 {
+2025-12-16T12:36:28.4283024Z 			compatible = "nordic,nrf-timer";
+2025-12-16T12:36:28.4283262Z 			status = "disabled";
+2025-12-16T12:36:28.4283448Z 			reg = < 0x4001a000 0x1000 >;
+2025-12-16T12:36:28.4283649Z 			cc-num = < 0x6 >;
+2025-12-16T12:36:28.4283837Z 			max-bit-width = < 0x20 >;
+2025-12-16T12:36:28.4284042Z 			interrupts = < 0x1a 0x1 >;
+2025-12-16T12:36:28.4284256Z 			prescaler = < 0x0 >;
+2025-12-16T12:36:28.4284440Z 		};
+2025-12-16T12:36:28.4284642Z 		timer4: timer@4001b000 {
+2025-12-16T12:36:28.4284848Z 			compatible = "nordic,nrf-timer";
+2025-12-16T12:36:28.4285074Z 			status = "disabled";
+2025-12-16T12:36:28.4285264Z 			reg = < 0x4001b000 0x1000 >;
+2025-12-16T12:36:28.4285459Z 			cc-num = < 0x6 >;
+2025-12-16T12:36:28.4285646Z 			max-bit-width = < 0x20 >;
+2025-12-16T12:36:28.4285853Z 			interrupts = < 0x1b 0x1 >;
+2025-12-16T12:36:28.4286052Z 			prescaler = < 0x0 >;
+2025-12-16T12:36:28.4286230Z 		};
+2025-12-16T12:36:28.4286391Z 		pwm0: pwm@4001c000 {
+2025-12-16T12:36:28.4286596Z 			compatible = "nordic,nrf-pwm";
+2025-12-16T12:36:28.4286823Z 			reg = < 0x4001c000 0x1000 >;
+2025-12-16T12:36:28.4287030Z 			interrupts = < 0x1c 0x1 >;
+2025-12-16T12:36:28.4287229Z 			status = "okay";
+2025-12-16T12:36:28.4287412Z 			#pwm-cells = < 0x3 >;
+2025-12-16T12:36:28.4287620Z 			pinctrl-0 = < &pwm0_default >;
+2025-12-16T12:36:28.4287974Z 			pinctrl-1 = < &pwm0_sleep >;
+2025-12-16T12:36:28.4288206Z 			pinctrl-names = "default", "sleep";
+2025-12-16T12:36:28.4288616Z 			phandle = < 0xf >;
+2025-12-16T12:36:28.4288793Z 		};
+2025-12-16T12:36:28.4288953Z 		pdm0: pdm@4001d000 {
+2025-12-16T12:36:28.4289158Z 			compatible = "nordic,nrf-pdm";
+2025-12-16T12:36:28.4289379Z 			reg = < 0x4001d000 0x1000 >;
+2025-12-16T12:36:28.4289580Z 			interrupts = < 0x1d 0x1 >;
+2025-12-16T12:36:28.4289786Z 			status = "disabled";
+2025-12-16T12:36:28.4289963Z 		};
+2025-12-16T12:36:28.4290108Z 		acl: acl@4001e000 {
+2025-12-16T12:36:28.4290312Z 			compatible = "nordic,nrf-acl";
+2025-12-16T12:36:28.4290529Z 			reg = < 0x4001e000 0x1000 >;
+2025-12-16T12:36:28.4290723Z 			status = "okay";
+2025-12-16T12:36:28.4290889Z 		};
+2025-12-16T12:36:28.4291080Z 		flash_controller: flash-controller@4001e000 {
+2025-12-16T12:36:28.4291381Z 			compatible = "nordic,nrf52-flash-controller";
+2025-12-16T12:36:28.4291873Z 			reg = < 0x4001e000 0x1000 >;
+2025-12-16T12:36:28.4292083Z 			partial-erase;
+2025-12-16T12:36:28.4292315Z 			#address-cells = < 0x1 >;
+2025-12-16T12:36:28.4292532Z 			#size-cells = < 0x1 >;
+2025-12-16T12:36:28.4292735Z 			flash0: flash@0 {
+2025-12-16T12:36:28.4292927Z 				compatible = "soc-nv-flash";
+2025-12-16T12:36:28.4293158Z 				erase-block-size = < 0x1000 >;
+2025-12-16T12:36:28.4293389Z 				write-block-size = < 0x4 >;
+2025-12-16T12:36:28.4293593Z 				reg = < 0x0 0x100000 >;
+2025-12-16T12:36:28.4293791Z 				partitions {
+2025-12-16T12:36:28.4293990Z 					compatible = "fixed-partitions";
+2025-12-16T12:36:28.4294232Z 					#address-cells = < 0x1 >;
+2025-12-16T12:36:28.4294440Z 					#size-cells = < 0x1 >;
+2025-12-16T12:36:28.4294653Z 					sd_partition: partition@0 {
+2025-12-16T12:36:28.4294872Z 						reg = < 0x0 0x26000 >;
+2025-12-16T12:36:28.4295058Z 					};
+2025-12-16T12:36:28.4295234Z 					code_partition: partition@26000 {
+2025-12-16T12:36:28.4295470Z 						reg = < 0x26000 0xc6000 >;
+2025-12-16T12:36:28.4295664Z 					};
+2025-12-16T12:36:28.4295856Z 					storage_partition: partition@ec000 {
+2025-12-16T12:36:28.4296104Z 						reg = < 0xec000 0x8000 >;
+2025-12-16T12:36:28.4296294Z 					};
+2025-12-16T12:36:28.4296468Z 					boot_partition: partition@f4000 {
+2025-12-16T12:36:28.4296707Z 						reg = < 0xf4000 0xc000 >;
+2025-12-16T12:36:28.4296895Z 					};
+2025-12-16T12:36:28.4297041Z 				};
+2025-12-16T12:36:28.4297188Z 			};
+2025-12-16T12:36:28.4297338Z 		};
+2025-12-16T12:36:28.4297508Z 		ppi: ppi@4001f000 {
+2025-12-16T12:36:28.4297715Z 			compatible = "nordic,nrf-ppi";
+2025-12-16T12:36:28.4297934Z 			reg = < 0x4001f000 0x1000 >;
+2025-12-16T12:36:28.4298139Z 			status = "okay";
+2025-12-16T12:36:28.4298308Z 		};
+2025-12-16T12:36:28.4298454Z 		mwu: mwu@40020000 {
+2025-12-16T12:36:28.4298646Z 			compatible = "nordic,nrf-mwu";
+2025-12-16T12:36:28.4298865Z 			reg = < 0x40020000 0x1000 >;
+2025-12-16T12:36:28.4299065Z 			status = "okay";
+2025-12-16T12:36:28.4299226Z 		};
+2025-12-16T12:36:28.4299378Z 		pwm1: pwm@40021000 {
+2025-12-16T12:36:28.4299578Z 			compatible = "nordic,nrf-pwm";
+2025-12-16T12:36:28.4299793Z 			reg = < 0x40021000 0x1000 >;
+2025-12-16T12:36:28.4300003Z 			interrupts = < 0x21 0x1 >;
+2025-12-16T12:36:28.4300216Z 			status = "disabled";
+2025-12-16T12:36:28.4300405Z 			#pwm-cells = < 0x3 >;
+2025-12-16T12:36:28.4300595Z 		};
+2025-12-16T12:36:28.4300748Z 		pwm2: pwm@40022000 {
+2025-12-16T12:36:28.4300943Z 			compatible = "nordic,nrf-pwm";
+2025-12-16T12:36:28.4301160Z 			reg = < 0x40022000 0x1000 >;
+2025-12-16T12:36:28.4301362Z 			interrupts = < 0x22 0x1 >;
+2025-12-16T12:36:28.4301705Z 			status = "disabled";
+2025-12-16T12:36:28.4301900Z 			#pwm-cells = < 0x3 >;
+2025-12-16T12:36:28.4302086Z 		};
+2025-12-16T12:36:28.4302237Z 		spi2: spi@40023000 {
+2025-12-16T12:36:28.4302439Z 			compatible = "nordic,nrf-spim";
+2025-12-16T12:36:28.4302672Z 			#address-cells = < 0x1 >;
+2025-12-16T12:36:28.4302876Z 			#size-cells = < 0x0 >;
+2025-12-16T12:36:28.4303073Z 			reg = < 0x40023000 0x1000 >;
+2025-12-16T12:36:28.4303277Z 			interrupts = < 0x23 0x1 >;
+2025-12-16T12:36:28.4303492Z 			max-frequency = < 0x7a1200 >;
+2025-12-16T12:36:28.4303842Z 			easydma-maxcnt-bits = < 0x10 >;
+2025-12-16T12:36:28.4304073Z 			status = "disabled";
+2025-12-16T12:36:28.4304353Z 		};
+2025-12-16T12:36:28.4304529Z 		rtc2: rtc@40024000 {
+2025-12-16T12:36:28.4304726Z 			compatible = "nordic,nrf-rtc";
+2025-12-16T12:36:28.4304944Z 			reg = < 0x40024000 0x1000 >;
+2025-12-16T12:36:28.4305138Z 			cc-num = < 0x4 >;
+2025-12-16T12:36:28.4305326Z 			interrupts = < 0x24 0x1 >;
+2025-12-16T12:36:28.4305532Z 			status = "disabled";
+2025-12-16T12:36:28.4305721Z 			clock-frequency = < 0x8000 >;
+2025-12-16T12:36:28.4305939Z 			prescaler = < 0x1 >;
+2025-12-16T12:36:28.4306119Z 		};
+2025-12-16T12:36:28.4306264Z 		i2s0: i2s@40025000 {
+2025-12-16T12:36:28.4306458Z 			compatible = "nordic,nrf-i2s";
+2025-12-16T12:36:28.4306685Z 			#address-cells = < 0x1 >;
+2025-12-16T12:36:28.4306887Z 			#size-cells = < 0x0 >;
+2025-12-16T12:36:28.4307083Z 			reg = < 0x40025000 0x1000 >;
+2025-12-16T12:36:28.4307288Z 			interrupts = < 0x25 0x1 >;
+2025-12-16T12:36:28.4307494Z 			status = "disabled";
+2025-12-16T12:36:28.4307670Z 		};
+2025-12-16T12:36:28.4307835Z 		usbd: zephyr_udc0: usbd@40027000 {
+2025-12-16T12:36:28.4308079Z 			compatible = "nordic,nrf-usbd";
+2025-12-16T12:36:28.4308295Z 			reg = < 0x40027000 0x1000 >;
+2025-12-16T12:36:28.4308499Z 			interrupts = < 0x27 0x1 >;
+2025-12-16T12:36:28.4308716Z 			num-bidir-endpoints = < 0x1 >;
+2025-12-16T12:36:28.4308939Z 			num-in-endpoints = < 0x7 >;
+2025-12-16T12:36:28.4309160Z 			num-out-endpoints = < 0x7 >;
+2025-12-16T12:36:28.4309378Z 			num-isoin-endpoints = < 0x1 >;
+2025-12-16T12:36:28.4309605Z 			num-isoout-endpoints = < 0x1 >;
+2025-12-16T12:36:28.4309826Z 			status = "okay";
+2025-12-16T12:36:28.4310076Z 			snippet_studio_rpc_usb_uart: snippet_studio_rpc_usb_uart {
+2025-12-16T12:36:28.4310398Z 				compatible = "zephyr,cdc-acm-uart";
+2025-12-16T12:36:28.4310632Z 			};
+2025-12-16T12:36:28.4310780Z 		};
+2025-12-16T12:36:28.4310934Z 		uart1: uart@40028000 {
+2025-12-16T12:36:28.4311144Z 			compatible = "nordic,nrf-uarte";
+2025-12-16T12:36:28.4311373Z 			reg = < 0x40028000 0x1000 >;
+2025-12-16T12:36:28.4311698Z 			interrupts = < 0x28 0x1 >;
+2025-12-16T12:36:28.4311909Z 			status = "disabled";
+2025-12-16T12:36:28.4312089Z 		};
+2025-12-16T12:36:28.4312242Z 		qspi: qspi@40029000 {
+2025-12-16T12:36:28.4312442Z 			compatible = "nordic,nrf-qspi";
+2025-12-16T12:36:28.4312671Z 			#address-cells = < 0x1 >;
+2025-12-16T12:36:28.4312882Z 			#size-cells = < 0x0 >;
+2025-12-16T12:36:28.4313107Z 			reg = < 0x40029000 0x1000 >, < 0x12000000 0x8000000 >;
+2025-12-16T12:36:28.4313384Z 			reg-names = "qspi", "qspi_mm";
+2025-12-16T12:36:28.4313608Z 			interrupts = < 0x29 0x1 >;
+2025-12-16T12:36:28.4313808Z 			status = "disabled";
+2025-12-16T12:36:28.4313987Z 		};
+2025-12-16T12:36:28.4314142Z 		pwm3: pwm@4002d000 {
+2025-12-16T12:36:28.4314337Z 			compatible = "nordic,nrf-pwm";
+2025-12-16T12:36:28.4314558Z 			reg = < 0x4002d000 0x1000 >;
+2025-12-16T12:36:28.4314770Z 			interrupts = < 0x2d 0x1 >;
+2025-12-16T12:36:28.4314971Z 			status = "disabled";
+2025-12-16T12:36:28.4315166Z 			#pwm-cells = < 0x3 >;
+2025-12-16T12:36:28.4315356Z 		};
+2025-12-16T12:36:28.4315504Z 		spi3: spi@4002f000 {
+2025-12-16T12:36:28.4315708Z 			compatible = "nordic,nrf-spim";
+2025-12-16T12:36:28.4315937Z 			#address-cells = < 0x1 >;
+2025-12-16T12:36:28.4316140Z 			#size-cells = < 0x0 >;
+2025-12-16T12:36:28.4316335Z 			reg = < 0x4002f000 0x1000 >;
+2025-12-16T12:36:28.4316542Z 			interrupts = < 0x2f 0x1 >;
+2025-12-16T12:36:28.4316751Z 			max-frequency = < 0x1e84800 >;
+2025-12-16T12:36:28.4316976Z 			easydma-maxcnt-bits = < 0x10 >;
+2025-12-16T12:36:28.4317205Z 			rx-delay-supported;
+2025-12-16T12:36:28.4317396Z 			rx-delay = < 0x2 >;
+2025-12-16T12:36:28.4317573Z 			status = "okay";
+2025-12-16T12:36:28.4317760Z 			pinctrl-0 = < &spi3_default >;
+2025-12-16T12:36:28.4317984Z 			pinctrl-1 = < &spi3_sleep >;
+2025-12-16T12:36:28.4318203Z 			pinctrl-names = "default", "sleep";
+2025-12-16T12:36:28.4318441Z 			led_strip: ws2812@0 {
+2025-12-16T12:36:28.4318659Z 				compatible = "worldsemi,ws2812-spi";
+2025-12-16T12:36:28.4319010Z 				reg = < 0x0 >;
+2025-12-16T12:36:28.4319213Z 				spi-max-frequency = < 0x3d0900 >;
+2025-12-16T12:36:28.4319553Z 				chain-length = < 0x15 >;
+2025-12-16T12:36:28.4319760Z 				spi-one-frame = < 0x70 >;
+2025-12-16T12:36:28.4319979Z 				spi-zero-frame = < 0x40 >;
+2025-12-16T12:36:28.4320202Z 				color-mapping = < 0x2 0x1 0x3 >;
+2025-12-16T12:36:28.4320417Z 			};
+2025-12-16T12:36:28.4320564Z 		};
+2025-12-16T12:36:28.4320723Z 		gpio0: gpio@50000000 {
+2025-12-16T12:36:28.4320929Z 			compatible = "nordic,nrf-gpio";
+2025-12-16T12:36:28.4321148Z 			gpio-controller;
+2025-12-16T12:36:28.4321350Z 			reg = < 0x50000000 0x200 0x50000500 0x300 >;
+2025-12-16T12:36:28.4321690Z 			#gpio-cells = < 0x2 >;
+2025-12-16T12:36:28.4321880Z 			status = "okay";
+2025-12-16T12:36:28.4322056Z 			port = < 0x0 >;
+2025-12-16T12:36:28.4322247Z 			gpiote-instance = < &gpiote >;
+2025-12-16T12:36:28.4322462Z 			phandle = < 0x4 >;
+2025-12-16T12:36:28.4322641Z 		};
+2025-12-16T12:36:28.4322796Z 		gpio1: gpio@50000300 {
+2025-12-16T12:36:28.4323003Z 			compatible = "nordic,nrf-gpio";
+2025-12-16T12:36:28.4323225Z 			gpio-controller;
+2025-12-16T12:36:28.4323422Z 			reg = < 0x50000300 0x200 0x50000800 0x300 >;
+2025-12-16T12:36:28.4323658Z 			#gpio-cells = < 0x2 >;
+2025-12-16T12:36:28.4323850Z 			ngpios = < 0x10 >;
+2025-12-16T12:36:28.4324034Z 			status = "okay";
+2025-12-16T12:36:28.4324202Z 			port = < 0x1 >;
+2025-12-16T12:36:28.4324391Z 			gpiote-instance = < &gpiote >;
+2025-12-16T12:36:28.4324610Z 			phandle = < 0xd >;
+2025-12-16T12:36:28.4324781Z 		};
+2025-12-16T12:36:28.4324944Z 		cryptocell: crypto@5002a000 {
+2025-12-16T12:36:28.4325293Z 			compatible = "nordic,cryptocell", "arm,cryptocell-310";
+2025-12-16T12:36:28.4325757Z 			reg = < 0x5002a000 0x1000 >, < 0x5002b000 0x1000 >;
+2025-12-16T12:36:28.4326016Z 			reg-names = "wrapper", "core";
+2025-12-16T12:36:28.4326243Z 			interrupts = < 0x2a 0x1 >;
+2025-12-16T12:36:28.4326455Z 			status = "disabled";
+2025-12-16T12:36:28.4326632Z 		};
+2025-12-16T12:36:28.4326775Z 	};
+2025-12-16T12:36:28.4326948Z 	pinctrl: pin-controller {
+2025-12-16T12:36:28.4327169Z 		compatible = "nordic,nrf-pinctrl";
+2025-12-16T12:36:28.4327417Z 		spi0_default: spi0_default {
+2025-12-16T12:36:28.4327631Z 			phandle = < 0x2 >;
+2025-12-16T12:36:28.4327810Z 			group1 {
+2025-12-16T12:36:28.4328008Z 				psels = < 0x4000014 >, < 0x5000011 >, < 0x6000019 >;
+2025-12-16T12:36:28.4328254Z 			};
+2025-12-16T12:36:28.4328394Z 		};
+2025-12-16T12:36:28.4328556Z 		spi0_sleep: spi0_sleep {
+2025-12-16T12:36:28.4328758Z 			phandle = < 0x3 >;
+2025-12-16T12:36:28.4328930Z 			group1 {
+2025-12-16T12:36:28.4329119Z 				psels = < 0x4000014 >, < 0x5000011 >, < 0x6000019 >;
+2025-12-16T12:36:28.4329374Z 				low-power-enable;
+2025-12-16T12:36:28.4329547Z 			};
+2025-12-16T12:36:28.4329694Z 		};
+2025-12-16T12:36:28.4329856Z 		pwm0_default: pwm0_default {
+2025-12-16T12:36:28.4330073Z 			phandle = < 0x5 >;
+2025-12-16T12:36:28.4330252Z 			group1 {
+2025-12-16T12:36:28.4330423Z 				psels = < 0x1600002d >;
+2025-12-16T12:36:28.4330617Z 			};
+2025-12-16T12:36:28.4330760Z 		};
+2025-12-16T12:36:28.4330925Z 		pwm0_sleep: pwm0_sleep {
+2025-12-16T12:36:28.4331128Z 			phandle = < 0x6 >;
+2025-12-16T12:36:28.4331305Z 			group1 {
+2025-12-16T12:36:28.4331833Z 				psels = < 0x1600002d >;
+2025-12-16T12:36:28.4332236Z 				low-power-enable;
+2025-12-16T12:36:28.4332517Z 			};
+2025-12-16T12:36:28.4332744Z 		};
+2025-12-16T12:36:28.4333074Z 		spi3_default: spi3_default {
+2025-12-16T12:36:28.4333384Z 			phandle = < 0x7 >;
+2025-12-16T12:36:28.4333643Z 			group1 {
+2025-12-16T12:36:28.4333930Z 				psels = < 0x500002c >;
+2025-12-16T12:36:28.4334214Z 			};
+2025-12-16T12:36:28.4334472Z 		};
+2025-12-16T12:36:28.4334750Z 		spi3_sleep: spi3_sleep {
+2025-12-16T12:36:28.4346442Z 			phandle = < 0x8 >;
+2025-12-16T12:36:28.4346664Z 			group1 {
+2025-12-16T12:36:28.4346846Z 				psels = < 0x500002c >;
+2025-12-16T12:36:28.4347070Z 				low-power-enable;
+2025-12-16T12:36:28.4347256Z 			};
+2025-12-16T12:36:28.4347402Z 		};
+2025-12-16T12:36:28.4347551Z 	};
+2025-12-16T12:36:28.4347894Z 	rng_hci: entropy_bt_hci {
+2025-12-16T12:36:28.4348141Z 		compatible = "zephyr,bt-hci-entropy";
+2025-12-16T12:36:28.4348397Z 		status = "okay";
+2025-12-16T12:36:28.4348682Z 	};
+2025-12-16T12:36:28.4348845Z 	sw_pwm: sw-pwm {
+2025-12-16T12:36:28.4349056Z 		compatible = "nordic,nrf-sw-pwm";
+2025-12-16T12:36:28.4349309Z 		status = "disabled";
+2025-12-16T12:36:28.4349533Z 		generator = < &timer1 >;
+2025-12-16T12:36:28.4349751Z 		clock-prescaler = < 0x0 >;
+2025-12-16T12:36:28.4349964Z 		#pwm-cells = < 0x3 >;
+2025-12-16T12:36:28.4350150Z 	};
+2025-12-16T12:36:28.4350300Z 	cpus {
+2025-12-16T12:36:28.4350465Z 		#address-cells = < 0x1 >;
+2025-12-16T12:36:28.4350673Z 		#size-cells = < 0x0 >;
+2025-12-16T12:36:28.4350863Z 		cpu@0 {
+2025-12-16T12:36:28.4351028Z 			device_type = "cpu";
+2025-12-16T12:36:28.4351239Z 			compatible = "arm,cortex-m4f";
+2025-12-16T12:36:28.4351586Z 			reg = < 0x0 >;
+2025-12-16T12:36:28.4351909Z 			#address-cells = < 0x1 >;
+2025-12-16T12:36:28.4352136Z 			#size-cells = < 0x1 >;
+2025-12-16T12:36:28.4352342Z 			itm: itm@e0000000 {
+2025-12-16T12:36:28.4352548Z 				compatible = "arm,armv7m-itm";
+2025-12-16T12:36:28.4352775Z 				reg = < 0xe0000000 0x1000 >;
+2025-12-16T12:36:28.4353012Z 				swo-ref-frequency = < 0x1e84800 >;
+2025-12-16T12:36:28.4353240Z 			};
+2025-12-16T12:36:28.4353386Z 		};
+2025-12-16T12:36:28.4353529Z 	};
+2025-12-16T12:36:28.4353706Z 	key_physical_attrs: key_physical_attrs {
+2025-12-16T12:36:28.4353973Z 		compatible = "zmk,key-physical-attrs";
+2025-12-16T12:36:28.4354220Z 		#key-cells = < 0x7 >;
+2025-12-16T12:36:28.4354413Z 		phandle = < 0xc >;
+2025-12-16T12:36:28.4354586Z 	};
+2025-12-16T12:36:28.4354759Z 	default_layout: default_layout {
+2025-12-16T12:36:28.4355004Z 		compatible = "zmk,physical-layout";
+2025-12-16T12:36:28.4355249Z 		display-name = "Layout";
+2025-12-16T12:36:28.4355471Z 		transform = < &default_transform >;
+2025-12-16T12:36:28.4362199Z 		keys = < &key_physical_attrs 0x64 0x64 0x0 0x25 0x0 0x0 0x0 >, < &key_physical_attrs 0x64 0x64 0x64 0x25 0x0 0x0 0x0 >, < &key_physical_attrs 0x64 0x64 0xc8 0xc 0x0 0x0 0x0 >, < &key_physical_attrs 0x64 0x64 0x12c 0x0 0x0 0x0 0x0 >, < &key_physical_attrs 0x64 0x64 0x190 0xc 0x0 0x0 0x0 >, < &key_physical_attrs 0x64 0x64 0x1f4 0x18 0x0 0x0 0x0 >, < &key_physical_attrs 0x64 0x64 0x39d 0x18 0x0 0x0 0x0 >, < &key_physical_attrs 0x64 0x64 0x47e 0x18 0x0 0x0 0x0 >, < &key_physical_attrs 0x64 0x64 0x4e2 0xc 0x0 0x0 0x0 >, < &key_physical_attrs 0x64 0x64 0x546 0x0 0x0 0x0 0x0 >, < &key_physical_attrs 0x64 0x64 0x5aa 0xc 0x0 0x0 0x0 >, < &key_physical_attrs 0x64 0x64 0x60e 0x25 0x0 0x0 0x0 >, < &key_physical_attrs 0x64 0x64 0x672 0x25 0x0 0x0 0x0 >, < &key_physical_attrs 0x64 0x64 0x0 0x89 0x0 0x0 0x0 >, < &key_physical_attrs 0x64 0x64 0x64 0x89 0x0 0x0 0x0 >, < &key_physical_attrs 0x64 0x64 0xc8 0x70 0x0 0x0 0x0 >, < &key_physical_attrs 0x64 0x64 0x12c 0x64 0x0 0x0 0x0 >, < &key_physical_attrs 0x64 0x64 0x190 0x70 0x0 0x0 0x0 >, < &key_physical_attrs 0x64 0x64 0x1f4 0x7c 0x0 0x0 0x0 >, < &key_physical_attrs 0x64 0x64 0x339 0x7c 0x0 0x0 0x0 >, < &key_physical_attrs 0x64 0x64 0x39d 0x7c 0x0 0x0 0x0 >, < &key_physical_attrs 0x64 0x64 0x401 0x7c 0x0 0x0 0x0 >, < &key_physical_attrs 0x64 0x64 0x47e 0x7c 0x0 0x0 0x0 >, < &key_physical_attrs 0x64 0x64 0x4e2 0x70 0x0 0x0 0x0 >, < &key_physical_attrs 0x64 0x64 0x546 0x64 0x0 0x0 0x0 >, < &key_physical_attrs 0x64 0x64 0x5aa 0x70 0x0 0x0 0x0 >, < &key_physical_attrs 0x64 0x64 0x60e 0x89 0x0 0x0 0x0 >, < &key_physical_attrs 0x64 0x64 0x672 0x89 0x0 0x0 0x0 >, < &key_physical_attrs 0x64 0x64 0x0 0xed 0x0 0x0 0x0 >, < &key_physical_attrs 0x64 0x64 0x64 0xed 0x0 0x0 0x0 >, < &key_physical_attrs 0x64 0x64 0xc8 0xd4 0x0 0x0 0x0 >, < &key_physical_attrs 0x64 0x64 0x12c 0xc8 0x0 0x0 0x0 >, < &key_physical_attrs 0x64 0x64 0x190 0xd4 0x0 0x0 0x0 >, < &key_physical_attrs 0x64 0x64 0x1f4 0xe0 0x0 0x0 0x0 >, < &key_physical_attrs 0x64 0x64 0x271 0xe0 0x0 0x0 0x0 >, < &key_physical_attrs 0x64 0x64 0x39d 0xe0 0x0 0x0 0x0 >, < &key_physical_attrs 0x64 0x64 0x47e 0xe0 0x0 0x0 0x0 >, < &key_physical_attrs 0x64 0x64 0x4e2 0xd4 0x0 0x0 0x0 >, < &key_physical_attrs 0x64 0x64 0x546 0xc8 0x0 0x0 0x0 >, < &key_physical_attrs 0x64 0x64 0x5aa 0xd4 0x0 0x0 0x0 >, < &key_physical_attrs 0x64 0x64 0x60e 0xed 0x0 0x0 0x0 >, < &key_physical_attrs 0x64 0x64 0x672 0xed 0x0 0x0 0x0 >, < &key_physical_attrs 0x64 0x64 0x15e 0x138 0x0 0x0 0x0 >, < &key_physical_attrs 0x64 0x64 0x1c2 0x138 0x4b0 0x1c2 0x19c >, < &key_physical_attrs 0x64 0x64 0x226 0x138 0x960 0x203 0x1b1 >, < &key_physical_attrs 0x64 0x64 0x44c 0x138 0xfffff6a0 0x4ce 0x1b1 >, < &key_physical_attrs 0x64 0x64 0x4b0 0x138 0xfffffb50 0x514 0x19c >, < &key_physical_attrs 0x64 0x64 0x514 0x138 0x0 0x0 0x0 >;
+2025-12-16T12:36:28.4368884Z 	};
+2025-12-16T12:36:28.4369039Z 	vbatt: vbatt {
+2025-12-16T12:36:28.4369243Z 		compatible = "zmk,battery-nrf-vddh";
+2025-12-16T12:36:28.4369467Z 	};
+2025-12-16T12:36:28.4369615Z 	EXT_POWER {
+2025-12-16T12:36:28.4369802Z 		compatible = "zmk,ext-power-generic";
+2025-12-16T12:36:28.4370058Z 		control-gpios = < &gpio0 0xd 0x0 >;
+2025-12-16T12:36:28.4370289Z 		init-delay-ms = < 0x32 >;
+2025-12-16T12:36:28.4370486Z 	};
+2025-12-16T12:36:28.4370642Z 	left_encoder: encoder_left {
+2025-12-16T12:36:28.4370863Z 		compatible = "alps,ec11";
+2025-12-16T12:36:28.4371081Z 		a-gpios = < &gpio1 0xa 0x10 >;
+2025-12-16T12:36:28.4371305Z 		b-gpios = < &gpio1 0xe 0x10 >;
+2025-12-16T12:36:28.4371639Z 		steps = < 0x1e >;
+2025-12-16T12:36:28.4371818Z 		status = "okay";
+2025-12-16T12:36:28.4371995Z 		phandle = < 0xe >;
+2025-12-16T12:36:28.4372172Z 	};
+2025-12-16T12:36:28.4372320Z 	sensors {
+2025-12-16T12:36:28.4372498Z 		compatible = "zmk,keymap-sensors";
+2025-12-16T12:36:28.4372747Z 		triggers-per-rotation = < 0xf >;
+2025-12-16T12:36:28.4372988Z 		sensors = < &left_encoder >;
+2025-12-16T12:36:28.4373192Z 	};
+2025-12-16T12:36:28.4373340Z 	kscan0: kscan {
+2025-12-16T12:36:28.4373543Z 		compatible = "zmk,kscan-gpio-matrix";
+2025-12-16T12:36:28.4373786Z 		wakeup-source;
+2025-12-16T12:36:28.4373969Z 		diode-direction = "col2row";
+2025-12-16T12:36:28.4374366Z 		row-gpios = < &gpio0 0x13 0x20 >, < &gpio0 0x8 0x20 >, < &gpio0 0xc 0x20 >, < &gpio0 0xb 0x20 >, < &gpio1 0x9 0x20 >;
+2025-12-16T12:36:28.4375019Z 		col-gpios = < &gpio0 0x3 0x0 >, < &gpio0 0x1c 0x0 >, < &gpio0 0x1e 0x0 >, < &gpio0 0x15 0x0 >, < &gpio0 0x17 0x0 >, < &gpio0 0x16 0x0 >, < &gpio0 0x1d 0x0 >;
+2025-12-16T12:36:28.4375464Z 	};
+2025-12-16T12:36:28.4375643Z 	default_transform: keymap_transform_0 {
+2025-12-16T12:36:28.4375911Z 		compatible = "zmk,matrix-transform";
+2025-12-16T12:36:28.4376144Z 		columns = < 0xe >;
+2025-12-16T12:36:28.4376325Z 		rows = < 0x5 >;
+2025-12-16T12:36:28.4377033Z 		map = < 0x0 0x1 0x2 0x3 0x4 0x5 0xc 0xd 0x7 0x8 0x9 0xa 0xb 0x100 0x101 0x102 0x103 0x104 0x105 0x20c 0x40c 0x30c 0x10d 0x107 0x108 0x109 0x10a 0x10b 0x200 0x201 0x202 0x203 0x204 0x205 0x302 0x10c 0x20d 0x207 0x208 0x209 0x20a 0x20b 0x303 0x304 0x305 0x30d 0x307 0x308 >;
+2025-12-16T12:36:28.4377794Z 		phandle = < 0xb >;
+2025-12-16T12:36:28.4377970Z 	};
+2025-12-16T12:36:28.4378130Z 	backlight: pwmleds {
+2025-12-16T12:36:28.4378336Z 		compatible = "pwm-leds";
+2025-12-16T12:36:28.4378541Z 		pwm_led_0 {
+2025-12-16T12:36:28.4378725Z 			pwms = < &pwm0 0x0 0xf4240 0x0 >;
+2025-12-16T12:36:28.4378946Z 		};
+2025-12-16T12:36:28.4379086Z 	};
+2025-12-16T12:36:28.4379252Z 	zip_xy_scaler: zip_xy_scaler {
+2025-12-16T12:36:28.4379504Z 		compatible = "zmk,input-processor-scaler";
+2025-12-16T12:36:28.4379775Z 		#input-processor-cells = < 0x2 >;
+2025-12-16T12:36:28.4380000Z 		type = < 0x2 >;
+2025-12-16T12:36:28.4380179Z 		codes = < 0x0 0x1 >;
+2025-12-16T12:36:28.4380369Z 		track-remainders;
+2025-12-16T12:36:28.4380550Z 		phandle = < 0x15 >;
+2025-12-16T12:36:28.4380727Z 	};
+2025-12-16T12:36:28.4380899Z 	zip_scroll_scaler: zip_scroll_scaler {
+2025-12-16T12:36:28.4381165Z 		compatible = "zmk,input-processor-scaler";
+2025-12-16T12:36:28.4381519Z 		#input-processor-cells = < 0x2 >;
+2025-12-16T12:36:28.4381745Z 		type = < 0x2 >;
+2025-12-16T12:36:28.4381915Z 		codes = < 0x8 0x6 >;
+2025-12-16T12:36:28.4382102Z 		track-remainders;
+2025-12-16T12:36:28.4382284Z 		phandle = < 0x17 >;
+2025-12-16T12:36:28.4382571Z 	};
+2025-12-16T12:36:28.4382765Z 	zip_button_behaviors: zip_button_behaviors {
+2025-12-16T12:36:28.4383170Z 		compatible = "zmk,input-processor-behaviors";
+2025-12-16T12:36:28.4383442Z 		#input-processor-cells = < 0x0 >;
+2025-12-16T12:36:28.4383673Z 		codes = < 0x100 0x101 0x102 >;
+2025-12-16T12:36:28.4383892Z 		bindings = < &none &none &none >;
+2025-12-16T12:36:28.4384100Z 	};
+2025-12-16T12:36:28.4384243Z 	behaviors {
+2025-12-16T12:36:28.4384409Z 		kp: key_press {
+2025-12-16T12:36:28.4384610Z 			compatible = "zmk,behavior-key-press";
+2025-12-16T12:36:28.4384861Z 			#binding-cells = < 0x1 >;
+2025-12-16T12:36:28.4385084Z 			display-name = "Key Press";
+2025-12-16T12:36:28.4385297Z 			phandle = < 0x11 >;
+2025-12-16T12:36:28.4385472Z 		};
+2025-12-16T12:36:28.4385630Z 		kt: key_toggle {
+2025-12-16T12:36:28.4385835Z 			compatible = "zmk,behavior-key-toggle";
+2025-12-16T12:36:28.4386085Z 			#binding-cells = < 0x1 >;
+2025-12-16T12:36:28.4386303Z 			display-name = "Key Toggle";
+2025-12-16T12:36:28.4386507Z 		};
+2025-12-16T12:36:28.4386666Z 		trans: transparent {
+2025-12-16T12:36:28.4386888Z 			compatible = "zmk,behavior-transparent";
+2025-12-16T12:36:28.4387148Z 			#binding-cells = < 0x0 >;
+2025-12-16T12:36:28.4387369Z 			display-name = "Transparent";
+2025-12-16T12:36:28.4387591Z 			phandle = < 0x1f >;
+2025-12-16T12:36:28.4387767Z 		};
+2025-12-16T12:36:28.4387914Z 		none: none {
+2025-12-16T12:36:28.4388102Z 			compatible = "zmk,behavior-none";
+2025-12-16T12:36:28.4388341Z 			#binding-cells = < 0x0 >;
+2025-12-16T12:36:28.4388551Z 			display-name = "None";
+2025-12-16T12:36:28.4388758Z 			phandle = < 0x10 >;
+2025-12-16T12:36:28.4388934Z 		};
+2025-12-16T12:36:28.4389077Z 		mt: mod_tap {
+2025-12-16T12:36:28.4389277Z 			compatible = "zmk,behavior-hold-tap";
+2025-12-16T12:36:28.4389525Z 			#binding-cells = < 0x2 >;
+2025-12-16T12:36:28.4389743Z 			flavor = "hold-preferred";
+2025-12-16T12:36:28.4389965Z 			tapping-term-ms = < 0xc8 >;
+2025-12-16T12:36:28.4390182Z 			bindings = < &kp >, < &kp >;
+2025-12-16T12:36:28.4390402Z 			display-name = "Mod-Tap";
+2025-12-16T12:36:28.4390596Z 		};
+2025-12-16T12:36:28.4390746Z 		lt: layer_tap {
+2025-12-16T12:36:28.4390950Z 			compatible = "zmk,behavior-hold-tap";
+2025-12-16T12:36:28.4391187Z 			#binding-cells = < 0x2 >;
+2025-12-16T12:36:28.4391396Z 			flavor = "tap-preferred";
+2025-12-16T12:36:28.4391710Z 			tapping-term-ms = < 0xc8 >;
+2025-12-16T12:36:28.4391918Z 			bindings = < &mo >, < &kp >;
+2025-12-16T12:36:28.4392131Z 			display-name = "Layer-Tap";
+2025-12-16T12:36:28.4392341Z 			phandle = < 0x1e >;
+2025-12-16T12:36:28.4392515Z 		};
+2025-12-16T12:36:28.4392673Z 		gresc: grave_escape {
+2025-12-16T12:36:28.4392889Z 			compatible = "zmk,behavior-mod-morph";
+2025-12-16T12:36:28.4393160Z 			#binding-cells = < 0x0 >;
+2025-12-16T12:36:28.4393388Z 			bindings = < &kp 0x70029 >, < &kp 0x70035 >;
+2025-12-16T12:36:28.4393634Z 			mods = < 0xaa >;
+2025-12-16T12:36:28.4393826Z 			display-name = "Grave/Escape";
+2025-12-16T12:36:28.4394038Z 		};
+2025-12-16T12:36:28.4394188Z 		sk: sticky_key {
+2025-12-16T12:36:28.4394396Z 			compatible = "zmk,behavior-sticky-key";
+2025-12-16T12:36:28.4394642Z 			#binding-cells = < 0x1 >;
+2025-12-16T12:36:28.4394867Z 			release-after-ms = < 0x3e8 >;
+2025-12-16T12:36:28.4395086Z 			bindings = < &kp >;
+2025-12-16T12:36:28.4395268Z 			ignore-modifiers;
+2025-12-16T12:36:28.4395465Z 			display-name = "Sticky Key";
+2025-12-16T12:36:28.4395666Z 		};
+2025-12-16T12:36:28.4395813Z 		sl: sticky_layer {
+2025-12-16T12:36:28.4396022Z 			compatible = "zmk,behavior-sticky-key";
+2025-12-16T12:36:28.4396269Z 			#binding-cells = < 0x1 >;
+2025-12-16T12:36:28.4396483Z 			release-after-ms = < 0x3e8 >;
+2025-12-16T12:36:28.4396694Z 			bindings = < &mo >;
+2025-12-16T12:36:28.4396881Z 			quick-release;
+2025-12-16T12:36:28.4397075Z 			display-name = "Sticky Layer";
+2025-12-16T12:36:28.4397279Z 		};
+2025-12-16T12:36:28.4397435Z 		mo: momentary_layer {
+2025-12-16T12:36:28.4397663Z 			compatible = "zmk,behavior-momentary-layer";
+2025-12-16T12:36:28.4397923Z 			#binding-cells = < 0x1 >;
+2025-12-16T12:36:28.4398263Z 			display-name = "Momentary Layer";
+2025-12-16T12:36:28.4398500Z 			phandle = < 0x12 >;
+2025-12-16T12:36:28.4398774Z 		};
+2025-12-16T12:36:28.4398927Z 		tog: toggle_layer {
+2025-12-16T12:36:28.4399144Z 			compatible = "zmk,behavior-toggle-layer";
+2025-12-16T12:36:28.4399391Z 			#binding-cells = < 0x1 >;
+2025-12-16T12:36:28.4399603Z 			display-name = "Toggle Layer";
+2025-12-16T12:36:28.4399815Z 			locking;
+2025-12-16T12:36:28.4399962Z 		};
+2025-12-16T12:36:28.4400114Z 		to: to_layer {
+2025-12-16T12:36:28.4400310Z 			compatible = "zmk,behavior-to-layer";
+2025-12-16T12:36:28.4400549Z 			#binding-cells = < 0x1 >;
+2025-12-16T12:36:28.4400763Z 			display-name = "To Layer";
+2025-12-16T12:36:28.4400966Z 			locking;
+2025-12-16T12:36:28.4401122Z 		};
+2025-12-16T12:36:28.4401272Z 		sys_reset: sysreset {
+2025-12-16T12:36:28.4401697Z 			compatible = "zmk,behavior-reset";
+2025-12-16T12:36:28.4401990Z 			#binding-cells = < 0x0 >;
+2025-12-16T12:36:28.4402197Z 			display-name = "Reset";
+2025-12-16T12:36:28.4402402Z 			phandle = < 0x1a >;
+2025-12-16T12:36:28.4402581Z 		};
+2025-12-16T12:36:28.4402734Z 		bootloader: bootload {
+2025-12-16T12:36:28.4402952Z 			compatible = "zmk,behavior-reset";
+2025-12-16T12:36:28.4403180Z 			type = < 0x57 >;
+2025-12-16T12:36:28.4403352Z 			bootloader;
+2025-12-16T12:36:28.4403532Z 			#binding-cells = < 0x0 >;
+2025-12-16T12:36:28.4403745Z 			display-name = "Bootloader";
+2025-12-16T12:36:28.4403955Z 			phandle = < 0x1b >;
+2025-12-16T12:36:28.4404134Z 		};
+2025-12-16T12:36:28.4404284Z 		rgb_ug: rgb_ug {
+2025-12-16T12:36:28.4404492Z 			compatible = "zmk,behavior-rgb-underglow";
+2025-12-16T12:36:28.4404752Z 			#binding-cells = < 0x2 >;
+2025-12-16T12:36:28.4404965Z 			display-name = "Underglow";
+2025-12-16T12:36:28.4405171Z 			phandle = < 0x18 >;
+2025-12-16T12:36:28.4405349Z 		};
+2025-12-16T12:36:28.4405501Z 		bt: bluetooth {
+2025-12-16T12:36:28.4405697Z 			compatible = "zmk,behavior-bluetooth";
+2025-12-16T12:36:28.4405953Z 			#binding-cells = < 0x2 >;
+2025-12-16T12:36:28.4406175Z 			display-name = "Bluetooth";
+2025-12-16T12:36:28.4406387Z 			phandle = < 0x19 >;
+2025-12-16T12:36:28.4406563Z 		};
+2025-12-16T12:36:28.4406729Z 		ext_power: extpower {
+2025-12-16T12:36:28.4406943Z 			compatible = "zmk,behavior-ext-power";
+2025-12-16T12:36:28.4407188Z 			#binding-cells = < 0x1 >;
+2025-12-16T12:36:28.4407415Z 			display-name = "External Power";
+2025-12-16T12:36:28.4407634Z 		};
+2025-12-16T12:36:28.4407781Z 		out: outputs {
+2025-12-16T12:36:28.4407986Z 			compatible = "zmk,behavior-outputs";
+2025-12-16T12:36:28.4408231Z 			#binding-cells = < 0x1 >;
+2025-12-16T12:36:28.4408450Z 			display-name = "Output Selection";
+2025-12-16T12:36:28.4408689Z 			phandle = < 0x1d >;
+2025-12-16T12:36:28.4408866Z 		};
+2025-12-16T12:36:28.4409018Z 		caps_word: caps_word {
+2025-12-16T12:36:28.4409249Z 			compatible = "zmk,behavior-caps-word";
+2025-12-16T12:36:28.4409512Z 			#binding-cells = < 0x0 >;
+2025-12-16T12:36:28.4409753Z 			continue-list = < 0x207002d 0x7002a 0x7004c >;
+2025-12-16T12:36:28.4410031Z 			display-name = "Caps Word";
+2025-12-16T12:36:28.4410244Z 		};
+2025-12-16T12:36:28.4410406Z 		key_repeat: key_repeat {
+2025-12-16T12:36:28.4410643Z 			compatible = "zmk,behavior-key-repeat";
+2025-12-16T12:36:28.4410904Z 			#binding-cells = < 0x0 >;
+2025-12-16T12:36:28.4411117Z 			usage-pages = < 0x7 >;
+2025-12-16T12:36:28.4411326Z 			display-name = "Key Repeat";
+2025-12-16T12:36:28.4411656Z 		};
+2025-12-16T12:36:28.4411809Z 		bl: bcklight {
+2025-12-16T12:36:28.4412013Z 			compatible = "zmk,behavior-backlight";
+2025-12-16T12:36:28.4412266Z 			#binding-cells = < 0x2 >;
+2025-12-16T12:36:28.4412482Z 			display-name = "Backlight";
+2025-12-16T12:36:28.4412684Z 		};
+2025-12-16T12:36:28.4412841Z 		macro_tap: macro_tap {
+2025-12-16T12:36:28.4413078Z 			compatible = "zmk,macro-control-mode-tap";
+2025-12-16T12:36:28.4413338Z 			#binding-cells = < 0x0 >;
+2025-12-16T12:36:28.4413535Z 		};
+2025-12-16T12:36:28.4413697Z 		macro_press: macro_press {
+2025-12-16T12:36:28.4413939Z 			compatible = "zmk,macro-control-mode-press";
+2025-12-16T12:36:28.4414332Z 			#binding-cells = < 0x0 >;
+2025-12-16T12:36:28.4414530Z 		};
+2025-12-16T12:36:28.4414690Z 		macro_release: macro_release {
+2025-12-16T12:36:28.4415055Z 			compatible = "zmk,macro-control-mode-release";
+2025-12-16T12:36:28.4415327Z 			#binding-cells = < 0x0 >;
+2025-12-16T12:36:28.4415515Z 		};
+2025-12-16T12:36:28.4415682Z 		macro_tap_time: macro_tap_time {
+2025-12-16T12:36:28.4415940Z 			compatible = "zmk,macro-control-tap-time";
+2025-12-16T12:36:28.4416202Z 			#binding-cells = < 0x1 >;
+2025-12-16T12:36:28.4416392Z 		};
+2025-12-16T12:36:28.4416555Z 		macro_wait_time: macro_wait_time {
+2025-12-16T12:36:28.4416821Z 			compatible = "zmk,macro-control-wait-time";
+2025-12-16T12:36:28.4417078Z 			#binding-cells = < 0x1 >;
+2025-12-16T12:36:28.4417270Z 		};
+2025-12-16T12:36:28.4417468Z 		macro_pause_for_release: macro_pause_for_release {
+2025-12-16T12:36:28.4417770Z 			compatible = "zmk,macro-pause-for-release";
+2025-12-16T12:36:28.4418036Z 			#binding-cells = < 0x0 >;
+2025-12-16T12:36:28.4418229Z 		};
+2025-12-16T12:36:28.4418401Z 		macro_param_1to1: macro_param_1to1 {
+2025-12-16T12:36:28.4418658Z 			compatible = "zmk,macro-param-1to1";
+2025-12-16T12:36:28.4418907Z 			#binding-cells = < 0x0 >;
+2025-12-16T12:36:28.4419097Z 		};
+2025-12-16T12:36:28.4419262Z 		macro_param_1to2: macro_param_1to2 {
+2025-12-16T12:36:28.4419515Z 			compatible = "zmk,macro-param-1to2";
+2025-12-16T12:36:28.4419751Z 			#binding-cells = < 0x0 >;
+2025-12-16T12:36:28.4419948Z 		};
+2025-12-16T12:36:28.4420116Z 		macro_param_2to1: macro_param_2to1 {
+2025-12-16T12:36:28.4420360Z 			compatible = "zmk,macro-param-2to1";
+2025-12-16T12:36:28.4420591Z 			#binding-cells = < 0x0 >;
+2025-12-16T12:36:28.4420784Z 		};
+2025-12-16T12:36:28.4420949Z 		macro_param_2to2: macro_param_2to2 {
+2025-12-16T12:36:28.4421186Z 			compatible = "zmk,macro-param-2to2";
+2025-12-16T12:36:28.4421516Z 			#binding-cells = < 0x0 >;
+2025-12-16T12:36:28.4421709Z 		};
+2025-12-16T12:36:28.4421858Z 		soft_off: z_so_off {
+2025-12-16T12:36:28.4422076Z 			compatible = "zmk,behavior-soft-off";
+2025-12-16T12:36:28.4422319Z 			#binding-cells = < 0x0 >;
+2025-12-16T12:36:28.4422544Z 			split-peripheral-off-on-press;
+2025-12-16T12:36:28.4422769Z 		};
+2025-12-16T12:36:28.4422934Z 		studio_unlock: studio_unlock {
+2025-12-16T12:36:28.4423180Z 			compatible = "zmk,behavior-studio-unlock";
+2025-12-16T12:36:28.4423437Z 			#binding-cells = < 0x0 >;
+2025-12-16T12:36:28.4423655Z 			display-name = "Studio Unlock";
+2025-12-16T12:36:28.4423877Z 			phandle = < 0x1c >;
+2025-12-16T12:36:28.4424060Z 		};
+2025-12-16T12:36:28.4424219Z 		mkp: mouse_key_press {
+2025-12-16T12:36:28.4424452Z 			compatible = "zmk,behavior-mouse-key-press";
+2025-12-16T12:36:28.4424718Z 			#binding-cells = < 0x1 >;
+2025-12-16T12:36:28.4424936Z 			display-name = "Mouse Key Press";
+2025-12-16T12:36:28.4425166Z 			phandle = < 0x13 >;
+2025-12-16T12:36:28.4425341Z 		};
+2025-12-16T12:36:28.4425491Z 		mmv: mouse_move {
+2025-12-16T12:36:28.4425709Z 			compatible = "zmk,behavior-input-two-axis";
+2025-12-16T12:36:28.4425964Z 			#binding-cells = < 0x1 >;
+2025-12-16T12:36:28.4426177Z 			x-input-code = < 0x0 >;
+2025-12-16T12:36:28.4426388Z 			y-input-code = < 0x1 >;
+2025-12-16T12:36:28.4426600Z 			time-to-max-speed-ms = < 0x1f4 >;
+2025-12-16T12:36:28.4426844Z 			acceleration-exponent = < 0x1 >;
+2025-12-16T12:36:28.4427086Z 			trigger-period-ms = < 0x10 >;
+2025-12-16T12:36:28.4427299Z 			phandle = < 0x14 >;
+2025-12-16T12:36:28.4427479Z 		};
+2025-12-16T12:36:28.4427633Z 		msc: mouse_scroll {
+2025-12-16T12:36:28.4427850Z 			compatible = "zmk,behavior-input-two-axis";
+2025-12-16T12:36:28.4428109Z 			#binding-cells = < 0x1 >;
+2025-12-16T12:36:28.4428318Z 			x-input-code = < 0x6 >;
+2025-12-16T12:36:28.4428513Z 			y-input-code = < 0x8 >;
+2025-12-16T12:36:28.4428724Z 			time-to-max-speed-ms = < 0x1f4 >;
+2025-12-16T12:36:28.4428963Z 			acceleration-exponent = < 0x1 >;
+2025-12-16T12:36:28.4429191Z 			delay-ms = < 0x0 >;
+2025-12-16T12:36:28.4429371Z 			phandle = < 0x16 >;
+2025-12-16T12:36:28.4429546Z 		};
+2025-12-16T12:36:28.4429694Z 		td0: td0 {
+2025-12-16T12:36:28.4430007Z 			compatible = "zmk,behavior-tap-dance";
+2025-12-16T12:36:28.4430293Z 			display-name = "Shift/Caps Lock Tap Dance";
+2025-12-16T12:36:28.4430646Z 			#binding-cells = < 0x0 >;
+2025-12-16T12:36:28.4430872Z 			bindings = < &kp 0x700e1 >, < &kp 0x70039 >;
+2025-12-16T12:36:28.4431108Z 		};
+2025-12-16T12:36:28.4431277Z 		parenthesis: parenthesis {
+2025-12-16T12:36:28.4431602Z 			compatible = "zmk,behavior-tap-dance";
+2025-12-16T12:36:28.4431850Z 			label = "PARENTHESIS";
+2025-12-16T12:36:28.4432058Z 			#binding-cells = < 0x0 >;
+2025-12-16T12:36:28.4432284Z 			bindings = < &kp 0x2070027 >, < &kp 0x2070026 >;
+2025-12-16T12:36:28.4432538Z 			phandle = < 0x20 >;
+2025-12-16T12:36:28.4432715Z 		};
+2025-12-16T12:36:28.4432865Z 		bracket: bracket {
+2025-12-16T12:36:28.4433073Z 			compatible = "zmk,behavior-tap-dance";
+2025-12-16T12:36:28.4433317Z 			label = "BRACKET";
+2025-12-16T12:36:28.4433505Z 			#binding-cells = < 0x0 >;
+2025-12-16T12:36:28.4433729Z 			bindings = < &kp 0x70031 >, < &kp 0x70030 >;
+2025-12-16T12:36:28.4433974Z 			phandle = < 0x21 >;
+2025-12-16T12:36:28.4434151Z 		};
+2025-12-16T12:36:28.4434295Z 		brace: brace {
+2025-12-16T12:36:28.4434497Z 			compatible = "zmk,behavior-tap-dance";
+2025-12-16T12:36:28.4434733Z 			label = "BRACE";
+2025-12-16T12:36:28.4434912Z 			#binding-cells = < 0x0 >;
+2025-12-16T12:36:28.4435143Z 			bindings = < &kp 0x2070031 >, < &kp 0x2070030 >;
+2025-12-16T12:36:28.4435399Z 			phandle = < 0x22 >;
+2025-12-16T12:36:28.4435568Z 		};
+2025-12-16T12:36:28.4435717Z 	};
+2025-12-16T12:36:28.4435899Z 	mkp_input_listener: mkp_input_listener {
+2025-12-16T12:36:28.4436156Z 		compatible = "zmk,input-listener";
+2025-12-16T12:36:28.4436388Z 		device = < &mkp >;
+2025-12-16T12:36:28.4436562Z 	};
+2025-12-16T12:36:28.4436729Z 	mmv_input_listener: mmv_input_listener {
+2025-12-16T12:36:28.4436983Z 		compatible = "zmk,input-listener";
+2025-12-16T12:36:28.4437208Z 		device = < &mmv >;
+2025-12-16T12:36:28.4437429Z 		input-processors = < &zip_xy_scaler 0x2 0x1 >;
+2025-12-16T12:36:28.4437681Z 	};
+2025-12-16T12:36:28.4437858Z 	msc_input_listener: msc_input_listener {
+2025-12-16T12:36:28.4438106Z 		compatible = "zmk,input-listener";
+2025-12-16T12:36:28.4438327Z 		device = < &msc >;
+2025-12-16T12:36:28.4438552Z 		input-processors = < &zip_scroll_scaler 0x2 0x1 >;
+2025-12-16T12:36:28.4438811Z 	};
+2025-12-16T12:36:28.4438964Z 	rgb_encoder: rgb_encoder {
+2025-12-16T12:36:28.4439206Z 		compatible = "zmk,behavior-sensor-rotate";
+2025-12-16T12:36:28.4439476Z 		#sensor-binding-cells = < 0x0 >;
+2025-12-16T12:36:28.4439733Z 		bindings = < &rgb_ug 0x7 0x0 >, < &rgb_ug 0x8 0x0 >;
+2025-12-16T12:36:28.4439988Z 	};
+2025-12-16T12:36:28.4440159Z 	scroll_encoder: scroll_encoder {
+2025-12-16T12:36:28.4440408Z 		compatible = "zmk,behavior-sensor-rotate";
+2025-12-16T12:36:28.4440670Z 		#sensor-binding-cells = < 0x0 >;
+2025-12-16T12:36:28.4440961Z 		bindings = < &msc 0xffe7 >, < &msc 0x19 >;
+2025-12-16T12:36:28.4441197Z 		tap-ms = < 0x64 >;
+2025-12-16T12:36:28.4441374Z 	};
+2025-12-16T12:36:28.4441613Z 	combos {
+2025-12-16T12:36:28.4441777Z 		compatible = "zmk,combos";
+2025-12-16T12:36:28.4441982Z 		device1 {
+2025-12-16T12:36:28.4442157Z 			bindings = < &bt 0x3 0x0 >;
+2025-12-16T12:36:28.4442375Z 			key-positions = < 0x4 0x2c >;
+2025-12-16T12:36:28.4442584Z 			layers = < 0x3 >;
+2025-12-16T12:36:28.4442756Z 		};
+2025-12-16T12:36:28.4442903Z 		device2 {
+2025-12-16T12:36:28.4443066Z 			bindings = < &bt 0x3 0x1 >;
+2025-12-16T12:36:28.4443284Z 			key-positions = < 0x3 0x2c >;
+2025-12-16T12:36:28.4443495Z 			layers = < 0x3 >;
+2025-12-16T12:36:28.4443661Z 		};
+2025-12-16T12:36:28.4443811Z 		device3 {
+2025-12-16T12:36:28.4443976Z 			bindings = < &bt 0x3 0x2 >;
+2025-12-16T12:36:28.4444183Z 			key-positions = < 0x2 0x2c >;
+2025-12-16T12:36:28.4444394Z 			layers = < 0x3 >;
+2025-12-16T12:36:28.4444568Z 		};
+2025-12-16T12:36:28.4444710Z 		device4 {
+2025-12-16T12:36:28.4444874Z 			bindings = < &bt 0x3 0x3 >;
+2025-12-16T12:36:28.4445088Z 			key-positions = < 0x11 0x2c >;
+2025-12-16T12:36:28.4445299Z 			layers = < 0x3 >;
+2025-12-16T12:36:28.4445635Z 		};
+2025-12-16T12:36:28.4445790Z 		device5 {
+2025-12-16T12:36:28.4445949Z 			bindings = < &bt 0x3 0x4 >;
+2025-12-16T12:36:28.4446301Z 			key-positions = < 0x10 0x2c >;
+2025-12-16T12:36:28.4446515Z 			layers = < 0x3 >;
+2025-12-16T12:36:28.4446677Z 		};
+2025-12-16T12:36:28.4446830Z 		lsysreset {
+2025-12-16T12:36:28.4447010Z 			bindings = < &sys_reset >;
+2025-12-16T12:36:28.4447223Z 			key-positions = < 0x2c 0x1c >;
+2025-12-16T12:36:28.4447428Z 		};
+2025-12-16T12:36:28.4447577Z 		rsysreset {
+2025-12-16T12:36:28.4447748Z 			bindings = < &sys_reset >;
+2025-12-16T12:36:28.4447961Z 			key-positions = < 0x2d 0x29 >;
+2025-12-16T12:36:28.4448170Z 		};
+2025-12-16T12:36:28.4448321Z 		lbootloader {
+2025-12-16T12:36:28.4448500Z 			bindings = < &bootloader >;
+2025-12-16T12:36:28.4448716Z 			key-positions = < 0x2c 0xd >;
+2025-12-16T12:36:28.4448923Z 		};
+2025-12-16T12:36:28.4449068Z 		rbootloader {
+2025-12-16T12:36:28.4449248Z 			bindings = < &bootloader >;
+2025-12-16T12:36:28.4449460Z 			key-positions = < 0x1b 0x2d >;
+2025-12-16T12:36:28.4449664Z 		};
+2025-12-16T12:36:28.4449816Z 		sutudiounlock {
+2025-12-16T12:36:28.4450005Z 			bindings = < &studio_unlock >;
+2025-12-16T12:36:28.4450227Z 			key-positions = < 0x2c 0x0 >;
+2025-12-16T12:36:28.4450430Z 		};
+2025-12-16T12:36:28.4450581Z 		outble {
+2025-12-16T12:36:28.4450749Z 			bindings = < &out 0x2 >;
+2025-12-16T12:36:28.4450959Z 			key-positions = < 0x2c 0xe >;
+2025-12-16T12:36:28.4451170Z 			layers = < 0x3 >;
+2025-12-16T12:36:28.4451336Z 		};
+2025-12-16T12:36:28.4451720Z 		outusb {
+2025-12-16T12:36:28.4451932Z 			bindings = < &out 0x1 >;
+2025-12-16T12:36:28.4452141Z 			key-positions = < 0x2c 0x1d >;
+2025-12-16T12:36:28.4452360Z 			layers = < 0x3 >;
+2025-12-16T12:36:28.4452534Z 		};
+2025-12-16T12:36:28.4452673Z 	};
+2025-12-16T12:36:28.4452824Z 	keymap {
+2025-12-16T12:36:28.4452994Z 		compatible = "zmk,keymap";
+2025-12-16T12:36:28.4453196Z 		default_layer {
+2025-12-16T12:36:28.4453384Z 			display-name = "QWERTY";
+2025-12-16T12:36:28.4454827Z 			bindings = < &kp 0x70029 &kp 0x70014 &kp 0x7001a &kp 0x70008 &kp 0x70015 &kp 0x70017 &mmv 0xfb50 &kp 0x7001c &kp 0x70018 &kp 0x7000c &kp 0x70012 &kp 0x70013 &kp 0x7002a &kp 0x700e1 &kp 0x70004 &kp 0x70016 &kp 0x70007 &kp 0x70009 &kp 0x7000a &mmv 0xfb500000 &mkp 0x1 &mmv 0x4b00000 &kp 0x7000b &kp 0x7000d &kp 0x7000e &kp 0x7000f &kp 0x70033 &kp 0x70029 &kp 0x700e0 &kp 0x7001d &kp 0x7001b &kp 0x70006 &kp 0x70019 &kp 0x70005 &none &mmv 0x4b0 &kp 0x70011 &kp 0x70010 &kp 0x70036 &kp 0x70037 &kp 0x70038 &kp 0x700e5 &kp 0x700e2 &mo 0x2 &lt 0x4 0x7002c &lt 0x3 0x70028 &mo 0x1 &kp 0x700e5 >;
+2025-12-16T12:36:28.4456263Z 		};
+2025-12-16T12:36:28.4456413Z 		lower_numer {
+2025-12-16T12:36:28.4456588Z 			display-name = "NUMBER";
+2025-12-16T12:36:28.4457985Z 			bindings = < &kp 0x7002b &none &kp 0x70026 &kp 0x70025 &kp 0x70024 &none &kp 0x7004a &kp 0x207002f &kp 0x7004e &kp 0x7004b &kp 0x70064 &kp 0x207001e &kp 0x7002f &kp 0x700e1 &kp 0x7002e &kp 0x70023 &kp 0x70022 &kp 0x70021 &kp 0x70027 &kp 0x70027 &kp 0x70029 &kp 0x2070021 &mmv 0xfb500000 &mmv 0x4b0 &mmv 0xfb50 &mmv 0x4b00000 &kp 0x4007001a &kp 0x70034 &kp 0x700e0 &none &kp 0x70020 &kp 0x7001f &kp 0x7001e &kp 0x70027 &none &kp 0x7004d &kp 0x70050 &kp 0x70051 &kp 0x70052 &kp 0x7004f &kp 0x70054 &kp 0x7002d &none &none &kp 0x700e2 &kp 0x7002c &none &mkp 0x1 >;
+2025-12-16T12:36:28.4459386Z 		};
+2025-12-16T12:36:28.4459537Z 		raise_symbol {
+2025-12-16T12:36:28.4459722Z 			display-name = "SYMBOL";
+2025-12-16T12:36:28.4461111Z 			bindings = < &kp 0x407002b &trans &kp 0x107004a &kp 0x7004a &kp 0x7004d &kp 0x107004d &kp 0x7004a &kp 0x4207002d &kp 0x7002d &kp 0x207002e &kp 0x2070022 &parenthesis &kp 0x7004c &kp 0x700e1 &trans &trans &trans &trans &trans &kp 0x70027 &trans &kp 0x2070021 &kp 0x70027 &kp 0x2070025 &kp 0x2070020 &kp 0x2070021 &bracket &kp 0x70035 &kp 0x700e0 &trans &trans &trans &trans &trans &trans &kp 0x7004d &kp 0x7002e &kp 0x207001f &kp 0x207001e &kp 0x4007001a &brace &kp 0x2070024 &trans &none &trans &kp 0x70028 &trans &trans >;
+2025-12-16T12:36:28.4462615Z 		};
+2025-12-16T12:36:28.4462894Z 		fn_layer {
+2025-12-16T12:36:28.4463074Z 			display-name = "FN";
+2025-12-16T12:36:28.4464180Z 			bindings = < &none &kp 0x70043 &kp 0x70042 &kp 0x70041 &kp 0x70040 &none &rgb_ug 0x7 0x0 &none &none &none &none &none &none &none &kp 0x70044 &kp 0x7003f &kp 0x7003e &kp 0x7003d &none &rgb_ug 0xc 0x0 &rgb_ug 0x0 0x0 &rgb_ug 0xb 0x0 &none &none &none &none &none &none &none &kp 0x70045 &kp 0x7003c &kp 0x7003b &kp 0x7003a &none &none &rgb_ug 0x8 0x0 &kp 0x70050 &kp 0x70051 &kp 0x70052 &kp 0x7004f &none &none &none &none &none &none &kp 0x7002c &kp 0x700e6 >;
+2025-12-16T12:36:28.4465409Z 		};
+2025-12-16T12:36:28.4465559Z 		rec_layer {
+2025-12-16T12:36:28.4465733Z 			display-name = "REC";
+2025-12-16T12:36:28.4466976Z 			bindings = < &trans &trans &trans &trans &trans &trans &kp 0xc00e9 &msc 0xffe70000 &msc 0xffe7 &msc 0x19 &msc 0x190000 &trans &trans &trans &trans &mkp 0x4 &mkp 0x2 &mkp 0x1 &none &trans &kp 0xc00e2 &trans &mmv 0xfb500000 &mmv 0x4b0 &mmv 0xfb50 &mmv 0x4b00000 &trans &kp 0x7004b &none &trans &kp 0xc00e2 &kp 0xc00ea &kp 0xc00e9 &trans &trans &kp 0xc00ea &kp 0x70050 &kp 0x70051 &kp 0x70052 &kp 0x7004f &trans &kp 0x7004e &trans &trans &none &trans &trans &trans >;
+2025-12-16T12:36:28.4468237Z 		};
+2025-12-16T12:36:28.4468380Z 	};
+2025-12-16T12:36:28.4468531Z };
+2025-12-16T12:36:28.4529894Z Post job cleanup.
+2025-12-16T12:36:28.4533941Z ##[command]/usr/bin/docker exec  47f5d863af06db48c42b59e6015a6019d2087e224e5abf55b6266e2b27df0f28 sh -c "cat /etc/*release | grep ^ID"
+2025-12-16T12:36:28.6448823Z [command]/usr/bin/git version
+2025-12-16T12:36:28.6483773Z git version 2.43.0
+2025-12-16T12:36:28.6530321Z Temporarily overriding HOME='/__w/_temp/95b848ac-4d76-4ca1-9269-439db0cca8eb' before making global git config changes
+2025-12-16T12:36:28.6531864Z Adding repository directory to the temporary git global config as a safe directory
+2025-12-16T12:36:28.6537964Z [command]/usr/bin/git config --global --add safe.directory /__w/zmk-config/zmk-config
+2025-12-16T12:36:28.6568848Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2025-12-16T12:36:28.6607047Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2025-12-16T12:36:28.6834193Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2025-12-16T12:36:28.6852992Z http.https://github.com/.extraheader
+2025-12-16T12:36:28.6864960Z [command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader
+2025-12-16T12:36:28.6894092Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2025-12-16T12:36:28.7112163Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2025-12-16T12:36:28.7140817Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2025-12-16T12:36:28.7476879Z Stop and remove container: cefb62cffcce4a1885cd9800e6c92b87_zmkfirmwarezmkbuildarmstable_ae8429
+2025-12-16T12:36:28.7481255Z ##[command]/usr/bin/docker rm --force 47f5d863af06db48c42b59e6015a6019d2087e224e5abf55b6266e2b27df0f28
+2025-12-16T12:36:34.1926177Z 47f5d863af06db48c42b59e6015a6019d2087e224e5abf55b6266e2b27df0f28
+2025-12-16T12:36:34.1955866Z Remove container network: github_network_60092b694e8d4895a52c396a0f57816e
+2025-12-16T12:36:34.1959995Z ##[command]/usr/bin/docker network rm github_network_60092b694e8d4895a52c396a0f57816e
+2025-12-16T12:36:34.3208664Z github_network_60092b694e8d4895a52c396a0f57816e
+2025-12-16T12:36:34.3279147Z Cleaning up orphan processes

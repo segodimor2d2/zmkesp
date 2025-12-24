@@ -84,7 +84,7 @@ MARGIN_MIN = 2000 # 2000
 MARGIN_MAX = 4000 # 4000
 
 # MOUSE SENSITIVITY - fator de normalização (maior = menos sensível)
-MOUSESENSX = 160.0
+MOUSESENSX = 260.0
 MOUSESENSY = 360.0
 
 # Sensibilidade separada por eixo e sentido

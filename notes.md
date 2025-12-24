@@ -22,6 +22,7 @@ e /home/segodimo/corne/rec_corne_tst.keymap
 ```
 
 ```bash
+e esp/dicctozmk.py
 e /home/segodimo/zmkesp/esp/dicctozmk.py
 e /home/segodimo/zmkesp/esp/main.py
 e /home/segodimo/zmk-ws/zmkpromicro/config/corne.keymap

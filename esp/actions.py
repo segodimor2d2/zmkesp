@@ -1,7 +1,7 @@
 from machine import Pin, UART
 import time
 from printlogs import log
-from config import THIS_IS, GY1, GY2, MOUSESENSX, MOUSESENSY, VIBRAR_LIGADO, VIBRAR_DESLIGADO, VIBRAR_LONGO, VIBRAR_ALERTA
+from config import THIS_IS, GY1, GY2, MOUSESENSX, MOUSESENSY, VIBRAR_LIGADO, VIBRAR_DESLIGADO, VIBRAR_LONGO, VIBRAR_ALERTA, VIBREADY
 
 # UART - ajuste TX e RX conforme o seu hardware
 uart = UART(1, baudrate=115200, tx=17, rx=16)
@@ -130,26 +130,27 @@ def vibrar(pino_vibracao, n_pulsos, step=None, key_ready=False):
     if pino_vibracao is None:
         log("vibrador não inicializado", 1)
         return
-    if key_ready:
-        for _ in range(n_pulsos):
-            try:
-                pino_vibracao.on()
-            except Exception:
-                try: pino_vibracao.value(1)
-                except: pass
-            
-            if step == 0: time.sleep_ms(VIBRAR_LIGADO)
-            if step == 1: time.sleep_ms(VIBRAR_LONGO)
-            if step == 2: time.sleep_ms(VIBRAR_ALERTA)
-            else: time.sleep_ms(VIBRAR_DESLIGADO)
-            
-            try:
-                pino_vibracao.off()
-            except Exception:
-                try: pino_vibracao.value(0)
-                except: pass
-            
-            time.sleep_ms(VIBRAR_DESLIGADO)
+    if VIBREADY:
+        if key_ready:
+            for _ in range(n_pulsos):
+                try:
+                    pino_vibracao.on()
+                except Exception:
+                    try: pino_vibracao.value(1)
+                    except: pass
+                
+                if step == 0: time.sleep_ms(VIBRAR_LIGADO)
+                if step == 1: time.sleep_ms(VIBRAR_LONGO)
+                if step == 2: time.sleep_ms(VIBRAR_ALERTA)
+                else: time.sleep_ms(VIBRAR_DESLIGADO)
+                
+                try:
+                    pino_vibracao.off()
+                except Exception:
+                    try: pino_vibracao.value(0)
+                    except: pass
+                
+                time.sleep_ms(VIBRAR_DESLIGADO)
 
 
 def piscaled(pino_led, tms, n_pulsos=2, ledready=True):

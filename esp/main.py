@@ -246,7 +246,7 @@ def start(i2c=None, mpu=None, mpr=None, pots=None, vib=None, led=None, force_cal
         # accl_state = accl_principal(accl, acclthresholds, accl_state)
 
         # Atualiza giroscópio
-        gyro_state = gyro_principal(gyro, gy1, gy2, vib, key_ready, gyro_state)
+        gyro_state = gyro_principal(gyro, gy1, gy2, vib, led, key_ready, gyro_state)
 
         # Atualiza potenciômetros
         abclevel = [gyro_state.stepX, gyro_state.stepY]
@@ -329,6 +329,7 @@ def start(i2c=None, mpu=None, mpr=None, pots=None, vib=None, led=None, force_cal
             if gyro_state.cycle == config.CYCLE_RESET_LIMIT:
                 gyro_state.stepX = gyro_state.stepY = 0
                 vibrar(vib, 2, key_ready=key_ready)
+                piscaled(led, 50, 2, config.LEDREADY)
                 gyro_state.wait2Zero = False
                 gyro_state.cycle = 0
         

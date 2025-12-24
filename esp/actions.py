@@ -152,21 +152,21 @@ def vibrar(pino_vibracao, n_pulsos, step=None, key_ready=False):
             time.sleep_ms(VIBRAR_DESLIGADO)
 
 
-def piscaled(pino_led, tms, n_pulsos=2):
+def piscaled(pino_led, tms, n_pulsos=2, ledready=True):
     if pino_led is None:
         print("led não inicializado")
         return
-
-    for _ in range(n_pulsos):
-        try:
-            pino_led.on()
-        except Exception:
-            try: pino_led.value(1)
-            except: pass
-        time.sleep_ms(tms)
-        try:
-            pino_led.off()
-        except Exception:
-            try: pino_led.value(0)
-            except: pass
-        time.sleep_ms(tms)
+    if ledready:
+        for _ in range(n_pulsos):
+            try:
+                pino_led.on()
+            except Exception:
+                try: pino_led.value(1)
+                except: pass
+            time.sleep_ms(tms)
+            try:
+                pino_led.off()
+            except Exception:
+                try: pino_led.value(0)
+                except: pass
+            time.sleep_ms(tms)

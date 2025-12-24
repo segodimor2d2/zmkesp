@@ -113,12 +113,14 @@ TSLEEP  = 50      # Delay entre loops (ms)
 TCLEAR  = 15000   # Intervalo para reset de contador
 
 # ============================================================
-# Motor Vib 
+# Motor Vib / LED
 # ============================================================
 VIBRAR_DESLIGADO = 90   # 70 default
 VIBRAR_LIGADO = 120     # 101 default == 0
 VIBRAR_LONGO = 250      # 200 para step == 1
 VIBRAR_ALERTA = 300     # 300 para step == 2
+
+LEDREADY = True # Pisca no step do giro
 
 # ============================================================
 # DEBUG

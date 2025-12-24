@@ -1,6 +1,6 @@
 import time
 import config
-from actions import vibrar
+from actions import vibrar, piscaled 
 from printlogs import log
 
 
@@ -69,7 +69,7 @@ def average_and_slide(buffer, mpuSensor):
             lst.pop(0)
     return gyro, accl
 
-def check_gyro_axis(gyro, axis_index, step, event_pos, event_neg, vib, key_ready, wait2Zero, cycle, invert=False):
+def check_gyro_axis(gyro, axis_index, step, event_pos, event_neg, vib, led, key_ready, wait2Zero, cycle, invert=False):
     """Verifica giroscópio em um eixo e atualiza estado."""
     pos_thresh = config.LIMGYRO - (config.LIMGYRO * config.THRES_PERCENT)
     neg_thresh = -config.LIMGYRO + (config.LIMGYRO * config.THRES_PERCENT)
@@ -78,6 +78,7 @@ def check_gyro_axis(gyro, axis_index, step, event_pos, event_neg, vib, key_ready
         step += -1 if invert else 1
         # vibrar(vib, 1, step, key_ready=ready)
         vibrar(vib, 1, step=config.VIBRAR_DESLIGADO, key_ready=key_ready)
+        piscaled(led, 50, 1, config.LEDREADY)
         event_pos = True
         wait2Zero = True
         cycle = 0
@@ -88,6 +89,7 @@ def check_gyro_axis(gyro, axis_index, step, event_pos, event_neg, vib, key_ready
         step += 1 if invert else -1
         # vibrar(vib, 1, step, key_ready=key_ready)
         vibrar(vib, 1, step=config.VIBRAR_DESLIGADO, key_ready=key_ready)
+        piscaled(led, 50, 1, config.LEDREADY)
         event_neg = True
         wait2Zero = True
         cycle = 0
@@ -96,7 +98,7 @@ def check_gyro_axis(gyro, axis_index, step, event_pos, event_neg, vib, key_ready
 
     return step, event_pos, event_neg, wait2Zero, cycle
 
-def check_step_wait(event_triggered, step_wait, step, delta, vib, key_ready):
+def check_step_wait(event_triggered, step_wait, step, delta, vib, led, key_ready):
     """Controle de espera para repetição automática."""
     step_wait = step_wait + 1 if event_triggered else 0
     if step_wait >= config.STEP_WAIT_LIMIT:
@@ -106,14 +108,14 @@ def check_step_wait(event_triggered, step_wait, step, delta, vib, key_ready):
         step_wait = 0
     return step_wait, step
 
-def gyro_principal(gyro, gy1, gy2, vib, key_ready, state: GyroState):
+def gyro_principal(gyro, gy1, gy2, vib, led, key_ready, state: GyroState):
     """Processa movimentos do giroscópio e atualiza estado."""
 
     # Movimento no eixo X
     state.stepX, state.evXP, state.evXN, state.wait2Zero, state.cycle = check_gyro_axis(
         gyro, gy1, state.stepX,
         state.evXP, state.evXN,
-        vib, key_ready, state.wait2Zero, state.cycle,
+        vib, led, key_ready, state.wait2Zero, state.cycle,
         invert=config.INVERT_X
     )
 
@@ -121,7 +123,7 @@ def gyro_principal(gyro, gy1, gy2, vib, key_ready, state: GyroState):
     state.stepY, state.evYP, state.evYN, state.wait2Zero, state.cycle = check_gyro_axis(
         gyro, gy2, state.stepY,
         state.evYP, state.evYN,
-        vib, key_ready, state.wait2Zero, state.cycle,
+        vib, led, key_ready, state.wait2Zero, state.cycle,
         invert=config.INVERT_Y
     )
 
@@ -129,10 +131,10 @@ def gyro_principal(gyro, gy1, gy2, vib, key_ready, state: GyroState):
     invX = -1 if config.INVERT_X else 1
     invY = -1 if config.INVERT_Y else 1
 
-    state.swXP, state.stepX = check_step_wait(state.evXP, state.swXP, state.stepX, invX * (1 if gy1 == 0 else -1), vib, key_ready)
-    state.swXN, state.stepX = check_step_wait(state.evXN, state.swXN, state.stepX, invX * (-1 if gy1 == 0 else 1), vib, key_ready)
-    state.swYP, state.stepY = check_step_wait(state.evYP, state.swYP, state.stepY, invY * (-1 if gy1 == 0 else 1), vib, key_ready)
-    state.swYN, state.stepY = check_step_wait(state.evYN, state.swYN, state.stepY, invY * (1 if gy1 == 0 else -1), vib, key_ready)
+    state.swXP, state.stepX = check_step_wait(state.evXP, state.swXP, state.stepX, invX * (1 if gy1 == 0 else -1), vib, led, key_ready)
+    state.swXN, state.stepX = check_step_wait(state.evXN, state.swXN, state.stepX, invX * (-1 if gy1 == 0 else 1), vib, led, key_ready)
+    state.swYP, state.stepY = check_step_wait(state.evYP, state.swYP, state.stepY, invY * (-1 if gy1 == 0 else 1), vib, led, key_ready)
+    state.swYN, state.stepY = check_step_wait(state.evYN, state.swYN, state.stepY, invY * (1 if gy1 == 0 else -1), vib, led, key_ready)
 
     return state
 

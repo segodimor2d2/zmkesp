@@ -72,9 +72,12 @@ THRES_PERCENT = 0.1     # 0.05 (5%) | 0.2 (20%)
 GY1, GY2 = 1, 0    # Ordem dos eixos: X,Y (T,M=1,0) (M,T=0,1)
 
 if THIS_IS == 0: # Inverter sentido do eixo
-    INVERT_X, INVERT_Y, INVERT_Z = True, False, True # T,M 
+    INVERT_X, INVERT_Y, INVERT_Z = False, False, True # T,M 
+    INVERTMVX, INVERTMVY = True, False
+
 else:
-    INVERT_X, INVERT_Y, INVERT_Z = True, True, True  # T,M
+    INVERT_X, INVERT_Y, INVERT_Z = False, True, True  # T,M
+    INVERTMVX, INVERTMVY = False, True
 
 CALIB_ACCL_FILE = "accl_calib.json"
 SAMPLES_ACCL = 100
@@ -84,7 +87,7 @@ MARGIN_MIN = 2000 # 2000
 MARGIN_MAX = 4000 # 4000
 
 # MOUSE SENSITIVITY - fator de normalização (maior = menos sensível)
-MOUSESENSX = 260.0
+MOUSESENSX = 360.0
 MOUSESENSY = 360.0
 
 # Sensibilidade separada por eixo e sentido
@@ -116,7 +119,7 @@ TCLEAR  = 15000   # Intervalo para reset de contador
 # Motor Vib / LED
 # ============================================================
 LEDREADY = True # Pisca no step do giro
-VIBREADY = True # Desliga vibração
+VIBREADY = False # Desliga vibração
 
 VIBRAR_DESLIGADO = 90   # 70 default
 VIBRAR_LIGADO = 120     # 101 default == 0

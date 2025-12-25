@@ -1,7 +1,7 @@
 from machine import Pin, UART
 import time
 from printlogs import log
-from config import THIS_IS, GY1, GY2, MOUSESENSX, MOUSESENSY, VIBRAR_LIGADO, VIBRAR_DESLIGADO, VIBRAR_LONGO, VIBRAR_ALERTA, VIBREADY
+from config import THIS_IS, GY1, GY2, MOUSESENSX, MOUSESENSY, VIBRAR_LIGADO, VIBRAR_DESLIGADO, VIBRAR_LONGO, VIBRAR_ALERTA, VIBREADY, INVERTMVX, INVERTMVY
 
 # UART - ajuste TX e RX conforme o seu hardware
 uart = UART(1, baudrate=115200, tx=17, rx=16)
@@ -71,9 +71,8 @@ def gyromouse(gx, gy, deadzone=200.0):
 
 
     # Inverte os sentidos do mouse
-    if THIS_IS == 0:
-        dx = -dx
-        dy = -dy
+    if INVERTMVX: dx = -dx
+    if INVERTMVY: dy = -dy
 
     # Ordem dos eixos do mouse - GY1, GY2 
     return (dx, dy) if (GY1 == 0 and GY2 == 1) else (dy, dx)

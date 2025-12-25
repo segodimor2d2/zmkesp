@@ -329,7 +329,7 @@ def start(i2c=None, mpu=None, mpr=None, pots=None, vib=None, led=None, force_cal
             if gyro_state.cycle == config.CYCLE_RESET_LIMIT:
                 gyro_state.stepX = gyro_state.stepY = 0
                 vibrar(vib, 2, key_ready=key_ready)
-                piscaled(led, 50, 2, config.LEDREADY)
+                # piscaled(led, 50, 2, config.LEDREADY)
                 gyro_state.wait2Zero = False
                 gyro_state.cycle = 0
         

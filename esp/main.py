@@ -291,7 +291,7 @@ def start(i2c=None, mpu=None, mpr=None, pots=None, vib=None, led=None, force_cal
 
 
         # --- botão ativa o mouse ---
-        if mouse_ready and 4 in ativos and 6 in ativos and not key_ready:
+        if mouse_ready and 4 in ativos and 7 in ativos and not key_ready:
             dx, dy = gyromouse(gyro[0], gyro[1])
             if dx != 0 or dy != 0:
                 send_mouse(dx, dy, 0, 0, 1) # BOTÃO ESQUERDO

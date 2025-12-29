@@ -1921,7 +1921,14 @@ acceleration-exponent = <variavel>;    // curva da aceleração
 
 
 
----
+
+
+
+
+
+
+
+
 
 
 

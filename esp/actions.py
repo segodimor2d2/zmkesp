@@ -125,31 +125,36 @@ def tsttap(row, col, delay=0.1):
     send_charPs([row, col, False])
 
 
-def vibrar(pino_vibracao, n_pulsos, step=None, key_ready=False):
+def vib_run(pino_vibracao, n_pulsos, step=None):
+    for _ in range(n_pulsos):
+        try:
+            pino_vibracao.on()
+        except Exception:
+            try: pino_vibracao.value(1)
+            except: pass
+        
+        if step == 0: time.sleep_ms(VIBRAR_LIGADO)
+        elif step == 1: time.sleep_ms(VIBRAR_LONGO)
+        elif step == 2: time.sleep_ms(VIBRAR_ALERTA)
+        else: time.sleep_ms(VIBRAR_DESLIGADO)
+        
+        try:
+            pino_vibracao.off()
+        except Exception:
+            try: pino_vibracao.value(0)
+            except: pass
+        
+        time.sleep_ms(VIBRAR_DESLIGADO)
+
+def vibrar(pino_vibracao, n_pulsos, step=None, key_ready=False, vib_ready=False):
     if pino_vibracao is None:
         log("vibrador não inicializado", 1)
         return
-    if VIBREADY:
-        if key_ready:
-            for _ in range(n_pulsos):
-                try:
-                    pino_vibracao.on()
-                except Exception:
-                    try: pino_vibracao.value(1)
-                    except: pass
-                
-                if step == 0: time.sleep_ms(VIBRAR_LIGADO)
-                if step == 1: time.sleep_ms(VIBRAR_LONGO)
-                if step == 2: time.sleep_ms(VIBRAR_ALERTA)
-                else: time.sleep_ms(VIBRAR_DESLIGADO)
-                
-                try:
-                    pino_vibracao.off()
-                except Exception:
-                    try: pino_vibracao.value(0)
-                    except: pass
-                
-                time.sleep_ms(VIBRAR_DESLIGADO)
+
+    if vib_ready:
+        vib_run(pino_vibracao, n_pulsos, step)
+    elif key_ready and VIBREADY:
+        vib_run(pino_vibracao, n_pulsos, step)
 
 
 def piscaled(pino_led, tms, n_pulsos=2, ledready=True):

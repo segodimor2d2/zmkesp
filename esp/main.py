@@ -20,13 +20,13 @@ def post_data(url, data):
         print("Erro no POST:", e)
 
 def restart(vib, segundos=3):
-    vibrar(vib, 1, 2, key_ready=True)
+    vibrar(vib, 1, 2, vib_ready=True)
 
     import machine
     machine.reset()
 
 def liberar_repl(vib, led, segundos=3):
-    vibrar(vib, 1, 2, key_ready=True)
+    vibrar(vib, 1, 2, vib_ready=True)
 
     import webrepl
     import network
@@ -75,7 +75,7 @@ def liberar_repl(vib, led, segundos=3):
     try:
         if webrepl.is_running():
             print("WebREPL já ativo")
-            vibrar(vib, 1, 2, key_ready=True)
+            vibrar(vib, 1, 2, vib_ready=True)
         else:
             webrepl.start()
 
@@ -106,32 +106,32 @@ def liberar_repl(vib, led, segundos=3):
 def switch_ready(key_ready, mouse_ready, vib):
     if key_ready:
         # desliga teclado → liga mouse
-        vibrar(vib, 3, 0, key_ready=True)
+        vibrar(vib, 1, 0, vib_ready=True)
         return False, True
 
     elif mouse_ready:
         # desliga mouse → liga teclado
-        vibrar(vib, 3, 0, key_ready=True)
+        vibrar(vib, 2, 3, vib_ready=True)
         return True, False
 
     return key_ready, mouse_ready
 
 def toggle_ready(key_ready, mouse_ready, vib):
     if not key_ready and not mouse_ready:
-        vibrar(vib, 3, 0, key_ready=True)
+        vibrar(vib, 2, 2, vib_ready=True)
         return True, False 
 
     # Caso 2: teclado ou mouse ligado → desliga tudo
-    vibrar(vib, 3, 0, key_ready=True)
+    vibrar(vib, 2, 2, vib_ready=True)
     return False, False
 
 
-def toggle_mouse(mouse_ready, vib, gyro=None):
-    new_state = not mouse_ready
-    vibrar(vib, 3, 0, key_ready=True)
-    if new_state and gyro is not None:
-        reset_mouse_center(gyro[0], gyro[1])  # aqui define novo centro
-    return new_state
+# def toggle_mouse(mouse_ready, vib, gyro=None):
+#     new_state = not mouse_ready
+#     vibrar(vib, 1, 1, vib_ready=True)
+#     if new_state and gyro is not None:
+#         reset_mouse_center(gyro[0], gyro[1])  # aqui define novo centro
+#     return new_state
 
 
 # --- define triggers fora do start ---
@@ -157,7 +157,7 @@ def start(i2c=None, mpu=None, mpr=None, pots=None, vib=None, led=None, force_cal
     if mpr is None: mpr = init_mpr121(i2c)
     if led is None: led = init_led(2)
 
-    vibrar(vib, 3, 0, key_ready=True)
+    vibrar(vib, 1, 1, vib_ready=True)
     piscaled(led, 100, 2)
 
     remap_list = config.INDEX_MAP_POTS 
@@ -291,7 +291,7 @@ def start(i2c=None, mpu=None, mpr=None, pots=None, vib=None, led=None, force_cal
 
 
         # --- botão ativa o mouse ---
-        if mouse_ready and 4 in ativos and 7 in ativos and not key_ready:
+        if mouse_ready and 4 in ativos and 6 in ativos and not key_ready:
             dx, dy = gyromouse(gyro[0], gyro[1])
             if dx != 0 or dy != 0:
                 send_mouse(dx, dy, 0, 0, 1) # BOTÃO ESQUERDO
@@ -342,7 +342,7 @@ def start(i2c=None, mpu=None, mpr=None, pots=None, vib=None, led=None, force_cal
 
 
 if __name__ == "__main__":
-    vibrar(init_vibrator(), 4, key_ready=True)
+    # vibrar(init_vibrator(), 4, vib_ready=True)
     # liberar_repl(init_vibrator(), init_led(2), 3)  # <-- webrepl ativado
     start(force_calib=False)
 

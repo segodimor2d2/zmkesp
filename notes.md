@@ -1920,9 +1920,8 @@ acceleration-exponent = <variavel>;    // curva da aceleração
 };
 
 
-vvvvcccc/   ;.,mnçlkjkjjh
+
+---
 
 
 
-
-klkjjjkjk                               ççççlkjçççççççççç

@@ -481,9 +481,6 @@ python esp/webrepl_cli.py -p 105474 esp/hw.py 192.168.31.63:8266:/hw.py
 
 
 
-
-
-
 $$$$
 
 python serverflask.py
@@ -1924,7 +1921,7 @@ acceleration-exponent = <variavel>;    // curva da aceleração
 
 
 
-
+como eu consigo fazer para que a função toggle_ready seja chamada quando eu pressione o botão 8 por 3 segundos?
 
 
 

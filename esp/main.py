@@ -106,12 +106,12 @@ def liberar_repl(vib, led, segundos=3):
 def switch_ready(key_ready, mouse_ready, vib):
     if key_ready:
         # desliga teclado → liga mouse
-        vibrar(vib, 1, 0, vib_ready=True)
+        vibrar(vib, 1, 1, vib_ready=True)
         return False, True
 
     elif mouse_ready:
         # desliga mouse → liga teclado
-        vibrar(vib, 2, 3, vib_ready=True)
+        vibrar(vib, 2, 1, vib_ready=True)
         return True, False
 
     return key_ready, mouse_ready
@@ -198,17 +198,26 @@ def start(i2c=None, mpu=None, mpr=None, pots=None, vib=None, led=None, force_cal
     mouse_ready = False 
     num = 0
 
+    btn8_press_time = None
+    btn8_longpress_as = False
+    # btn8_longpress_bs = False
+    # btn8_longpress_cs = False
+
+    LONGPRESS_AS = 1000
+    # LONGPRESS_BS = 1500
+    # LONGPRESS_CS = 2500
+
     # --- triggers ---
     triggers = [
 
-        {
-            "buttons": {8},
-            # "condition": lambda gs: True,
-            "condition": lambda gs: gs.stepY == -1,
-            "action": toggle_ready,
-            "last_state": False,
-            "returns_ready": True
-        },
+        # {
+        #     "buttons": {8},
+        #     # "condition": lambda gs: True,
+        #     "condition": lambda gs: gs.stepY == -1,
+        #     "action": toggle_ready,
+        #     "last_state": False,
+        #     "returns_ready": True
+        # },
         {
             "buttons": {8},
 
@@ -318,6 +327,39 @@ def start(i2c=None, mpu=None, mpr=None, pots=None, vib=None, led=None, force_cal
 
         # if 4 in liberados and mouse_ready:
         #     reset_mouse_center(gyro[0], gyro[1])
+
+
+        now = time.ticks_ms()
+
+        # --- BOTÃO 8: long press ---
+        if 8 in ativos:
+            piscaled(led, 30, 1)
+            if btn8_press_time is None:
+                btn8_press_time = now
+                btn8_longpress_as = False
+                btn8_longpress_bs = False
+            else:
+                dt = time.ticks_diff(now, btn8_press_time)
+
+                if dt >= LONGPRESS_AS and not btn8_longpress_as:
+                    key_ready, mouse_ready = toggle_ready( key_ready, mouse_ready, vib)
+                    btn8_longpress_as = True
+
+                # if dt >= LONGPRESS_BS and not btn8_longpress_bs:
+                #     liberar_repl(vib, led, segundos=20)
+                #     # vibrar(vib, 1, 0, vib_ready=True)
+                #     btn8_longpress_bs = True
+                #
+                # if dt >= LONGPRESS_CS and not btn8_longpress_cs:
+                #     print("oi")
+                #     vibrar(vib, 1, 0, vib_ready=True)
+                #     btn8_longpress_cs = True
+        else:
+            # soltou o botão → reset
+            btn8_press_time = None
+            btn8_longpress_as = False
+            # btn8_longpress_bs = False
+            # btn8_longpress_cs = False
 
         # atualiza estado
         last_ativos = ativos

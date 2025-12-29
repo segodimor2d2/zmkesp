@@ -200,11 +200,11 @@ def start(i2c=None, mpu=None, mpr=None, pots=None, vib=None, led=None, force_cal
 
     btn8_press_time = None
     btn8_longpress_as = False
-    # btn8_longpress_bs = False
+    btn8_longpress_bs = False
     # btn8_longpress_cs = False
 
     LONGPRESS_AS = 1000
-    # LONGPRESS_BS = 1500
+    LONGPRESS_BS = 2000
     # LONGPRESS_CS = 2500
 
     # --- triggers ---
@@ -218,15 +218,14 @@ def start(i2c=None, mpu=None, mpr=None, pots=None, vib=None, led=None, force_cal
         #     "last_state": False,
         #     "returns_ready": True
         # },
-        {
-            "buttons": {8},
-
-            # "condition": lambda gs: True,
-            "condition": lambda gs: gs.stepY == 1,
-            "action": switch_ready,
-            "last_state": False,
-            "returns_switch": True
-        },
+        # {
+        #     "buttons": {8},
+        #     # "condition": lambda gs: True,
+        #     "condition": lambda gs: gs.stepY == 1,
+        #     "action": switch_ready,
+        #     "last_state": False,
+        #     "returns_switch": True
+        # },
         {
             "buttons": {4, 6, 8},
             "condition": lambda gs: True,
@@ -342,14 +341,15 @@ def start(i2c=None, mpu=None, mpr=None, pots=None, vib=None, led=None, force_cal
                 dt = time.ticks_diff(now, btn8_press_time)
 
                 if dt >= LONGPRESS_AS and not btn8_longpress_as:
-                    key_ready, mouse_ready = toggle_ready( key_ready, mouse_ready, vib)
+                    key_ready, mouse_ready = switch_ready( key_ready, mouse_ready, vib)
                     btn8_longpress_as = True
 
-                # if dt >= LONGPRESS_BS and not btn8_longpress_bs:
-                #     liberar_repl(vib, led, segundos=20)
-                #     # vibrar(vib, 1, 0, vib_ready=True)
-                #     btn8_longpress_bs = True
-                #
+                if dt >= LONGPRESS_BS and not btn8_longpress_bs:
+                    key_ready, mouse_ready = toggle_ready( key_ready, mouse_ready, vib)
+                    # liberar_repl(vib, led, segundos=20)
+                    # vibrar(vib, 1, 0, vib_ready=True)
+                    btn8_longpress_bs = True
+
                 # if dt >= LONGPRESS_CS and not btn8_longpress_cs:
                 #     print("oi")
                 #     vibrar(vib, 1, 0, vib_ready=True)
@@ -358,7 +358,7 @@ def start(i2c=None, mpu=None, mpr=None, pots=None, vib=None, led=None, force_cal
             # soltou o botão → reset
             btn8_press_time = None
             btn8_longpress_as = False
-            # btn8_longpress_bs = False
+            btn8_longpress_bs = False
             # btn8_longpress_cs = False
 
         # atualiza estado
